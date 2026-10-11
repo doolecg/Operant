@@ -1,3 +1,26 @@
+# Operant 3.1.1
+
+**Install:** download the file for your system from the assets below. Operant keeps itself up to date from these releases.
+
+## New
+- **Learning runs on its own.** Nothing waits for your approval any more. Lessons, skill drafts and fixes to installed skills apply themselves, and every change is recorded so it can be undone.
+- **Learning on close.** Closing a terminal learns from it at once. The "learn from this?" question is gone.
+- **Tidy after every learn.** After each learn step, lessons whose files are gone are marked stale, stale lessons and rejected drafts older than 14 days are deleted, and similar lessons are merged and tightened.
+
+---
+
+## Changed
+- **Merging has no waiting period.** It no longer waits for 40 lessons or 24 hours. Lessons that mention a command or "always" or "never" are kept and merged like the rest.
+- **Skills install themselves.** In the default advanced mode, waiting skill drafts and skill fixes are installed.
+- **Waiting lessons apply.** Lessons left waiting by an earlier run are activated on the next learn, unless review is set to queue or the mode to suggest.
+
+---
+
+## Fixed
+- **A safety check replaces review.** A lesson or skill that holds a download, a pipe into a shell, `sudo`, `rm -rf`, or an order to ignore earlier rules is refused and logged. Links are removed from kept text.
+
+---
+
 # Operant 3.1.0
 
 **Install:** download the file for your system from the assets below. Operant keeps itself up to date from these releases.
