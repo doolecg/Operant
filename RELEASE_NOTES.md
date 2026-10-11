@@ -1,3 +1,24 @@
+# Operant 3.1.2
+
+**Install:** download the file for your system from the assets below. Operant keeps itself up to date from these releases.
+
+## New
+- **Mouse buttons as shortcuts.** Side mouse buttons can now be bound to shortcuts in Settings.
+- **Hold to talk.** Dictation can be held down to talk and released to stop.
+
+---
+
+## Changed
+- **Faster tidy after learning.** Lessons are tidied and merged more quickly.
+- **No waiting for review.** Lessons and skill drafts apply on their own.
+
+---
+
+## Fixed
+- **Learning edge cases.** Small fixes to how lessons are stored and merged.
+
+---
+
 # Operant 3.1.1
 
 **Install:** download the file for your system from the assets below. Operant keeps itself up to date from these releases.
