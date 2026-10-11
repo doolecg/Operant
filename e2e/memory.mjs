@@ -7,7 +7,7 @@ import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:
 import { createServer } from 'node:http'
 import { DatabaseSync } from 'node:sqlite'
 import { tmpdir } from 'node:os'
-import { join, resolve } from 'node:path'
+import { delimiter, join, resolve } from 'node:path'
 import { _electron as electron } from 'playwright-core'
 import { shot } from './lib/shot.mjs'
 import { claudeHome, e2eEnv } from './fixtures/real-claude.mjs'
@@ -22,6 +22,8 @@ process.on('exit', () => rmSync(claudeRoot, { recursive: true, force: true }))
 writeFileSync(join(project, 'app.ts'), 'export function main() { return helper() }\nfunction helper() { return 1 }\n')
 
 const env = e2eEnv({ dataDir, claudeDir })
+// The real opencode, not the fixtures/bin stand-in: the OpenCode learning AI is tested against a real model.
+for (const k of Object.keys(env).filter((k) => k.toUpperCase() === 'PATH')) env[k] = env[k].split(delimiter).filter((d) => resolve(d) !== resolve('e2e/fixtures/bin')).join(delimiter)
 const packaged = process.env.OPERANT_E2E_EXE
 
 const consoleNotes = []
@@ -117,23 +119,25 @@ try {
     await page.reload()
     await page.waitForFunction(() => !!window.operant)
     // The Playground stays selected after a reload, so pick the seeded project.
-    await page.locator(`[data-crew-row="${ids.crew}"]`).click()
+    await page.locator('[data-crew-row]').getByText('alpha', { exact: true }).click({ position: { x: 4, y: 4 } })
     await page.getByRole('heading', { name: 'alpha', level: 1 }).waitFor()
   })
 
-  await step('settings: Learning section, per-store switches, review mode', async () => {
+  await step('settings: Learning section, When to learn, per-store switches, no review mode', async () => {
     await page.keyboard.press('Control+,')
     await page.getByRole('heading', { name: 'Settings' }).waitFor()
     await page.getByRole('button', { name: 'Learning', exact: true }).click()
     const sw = (name) => page.getByRole('switch', { name })
     await page.getByRole('combobox', { name: 'When to learn' }).waitFor()
-    // The default holds lessons for review; the rest of this run needs them written straight away.
-    assert.equal((await inv('settings:get')).learn.review, 'auto')
-    await inv('settings:set', { learn: { review: 'auto' } })
-    await sw('Write to CodeGraph notes').click()
-    await until('codegraph off', async () => (await inv('settings:get')).learn.codegraph === false)
+    // Nothing waits for review any more: there is no review-mode control, and lessons are written straight away.
+    assert.equal(await page.getByText('Review mode', { exact: true }).count(), 0)
+    await page.getByRole('switch', { name: 'Write to CodeGraph notes' }).waitFor()
+    // CodeGraph notes are opt-in: off until switched on.
+    assert.equal((await inv('settings:get')).learn.codegraph, false)
     await sw('Write to CodeGraph notes').click()
     await until('codegraph on', async () => (await inv('settings:get')).learn.codegraph === true)
+    await sw('Write to CodeGraph notes').click()
+    await until('codegraph off', async () => (await inv('settings:get')).learn.codegraph === false)
     await pick('When to learn', 'Off')
     await until('master off', async () => (await inv('settings:get')).learn.enabled === false)
     assert.ok(await sw('Write to Hindsight').isDisabled(), 'store switches wait for the master switch')
@@ -150,19 +154,17 @@ try {
     await card.getByTestId('learn-ai-resolved').getByText('claude-haiku-5-5').waitFor()
     await card.getByRole('button', { name: 'Test', exact: true }).click()
     await card.getByTestId('learn-ai-result').getByText(/^OK, /).waitFor()
-    // OpenCode: nothing in the fake list is a cheap model, so the default says so; an own model resolves.
+    // OpenCode on a real free model (opencode/big-pickle), and a real Test call through it.
     await pick('Learning CLI', 'OpenCode')
     await until('opencode saved', async () => (await inv('settings:get')).learn.cli === 'opencode')
-    await card.getByTestId('learn-ai-resolved').getByText(/pick one/).waitFor()
-    await inv('settings:set', { learn: { model: 'provider-3/model-003-instruct' } })
-    await card.getByTestId('learn-ai-resolved').getByText('provider-3/model-003-instruct').waitFor()
+    await inv('settings:set', { learn: { model: 'opencode/big-pickle' } })
+    await card.getByTestId('learn-ai-resolved').getByText('opencode/big-pickle').waitFor()
     assert.equal((await inv('learn:ai')).isDefault, false)
-    // On Windows the fixture is a .cmd that an unshelled spawn can't start; either way the result is shown, honestly.
     await card.getByRole('button', { name: 'Test', exact: true }).click()
-    await card.getByTestId('learn-ai-result').getByText(/^(OK, |Failed after )/).waitFor()
+    await card.getByTestId('learn-ai-result').getByText(/^OK, /).waitFor({ timeout: 120_000 })
     const t = await inv('learn:test')
     assert.equal(t.cli, 'opencode')
-    assert.ok(t.ok || t.error.length > 0, 'a failed test explains itself')
+    assert.ok(t.ok, `OpenCode test on big-pickle: ${t.error ?? ''}`)
     await shot(page, 'learning-ai')
     await inv('settings:set', { learn: { cli: 'claude', model: '', effort: '' } })
     await card.getByTestId('learn-ai-resolved').getByText('claude-haiku-5-5').waitFor()
@@ -334,7 +336,7 @@ try {
     const drafts = await inv('learn:drafts', ids.crew, 'pending')
     assert.equal(drafts.length, 2)
     const d = drafts.find((x) => x.name === 'release-procedure')
-    const target = join(project, '.claude', 'skills', d.name, 'SKILL.md')
+    const target = join(claudeDir, 'skills', d.name, 'SKILL.md')
     assert.ok(!existsSync(target), 'nothing is installed before approval')
     await list.getByRole('button', { name: `Edit skill draft ${d.id}` }).click()
     const dialog = page.getByRole('dialog')
@@ -372,7 +374,10 @@ try {
     await mode('Terminal').click()
     const badge = page.getByRole('button', { name: /^Learning health:/ })
     await badge.waitFor()
-    assert.match((await badge.getAttribute('aria-label')) ?? '', /Hindsight is down/)
+    // Hindsight is opt-in: switched on here, against the unreachable remote URL saved above, so it shows as down.
+    assert.doesNotMatch((await badge.getAttribute('aria-label')) ?? '', /Hindsight is down/)
+    await inv('settings:set', { learn: { hindsight: true } })
+    await until('badge says Hindsight is down', async () => /Hindsight is down/.test((await badge.getAttribute('aria-label')) ?? ''))
     await badge.click()
     await page.getByRole('heading', { name: 'Memory', level: 2 }).waitFor()
   })

@@ -1,4 +1,4 @@
-import { existsSync, mkdirSync, writeFileSync } from 'node:fs'
+import { mkdirSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { killTree, spawnHidden } from './proc'
@@ -65,20 +65,9 @@ export type ClaudeSpawn = (file: string, args: string[], opts: { cwd: string }) 
 export { e2eClaudeModel } from './launch'
 
 // Unit tests must never reach the owner's real `claude` or `opencode` (they cost money and run their hooks): they inject a spawn.
-// e2e runs use the real `claude` (always on Haiku, see e2eClaudeModel), but `opencode` must still be the fixture first on PATH.
-export function assertFakeClaude(env: NodeJS.ProcessEnv = process.env, platform: NodeJS.Platform = process.platform, cli: 'claude' | 'opencode' = 'claude'): void {
-  if (!env.VITEST && !env.OPERANT_E2E) return
+// e2e runs use the real CLIs (claude always on Haiku, see e2eClaudeModel; opencode on the model the script sets).
+export function assertFakeClaude(env: NodeJS.ProcessEnv = process.env, cli: 'claude' | 'opencode' = 'claude'): void {
   if (env.VITEST) throw new Error(`A test tried to start the real ${cli}: inject a spawn or a model instead`)
-  if (cli === 'claude') return
-  const key = Object.keys(env).find((k) => k.toUpperCase() === 'PATH') ?? 'PATH'
-  const names = platform === 'win32' ? [`${cli}.cmd`, `${cli}.exe`, `${cli}.bat`, cli] : [cli]
-  for (const dir of (env[key] ?? '').split(platform === 'win32' ? ';' : ':')) {
-    if (dir && names.some((n) => existsSync(join(dir, n)))) {
-      if (/[\\/]fixtures[\\/]/.test(`${dir}/`)) return
-      break
-    }
-  }
-  throw new Error(`An e2e run tried to start the real ${cli}: put e2e/fixtures/bin first on PATH`)
 }
 
 // A settings file whose only content turns hooks off; `claude --settings` layers it over the user's own settings.

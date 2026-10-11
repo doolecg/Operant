@@ -108,11 +108,12 @@ export { LEARN_MODEL }
 function opencodeLearnAdapter(): MasterAdapter {
   return createOpenCodeAdapter({
     spawn: (cmd, args, opts) => {
-      assertFakeClaude(process.env, process.platform, 'opencode')
+      assertFakeClaude(process.env, 'opencode')
       return spawnHidden(cmd, args, { cwd: opts.cwd, stdio: ['ignore', 'pipe', 'pipe'], source: 'opencode' }) as unknown as ChildLike
     },
     fetch: () => Promise.reject(new Error('the learn step does not use the OpenCode service')),
     readJson: () => null,
+    pinSession: false,
   })
 }
 

@@ -53,9 +53,45 @@ describe('hindsight service', () => {
   })
 
   it('never throws from recall or retain', async () => {
-    const s = svc({ fetch: async () => { throw new Error('down') } })
+    const s = svc({ fetch: async () => { throw new Error('down') }, run: async () => ({ code: 1, stdout: '', stderr: '' }) })
     expect(await s.recall('b', 'q')).toEqual({ ok: false, error: 'unreachable at http://127.0.0.1:9077' })
     expect(await s.retain('b', 'c', [])).toEqual({ ok: false, error: 'unreachable at http://127.0.0.1:9077' })
+  })
+
+  it('starts a local daemon that died and retries the call once, at most once per two minutes', async () => {
+    let up = false
+    let now = 0
+    const starts: string[][] = []
+    const s = svc({
+      now: () => now,
+      fetch: async (url) => {
+        if (!up) throw new Error('down')
+        return resp(true, url.endsWith('/recall') ? { results: [{ text: 'kept' }] } : { status: 'healthy' })
+      },
+      run: async (_c, args) => {
+        if (args[1] === 'daemon') {
+          starts.push(args)
+          up = true
+        }
+        return { code: 0, stdout: '', stderr: '' }
+      },
+    })
+    expect(await s.recall('b', 'q')).toEqual({ ok: true, items: ['kept'] })
+    expect(starts).toHaveLength(1)
+    up = false
+    now = 60000
+    expect((await s.retain('b', 'c', [])).ok).toBe(false)
+    expect(starts).toHaveLength(1)
+    now = 200000
+    expect((await s.retain('b', 'c', [])).ok).toBe(true)
+    expect(starts).toHaveLength(2)
+  })
+
+  it('never starts a server hosted elsewhere when it is down', async () => {
+    const runs: string[][] = []
+    const s = svc({ fetch: async () => { throw new Error('down') }, run: async (_c, args) => (runs.push(args), { code: 0, stdout: '', stderr: '' }) }, { url: () => 'http://example.test:8888' })
+    expect((await s.recall('b', 'q')).ok).toBe(false)
+    expect(runs).toEqual([])
   })
 
   describe('adopting the agent plugins server', () => {

@@ -9,6 +9,8 @@ import { runHidden } from './proc'
 // on the profile the agent plugins use, port 9077 unless its own settings file says otherwise.
 export const PROFILE = 'coding-agent'
 export const DEFAULT_PORT = 9077
+// A local daemon that stopped answering is started again at most this often, so a crash loop is not fed restarts.
+const REVIVE_GAP_MS = 120000
 const NO_UV = "uv isn't installed, and the memory server runs through it: winget install astral-sh.uv (or https://docs.astral.sh/uv/)"
 
 export interface RunResult {
@@ -112,6 +114,8 @@ export class HindsightService {
   private applied: string | null = null
   private appliedAddr: { host: string; port: number } | null = null
   private reached: string | null = null
+  private reviving: Promise<boolean> | null = null
+  private lastRevive = -Infinity
 
   private settings(): { port: number; embedVersion: string } {
     const j = obj(this.d.readJson(this.opts.settingsFile ?? join(homedir(), '.hindsight', 'coding-agent.json')))
@@ -316,7 +320,23 @@ export class HindsightService {
     return this.status()
   }
 
-  private async post(path: string, body: unknown): Promise<{ ok: true; data: unknown } | { ok: false; error: string }> {
+  // Like Hermes's pre-flight: when a local daemon has died, start it once and retry the call. Calls made meanwhile wait
+  // on the same start. A server hosted elsewhere is never touched.
+  private revive(): Promise<boolean> {
+    if (!this.managed) return Promise.resolve(false)
+    if (!this.reviving) {
+      if (this.d.now() - this.lastRevive < REVIVE_GAP_MS) return Promise.resolve(false)
+      this.lastRevive = this.d.now()
+      this.reviving = this.act('start')
+        .then((s) => s.state === 'running', () => false)
+        .finally(() => {
+          this.reviving = null
+        })
+    }
+    return this.reviving
+  }
+
+  private async post(path: string, body: unknown, retry = true): Promise<{ ok: true; data: unknown } | { ok: false; error: string }> {
     try {
       const r = await this.d.fetch(`${this.url}${path}`, {
         method: 'POST',
@@ -327,6 +347,7 @@ export class HindsightService {
       if (!r.ok) return { ok: false, error: `Hindsight answered ${r.status}` }
       return { ok: true, data: await r.json().catch(() => null) }
     } catch {
+      if (retry && (await this.revive())) return this.post(path, body, false)
       return { ok: false, error: `unreachable at ${this.url}` }
     }
   }

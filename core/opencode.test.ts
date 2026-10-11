@@ -53,6 +53,19 @@ describe('opencode adapter', () => {
     expect(events[1]).toEqual({ kind: 'output', text: 'hello' })
   })
 
+  it('runs without a pinned session when told to, since free models refuse a new --session id', async () => {
+    const child = fakeChild()
+    let args: string[] = []
+    const events: { kind: string; text?: string }[] = []
+    const a = createOpenCodeAdapter(base(child, { spawn: (_c, ar) => ((args = ar), child), pinSession: false }))
+    const h = await a.start({ cwd: '/p', prompt: 'do it', model: 'opencode/big-pickle', onEvent: (e) => events.push(e) })
+    expect(args).toEqual(['run', '--model', 'opencode/big-pickle', 'do it'])
+    child.out('ok')
+    child.emit('close', 0)
+    expect(await h.done).toEqual({ ok: true, text: 'ok' })
+    expect(events).toEqual([{ kind: 'output', text: 'ok' }])
+  })
+
   it('passes the effort as the #variant suffix of --model', async () => {
     const child = fakeChild()
     let args: string[] = []

@@ -56,6 +56,8 @@ export interface OpenCodeDeps {
   readJson: (file: string) => unknown
   sleep: (ms: number) => Promise<void>
   newSessionId: () => string
+  // Off for one-shot calls (the learn step): `run --session <new id>` is refused on OpenCode's free models.
+  pinSession?: boolean
 }
 
 const defaults: OpenCodeDeps = {
@@ -249,7 +251,8 @@ export function createOpenCodeAdapter(deps: Partial<OpenCodeDeps> = {}): MasterA
   async function start(o: MasterStartOptions): Promise<MasterHandle> {
     // The session id is pinned up front so the event stream and interrupt can address it before it exists.
     const sessionId = d.newSessionId()
-    const args = ['run', '--session', sessionId]
+    const pinned = d.pinSession !== false
+    const args = pinned ? ['run', '--session', sessionId] : ['run']
     // `run` has no --variant flag: the effort rides on the model as provider/model#variant.
     if (o.model) {
       const variant = o.effort && /^[A-Za-z0-9][A-Za-z0-9_-]{0,31}$/.test(o.effort) ? `#${o.effort}` : ''
@@ -299,8 +302,10 @@ export function createOpenCodeAdapter(deps: Partial<OpenCodeDeps> = {}): MasterA
     await d.sleep(0)
     if (spawnError) throw spawnError
 
-    o.onEvent({ kind: 'session', text: sessionId })
-    void streamEvents(sessionId, o.onEvent, abort.signal, () => finished)
+    if (pinned) {
+      o.onEvent({ kind: 'session', text: sessionId })
+      void streamEvents(sessionId, o.onEvent, abort.signal, () => finished)
+    }
 
     return {
       async stop() {

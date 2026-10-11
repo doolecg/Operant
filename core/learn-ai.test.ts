@@ -114,14 +114,14 @@ describe('learn model per CLI', () => {
   it('never starts the real OpenCode under test, and the guard names the CLI', async () => {
     const model = claudeLearnModel(undefined, { settings: () => ({ ...DEFAULT_LEARN_SETTINGS, cli: 'opencode', model: 'openai/gpt-5' }), models: list })
     await expect(model('p')).rejects.toThrow('A test tried to start the real opencode')
-    expect(() => assertFakeClaude({ OPERANT_E2E: '1', PATH: '' }, 'linux', 'opencode')).toThrow('real opencode')
   })
 
-  it('an e2e run may start the real claude but only the fixture opencode, and unit tests start neither', () => {
-    expect(() => assertFakeClaude({ OPERANT_E2E: '1', PATH: '' }, 'linux', 'claude')).not.toThrow()
-    expect(() => assertFakeClaude({ OPERANT_E2E: '1', PATH: '' }, 'linux', 'opencode')).toThrow('real opencode')
-    expect(() => assertFakeClaude({ VITEST: 'true', OPERANT_E2E: '1' }, 'linux', 'claude')).toThrow('A test tried to start the real claude')
-    expect(() => assertFakeClaude({}, 'linux', 'claude')).not.toThrow()
+  it('an e2e run may start the real claude and opencode, and unit tests start neither', () => {
+    expect(() => assertFakeClaude({ OPERANT_E2E: '1' }, 'claude')).not.toThrow()
+    expect(() => assertFakeClaude({ OPERANT_E2E: '1' }, 'opencode')).not.toThrow()
+    expect(() => assertFakeClaude({ VITEST: 'true', OPERANT_E2E: '1' }, 'claude')).toThrow('A test tried to start the real claude')
+    expect(() => assertFakeClaude({ VITEST: 'true' }, 'opencode')).toThrow('A test tried to start the real opencode')
+    expect(() => assertFakeClaude({}, 'claude')).not.toThrow()
   })
 
   it('a missing opencode shows up in the Test result and the learn run records the AI used', async () => {
