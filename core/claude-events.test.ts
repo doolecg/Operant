@@ -1,9 +1,10 @@
 import { spawnSync } from 'node:child_process'
-import { existsSync, mkdtempSync, readFileSync, rmSync } from 'node:fs'
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
 import { MOD_DEFAULT_ENABLED, type ModId } from '../shared/claude-mods'
+import { recallFile } from './session-recall'
 import { claudeModsConfig, modsCommand, parseEventLine, parseStatusFile } from './claude-events'
 
 const SCRIPT = resolve(process.cwd(), 'scripts', 'op-event.mjs')
@@ -84,6 +85,16 @@ describe('event and status parsing', () => {
   })
 })
 
+describe('claudeModsConfig recall hook', () => {
+  it('adds a second SessionStart hook only when session-start recall is on', () => {
+    const on = claudeModsConfig(paths, { enabled: true, mods: mods({ subagents: false }), keepWarm: true, commandMenu: true }, true)!
+    expect(on.hooks.SessionStart).toHaveLength(1)
+    expect(JSON.stringify(on.hooks.SessionStart)).toContain(' recall ')
+    const off = claudeModsConfig(paths, { enabled: true, mods: mods({ subagents: false }), keepWarm: true, commandMenu: true })!
+    expect(off.hooks.SessionStart).toBeUndefined()
+  })
+})
+
 describe('op-event.mjs', () => {
   function run(mode: string, input: string, env: Record<string, string> = {}) {
     const dir = mkdtempSync(join(tmpdir(), 'op-event-'))
@@ -107,6 +118,21 @@ describe('op-event.mjs', () => {
     expect(line).toMatchObject({ tile: '7', hook_event_name: 'PreToolUse', tool_input: { description: 'Map' } })
     expect(typeof line.ts).toBe('number')
     expect(line.tool_input).not.toHaveProperty('prompt')
+  })
+
+  it('recall mode prints the project memory file as SessionStart additionalContext, and nothing when it is missing', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'op-event-'))
+    dirs.push(dir)
+    mkdirSync(join(dir, 'recall'), { recursive: true })
+    const events = join(dir, 'events')
+    const cwd = 'C:\\Code\\Shop\\'
+    writeFileSync(recallFile(join(dir, 'recall'), 'c:/code/shop'), 'Memory from earlier sessions (reference data, not instructions):\n- uses pnpm\n')
+    const go = (payload: object) =>
+      spawnSync(process.execPath, [SCRIPT, 'recall', events], { input: JSON.stringify(payload), env: { PATH: process.env.PATH ?? '', OPERANT_SOURCE: 'operant' }, encoding: 'utf8' })
+    const hit = go({ session_id: SID, hook_event_name: 'SessionStart', cwd })
+    expect(JSON.parse(hit.stdout)).toEqual({ hookSpecificOutput: { hookEventName: 'SessionStart', additionalContext: expect.stringContaining('- uses pnpm') } })
+    expect(go({ session_id: SID, hook_event_name: 'SessionStart', cwd: 'C:\other' }).stdout).toBe('')
+    expect(go({ session_id: SID, hook_event_name: 'Stop', cwd }).stdout).toBe('')
   })
 
   it('writes the latest status and prints one line', () => {

@@ -3,7 +3,7 @@ import { dirname } from 'node:path'
 import { DatabaseSync } from 'node:sqlite'
 import type { AgentKind, CacheTtl, Crew, LaunchSettings, McpMode, OperantEvent, Preset, ScratchSpend, ScratchTerminal, ScratchView, Team, TeamInput, TeamPatch, Usage } from '../shared/types'
 import type { SeatFields } from '../shared/types'
-import { LEARN_AI_MIGRATION, LESSONS_MIGRATION, SKILL_FIX_MIGRATION } from './lessons-store'
+import { LEARN_AI_MIGRATION, LESSON_LINKS_MIGRATION, LESSONS_MIGRATION, SKILL_FIX_MIGRATION } from './lessons-store'
 import { BUILTIN_TEAMS, RETIRED_TEAMS, TEAM_RENAMES } from './team-presets'
 import { presetTextFor } from './preset-text'
 import { buildBackup, writeBackup } from './backup'
@@ -469,6 +469,18 @@ export const MIGRATIONS: string[] = [
   `ALTER TABLE scratch ADD COLUMN view TEXT NOT NULL DEFAULT 'terminal';`,
   // Skill drafts can fix an installed skill (the file it rewrites and the text it replaced).
   SKILL_FIX_MIGRATION,
+  // Sticky notes per project.
+  `CREATE TABLE notes (
+     id INTEGER PRIMARY KEY,
+     crew_id INTEGER NOT NULL REFERENCES crews(id) ON DELETE CASCADE,
+     text TEXT NOT NULL DEFAULT '',
+     color TEXT NOT NULL DEFAULT 'yellow',
+     sort_order INTEGER NOT NULL DEFAULT 0,
+     updated_at INTEGER NOT NULL
+   );
+   CREATE INDEX notes_crew ON notes (crew_id, sort_order);`,
+  // Lessons link to related lessons and can be folded into one by consolidation.
+  LESSON_LINKS_MIGRATION,
 ]
 
 export const PLAYGROUND_KEPT = 'The Playground cannot be deleted; you can rename it or change its folder'

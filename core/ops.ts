@@ -60,7 +60,7 @@ export class Ops {
 
   async recall(query: string, crewId?: number): Promise<RecallOutput> {
     const folder = crewId == null ? null : (this.d.store.getCrew(crewId)?.folder ?? null)
-    return recallMemory(this.d.hindsight, folder, query, this.d.settings().memory)
+    return recallMemory(this.d.hindsight, folder, query, this.d.settings().memory, this.d.learn.lessonLookup())
   }
 
   exportMemory(): Promise<MemoryExport> {

@@ -1,3 +1,51 @@
+# Operant 3.1.0
+
+**Install:** download the file for your system from the assets below. Operant keeps itself up to date from these releases.
+
+**Windows installer change.** The Windows installer now puts Operant in `C:\Program Files\Operant 3` and asks for administrator permission, and it no longer offers another drive. If you installed an earlier version for your user only, the first update to 3.1.0 may not finish by itself. If it does not, download the .msi from this page and run it. After the update the old copy is removed. Your projects, settings and memory are kept.
+
+## New
+- **Browser panel.** Each project can open a browser tile with tabs, a toolbar, a pop-out window, an inspector, page prompts and downloads. AI agents can drive it too (open pages, click, read text, cookies, storage, scripts). In confirm mode you approve each action, or choose Allow all for that tile's session.
+- **Install page.** Settings has a new Install page that lists every tool Operant can use, with its status and an Install button: Claude Code, OpenCode, uv, Node.js, the Hindsight memory server, CodeGraph, Playwright with the Git, Playwright and CodeGraph MCP servers, the Superpowers skills pack and the dictation speech model. Install shows the exact command and asks you to confirm. A feature whose tool is missing stays hidden.
+- **First-start setup.** A one-time window offers the optional tools to install. You can open it again from the Install page.
+- **Dictation.** A microphone button under the chat box turns your speech into text, also with Alt+D. It uses a speech model that runs on your computer. The first use downloads the model (about 75 to 150 MB), then it works offline. Dictation has its own settings.
+- **Notes.** Sticky notes for each project sit beside your terminals and chats (button under the chat box, or Alt+N). Notes have colours, bold, italic, lists and checklists, and they are saved between sessions.
+- **Learn and Steer.** A Learn button teaches Operant from the session you are in right now. Steer sends Claude a short note while it works, without stopping it.
+- **A glow and a spinner.** The chat box glows softly, and a small spinner shows, while Claude works or dictation runs.
+- **Tokens on every answer.** The Done and Thought lines show how many tokens were used.
+- **Click an image to enlarge it.** Images in chat open in a viewer with zoom, copy and save.
+- **Screenshots in the chat.** `operant shot <file>` saves a screenshot in the project's screenshots folder and shows it in the chat, where a click opens it large. The end-to-end test screenshots do the same.
+- **Currencies.** Choose a currency and type your own rate. Costs and budgets show in that currency.
+- **Tidier lessons.** Lessons that say nearly the same thing are merged and tightened into one, related lessons are linked, and what is sent to Hindsight is capped at 20 items a project a day. There is a Consolidate now button on the Memory page, and every merge can be undone from the learning records.
+- **Memory from the first message.** With Hindsight and CodeGraph switched on in Settings, Memory, each Claude or OpenCode session starts with your recalled lessons and CodeGraph.
+- **OpenCode as the default.** Learning on close, recalled lessons, CodeGraph and the Install page all follow OpenCode when it is your default. OpenCode tiles have no Chat view.
+- **Agent names from TV and film.** Agents get names such as R2-D2 and Marvin. Hover a name to see where it is from.
+- **Diamond logo.** The diamond is now the program icon, the top bar mark, the welcome screen and the README logo.
+- **Dev update channel.** Pushes to dev branches publish a pre-release that only the Dev channel offers.
+- **Learning line in the Right now card.** It shows what learning is doing for the current session.
+- **Appearance noise setting** and a bundled Figtree font.
+
+---
+
+## Changed
+- Lessons now apply by themselves. Only a lesson with a command, a link, or the words always or never waits for your OK. Learning needs at least 500 tokens of conversation.
+- Closing a Claude tile asks whether to learn from it, unless you already pressed Learn.
+- Learning also starts after a tile has been idle for a set time.
+- In the chat box, Learn and the keep-warm line sit on the right, above the box. The microphone sits at the bottom, next to the attachment button.
+- Tile headers, info bars and the sidebar footer wrap onto a second row when they get narrow, so no button is cut off.
+- A tile now says "Waiting on subagents" while sub-agents are still running, not "Done".
+- The chat activity box is gone; its information now lives in the Right now card.
+- The bottom terminal drawer that showed over Settings and Memory is gone.
+- The Design Picker mod is removed.
+
+---
+
+## Fixed
+- After an update with the MSI installer, if the app file was missing, Operant now reinstalls all files.
+- The text of long keep-warm lines is no longer cut off.
+
+---
+
 # Operant 3.0.3
 
 Operant no longer runs jobs for you. It is now a home for your coding terminals, with Claude Code and OpenCode side by side, memory that is kept per project, and backups.

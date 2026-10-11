@@ -14,7 +14,7 @@ describe('settings', () => {
     expect(s.defaultModels).toEqual({ claude: 'opus' })
     expect(s.updates).toEqual({ channel: 'stable', checkHours: 24, installOnQuit: true })
     expect(s.keybinds.newCrew).toBe('Mod+Shift+N')
-    expect(Object.keys(s.keybinds).sort()).toEqual(['indexCrew', 'mediaNext', 'mediaPlayPause', 'mediaPrev', 'mediaShuffle', 'newCrew', 'newShell', 'openInIde', 'openPlayground', 'openSettings', 'tileClose', 'tileFocusNext', 'tileFocusPrev', 'tileFullscreen', 'tileLayout', 'tileSplit', 'toggleAllPanels', 'toggleConsole', 'toggleSidebar', 'zoomIn', 'zoomOut', 'zoomReset'])
+    expect(Object.keys(s.keybinds).sort()).toEqual(['dictate', 'indexCrew', 'mediaNext', 'mediaPlayPause', 'mediaPrev', 'mediaShuffle', 'newCrew', 'newShell', 'openInIde', 'openPlayground', 'openSettings', 'tileClose', 'tileFocusNext', 'tileFocusPrev', 'tileFullscreen', 'tileLayout', 'tileSplit', 'toggleAllPanels', 'toggleConsole', 'toggleNotes', 'toggleSidebar', 'zoomIn', 'zoomOut', 'zoomReset'])
     expect('defaultReview' in s).toBe(false)
   })
 
@@ -94,7 +94,7 @@ describe('settings', () => {
 
   it('sanitises the hide flag, terminal and tiles settings', () => {
     const d = sanitizeSettings({})
-    expect(d.layout).toEqual({ sidebarWidth: 0, sidebarHidden: false })
+    expect(d.layout).toEqual({ sidebarWidth: 0, sidebarHidden: false, notesOpen: false, notesWidth: 0 })
     expect(d.terminal).toEqual({ copyOnSelect: false, fontSize: 13, scrollback: 5000, fileLinks: true, dropPaths: true })
     expect(d.tiles).toEqual({ layout: 'dwindle', gaps: 6, strip: 'normal' })
     const bad = sanitizeSettings({
@@ -102,14 +102,14 @@ describe('settings', () => {
       terminal: { copyOnSelect: 1, fontSize: 99, scrollback: 10, fileLinks: false, dropPaths: 'no' },
       tiles: { layout: 'grid', gaps: -4, strip: 'big' },
     })
-    expect(bad.layout).toEqual({ sidebarWidth: 0, sidebarHidden: false })
+    expect(bad.layout).toEqual({ sidebarWidth: 0, sidebarHidden: false, notesOpen: false, notesWidth: 0 })
     expect(bad.terminal).toEqual({ copyOnSelect: false, fontSize: 32, scrollback: 500, fileLinks: false, dropPaths: true })
     // A saved chat composer switch from before the Chat view is dropped on load.
     expect(sanitizeSettings({ terminal: { chatComposer: true } }).terminal).toEqual({ copyOnSelect: false, fontSize: 13, scrollback: 5000, fileLinks: true, dropPaths: true })
     expect(bad.tiles).toEqual({ layout: 'dwindle', gaps: 0, strip: 'normal' })
     // A saved layout from before the side panel was removed keeps the project list and drops the rest.
     const old = sanitizeSettings({ layout: { sidebarHidden: true, panelHidden: true, rightWidth: 300 }, keybinds: { toggleSidePanel: 'Alt+X' } })
-    expect(old.layout).toEqual({ sidebarWidth: 0, sidebarHidden: true })
+    expect(old.layout).toEqual({ sidebarWidth: 0, sidebarHidden: true, notesOpen: false, notesWidth: 0 })
     expect(old.keybinds).not.toHaveProperty('toggleSidePanel')
   })
 
@@ -123,7 +123,7 @@ describe('settings', () => {
 
   it('merges partial layout, terminal and tiles patches and labels every key action', () => {
     const m = mergeSettings(DEFAULT_SETTINGS, { layout: { sidebarHidden: true }, terminal: { fontSize: 16 }, tiles: { layout: 'master' } })
-    expect(m.layout).toEqual({ sidebarHidden: true, sidebarWidth: 0 })
+    expect(m.layout).toEqual({ sidebarHidden: true, sidebarWidth: 0, notesOpen: false, notesWidth: 0 })
     expect(m.terminal).toMatchObject({ fontSize: 16, scrollback: 5000 })
     expect(m.tiles).toMatchObject({ layout: 'master', gaps: 6 })
     expect(KEY_ACTIONS.map((a) => a.id).sort()).toEqual(Object.keys(DEFAULT_SETTINGS.keybinds).sort())
@@ -157,7 +157,7 @@ describe('browser settings', () => {
 })
 
 describe('claudeMods settings', () => {
-  const allOff = { subagents: false, promptEnhancer: false, designPicker: false, ideaShelf: false, folderTracker: false, plainEnglish: false }
+  const allOff = { subagents: false, promptEnhancer: false, ideaShelf: false, folderTracker: false, plainEnglish: false }
 
   it('defaults the master switch on, the sub-agent mod on and the rest off', () => {
     expect(DEFAULT_SETTINGS.claudeMods).toEqual({ enabled: true, mods: { ...allOff, subagents: true }, keepWarm: true, commandMenu: true })

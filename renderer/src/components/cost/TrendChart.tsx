@@ -1,5 +1,5 @@
 import type { UsageSeriesPoint } from '@shared/types'
-import { usd } from '@/lib/format'
+import { useMoney } from '@/lib/useMoney'
 
 // Colours for the split series; the legend and every bar's title also print the values, so colour is not the only cue.
 const SERIES_COLORS = ['var(--chart-1)', 'var(--chart-2)', 'var(--chart-3)', 'var(--chart-4)', 'var(--chart-5)', 'var(--chart-6)']
@@ -24,6 +24,7 @@ const niceMax = (v: number) => {
 }
 
 export function TrendChart({ points, split }: { points: UsageSeriesPoint[]; split: boolean }) {
+  const { money } = useMoney()
   if (points.length === 0) return <p className="text-muted-foreground text-xs">No spend in this range.</p>
   const totals = new Map<string, { label: string; cost: number }>()
   for (const p of points) {
@@ -49,7 +50,7 @@ export function TrendChart({ points, split }: { points: UsageSeriesPoint[]; spli
   const plotH = H - bottom - 6
   const slot = (W - left - 4) / buckets.length
   const barW = Math.max(1, Math.min(28, slot * 0.7))
-  const label = `Cost per ${buckets[0]?.includes(' ') ? 'hour' : 'day'}:${buckets.map((b) => `${b} ${usd(sumOf(b))}`).join(', ')}`
+  const label = `Cost per ${buckets[0]?.includes(' ') ? 'hour' : 'day'}:${buckets.map((b) => `${b} ${money(sumOf(b))}`).join(', ')}`
 
   return (
     <div className="space-y-2">
@@ -60,7 +61,7 @@ export function TrendChart({ points, split }: { points: UsageSeriesPoint[]; spli
             <g key={f}>
               <line x1={left} x2={W - 4} y1={y} y2={y} className="stroke-border" strokeWidth={1} />
               <text x={left - 4} y={y + 3} textAnchor="end" fontSize={9} className="fill-muted-foreground tabular-nums">
-                {usd(max * f)}
+                {money(max * f)}
               </text>
             </g>
           )
@@ -75,7 +76,7 @@ export function TrendChart({ points, split }: { points: UsageSeriesPoint[]; spli
           }
           return (
             <g key={b}>
-              <title>{`${b}: ${usd(sumOf(b))}`}</title>
+              <title>{`${b}: ${money(sumOf(b))}`}</title>
               {[...parts.entries()].map(([k, cost]) => {
                 const h = (cost / max) * plotH
                 y -= h
@@ -99,7 +100,7 @@ export function TrendChart({ points, split }: { points: UsageSeriesPoint[]; spli
             <li key={k} className="flex items-center gap-1.5">
               <span className="size-2.5 shrink-0 rounded-sm" style={{ backgroundColor: colorOf(k) }} aria-hidden />
               <span className="text-muted-foreground max-w-40 truncate">{totals.get(k)!.label}</span>
-              <span className="tabular-nums">{usd(totals.get(k)!.cost)}</span>
+              <span className="tabular-nums">{money(totals.get(k)!.cost)}</span>
             </li>
           ))}
           {hasOther && (

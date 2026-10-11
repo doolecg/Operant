@@ -83,6 +83,11 @@ export interface LaunchContext {
   modPlugins?: string[]
   // The embedded browser's MCP endpoint. The config file holds no secret: Claude expands ${OPERANT_TOKEN} from the tile's env.
   browserMcp?: { url: string }
+  // The CodeGraph MCP server for this session (Settings, Memory, Use CodeGraph, with the codegraph command installed). Passed as
+  // a launch file, so no config of the user's is written or changed.
+  codegraphMcp?: boolean
+  // The project's session-start memory file (session-recall.ts), set only when it exists and recall is on. OpenCode loads it as an instructions file.
+  recallFile?: string
 }
 
 const MODEL_RE = /^[a-z0-9][a-z0-9.\-[\]]{0,63}$/
@@ -302,6 +307,11 @@ function claudeCore(parts: ClaudeParts, ctx: LaunchContext): LaunchResult {
     files.push(f)
     add('--mcp-config', f.path)
   }
+  if (ctx.codegraphMcp && (!supported || supported.has('--mcp-config'))) {
+    const f: LaunchFile = { path: p.join(ctx.launchDir, 'codegraph-mcp.json'), content: stable({ mcpServers: { codegraph: { command: 'codegraph', args: ['serve', '--mcp'] } } }) }
+    files.push(f)
+    add('--mcp-config', f.path)
+  }
   add('--plugin-dir', ctx.pluginDir)
   for (const dir of ctx.modPlugins ?? []) add('--plugin-dir', checkPath('modPlugin', dir))
   if (parts.resume) add('--resume', sessionId)
@@ -361,9 +371,10 @@ const OPENCODE_CLI_OVERLAY = JSON.stringify({ tabs: { mode: 'off' } })
 
 // OpenCode's config overlay (OPENCODE_CONFIG_CONTENT): the embedded browser as a remote MCP server. The token never reaches
 // disk or this string: OpenCode expands {env:OPERANT_TOKEN} from the tile's env. `base` is an existing overlay to merge into.
-export function opencodeConfigContent(ctx: Pick<LaunchContext, 'browserMcp'>, base?: string): string | null {
-  if (!ctx.browserMcp) return base ?? null
-  const url = checkPath('browserMcp', ctx.browserMcp.url)
+export function opencodeConfigContent(ctx: Pick<LaunchContext, 'browserMcp' | 'recallFile' | 'codegraphMcp'>, base?: string): string | null {
+  if (!ctx.browserMcp && !ctx.recallFile && !ctx.codegraphMcp) return base ?? null
+  const url = ctx.browserMcp ? checkPath('browserMcp', ctx.browserMcp.url) : null
+  const recall = ctx.recallFile ? checkPath('recallFile', ctx.recallFile) : null
   let cfg: Record<string, unknown> = {}
   if (base) {
     try {
@@ -375,8 +386,16 @@ export function opencodeConfigContent(ctx: Pick<LaunchContext, 'browserMcp'>, ba
   }
   const mcp = cfg.mcp && typeof cfg.mcp === 'object' && !Array.isArray(cfg.mcp) ? (cfg.mcp as Record<string, unknown>) : {}
   const servers = mcp.servers && typeof mcp.servers === 'object' && !Array.isArray(mcp.servers) ? (mcp.servers as Record<string, unknown>) : {}
-  const entry = { type: 'remote', url, headers: { Authorization: 'Bearer {env:OPERANT_TOKEN}' }, disabled: false }
-  return JSON.stringify({ ...cfg, mcp: { ...mcp, servers: { ...servers, 'operant-browser': entry } } })
+  const added: Record<string, unknown> = {}
+  if (url) added['operant-browser'] = { type: 'remote', url, headers: { Authorization: 'Bearer {env:OPERANT_TOKEN}' }, disabled: false }
+  if (ctx.codegraphMcp) added.codegraph = { type: 'local', command: ['codegraph', 'serve', '--mcp'] }
+  const out: Record<string, unknown> = { ...cfg }
+  if (Object.keys(added).length) out.mcp = { ...mcp, servers: { ...servers, ...added } }
+  if (recall) {
+    const prior = Array.isArray(cfg.instructions) ? (cfg.instructions as unknown[]) : []
+    if (!prior.includes(recall)) out.instructions = [...prior, recall]
+  }
+  return JSON.stringify(out)
 }
 
 // A one-shot model call (learn, skill drafts): one non-interactive `claude -p` run whose events stream as JSON lines.

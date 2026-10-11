@@ -1,6 +1,8 @@
 import type { ModelList } from './models'
+import type { Note, NoteColor, NotePatch } from './notes'
 import type { ConsoleLine, ConsoleProcess, ConsoleSource } from './console'
-import type { DraftStatus, LearnAi, LearnChange, LearnChangeStatus, LearnRunInfo, LearnStatus, LearnTestResult, LearnStore, Lesson, LessonFilter, LessonPatch, LessonStatus, MemoryFile, SkillDraft } from './learn'
+import type { ConsolidateResult, DraftStatus, LearnAi, LearnChange, LearnChangeStatus, LearnRunInfo, LearnStatus, LearnTestResult, LearnStore, Lesson, LessonFilter, LessonPatch, LessonStatus, MemoryFile, SkillDraft } from './learn'
+import type { InstallId, InstallResult, InstallStatusItem } from './install'
 import type { AuxStatus, BackupEntry, BackupPartName, MemoryDiagnostics, MemoryExport, PresetImportItem, RecallOutput, ResetResult, SuperpowersStatus } from './ops'
 import type { BrowserAction, BrowserCapture, BrowserConfirm, BrowserConfirmEnd, BrowserDevTools, BrowserFound, BrowserHistoryEntry, BrowserNav, BrowserRect, BrowserState, BrowserZoom } from './browser'
 import type { Bookmark, ClearResult, CookieDraft, CookieInfo, CookieKey, Emulation, InspectLogs, InspectLogsChanged } from './browser-inspect'
@@ -172,6 +174,12 @@ export interface IpcApi extends ChatApi {
   'scratch:resize': (scratchId: number, cols: number, rows: number) => void
   'scratch:buffer': (scratchId: number) => string
 
+  // Sticky notes of a project, newest first. Every change pushes notes:changed.
+  'notes:list': (crewId: number) => Note[]
+  'notes:create': (crewId: number, color: NoteColor) => Note
+  'notes:update': (id: number, patch: NotePatch) => Note
+  'notes:delete': (id: number) => void
+
   // Any grouping and filter of the usage rows (day, project, job, seat, agent, model, CLI, provider): totals are the sum of the rows.
   'usage:report': (query: UsageQuery) => UsageReport
   // Cost and tokens per hour or day, optionally split (a line per model, project, ...).
@@ -227,6 +235,7 @@ export interface IpcApi extends ChatApi {
   // active (also approves a queued one), stale or deleted.
   'learn:setLessonStatus': (id: number, status: LessonStatus) => Lesson
   'learn:moveLesson': (id: number, from: LearnStore, to: LearnStore) => Lesson
+  'learn:consolidate': (crewId: number) => ConsolidateResult
   'learn:hindsightEntries': (crewId: number, query?: string) => { ok: true; items: string[] } | { ok: false; error: string }
   'learn:memoryFiles': (crewId: number) => MemoryFile[]
   'learn:drafts': (crewId?: number, status?: DraftStatus) => SkillDraft[]
@@ -237,6 +246,8 @@ export interface IpcApi extends ChatApi {
   'learn:deleteDraft': (id: number) => void
   // Runs the learn step on a Claude tile's finished session now; `confirm` lets it pass a budget that asks first.
   'learn:runNow': (tileId: number, confirm?: boolean) => LearnRunInfo | null
+  // The owner's answer to learn:askOnClose: run the learn step for that closed tile or skip it.
+  'learn:answerClose': (scratchId: number, learn: boolean) => void
   // Automatic changes (and proposals), newest first; rollback puts the replaced text back.
   'learn:records': (filter?: { crewId?: number; status?: LearnChangeStatus }) => LearnChange[]
   'learn:rollback': (changeId: number) => LearnChange
@@ -263,6 +274,9 @@ export interface IpcApi extends ChatApi {
   'backup:restore': (name: string, confirm: boolean) => BackupPartName[]
   'backup:delete': (name: string) => void
   'superpowers:status': () => SuperpowersStatus
+  // Every tool Operant can use and whether it is installed; 'install:run' installs one (only after the user confirmed its command).
+  'install:status': () => InstallStatusItem[]
+  'install:run': (id: InstallId) => InstallResult
   // MCP servers for the project's folder (null = user-level only); `refresh` re-runs the status checks.
   'mcp:list': (crewId: number | null, refresh?: boolean) => McpOverview
   'mcp:add': (crewId: number | null, input: McpServerInput) => McpOverview
@@ -465,6 +479,8 @@ export interface IpcEvents {
   // switching: the process ended for a Chat/Terminal view switch; the tile starts again at once.
   'scratch:exit': { scratchId: number; exitCode: number; switching?: boolean }
   'index:status': { crewId: number; status: IndexStatus }
+  // A project's notes changed.
+  'notes:changed': { crewId: number }
   // A project went over its warning share of a daily budget.
   // crewId is null for the all-projects cap.
   budget: { crewId: number | null; window: BudgetWindow; spentUsd: number; capUsd: number; pct: number }
@@ -476,6 +492,8 @@ export interface IpcEvents {
   'claudeMods:state': ClaudeTileState
   'media:timeline': MediaTimeline | null
   'media:art': string | null
+  // A Claude tile closed before the learn step ran for it: the renderer asks and answers with learn:answerClose.
+  'learn:askOnClose': { scratchId: number; title: string; crewId: number; sessionId: string }
   // The window asks to close while something runs: the renderer shows the dialog and answers app:closeReply.
   'app:closeRequest': RunningCounts
   // A finished or waiting Claude tile was clicked in a notification: show that tile.
@@ -593,6 +611,7 @@ export const CORE_CHANNELS: CoreChannel[] = [
   'learn:mergeLessons',
   'learn:setLessonStatus',
   'learn:moveLesson',
+  'learn:consolidate',
   'learn:hindsightEntries',
   'learn:memoryFiles',
   'learn:drafts',
@@ -601,6 +620,7 @@ export const CORE_CHANNELS: CoreChannel[] = [
   'learn:rejectDraft',
   'learn:deleteDraft',
   'learn:runNow',
+  'learn:answerClose',
   'learn:records',
   'learn:rollback',
   'learn:clearRecords',
@@ -620,6 +640,8 @@ export const CORE_CHANNELS: CoreChannel[] = [
   'backup:restore',
   'backup:delete',
   'superpowers:status',
+  'install:status',
+  'install:run',
   'tiles:getLayout',
   'tiles:saveLayout',
   'scratch:list',
@@ -633,6 +655,10 @@ export const CORE_CHANNELS: CoreChannel[] = [
   'scratch:write',
   'scratch:resize',
   'scratch:buffer',
+  'notes:list',
+  'notes:create',
+  'notes:update',
+  'notes:delete',
   'usage:report',
   'usage:timeseries',
   'usage:exportText',

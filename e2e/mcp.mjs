@@ -6,6 +6,7 @@ import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'nod
 import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
 import { _electron as electron } from 'playwright-core'
+import { shot } from './lib/shot.mjs'
 import { claudeHome, e2eEnv } from './fixtures/real-claude.mjs'
 
 const outDir = resolve(process.argv[2] ?? 'docs/specs/screenshots')
@@ -42,10 +43,6 @@ const packaged = process.env.OPERANT_E2E_EXE
 let app = null
 let page = null
 const inv = (channel, ...args) => page.evaluate(([c, a]) => window.operant.invoke(c, ...a), [channel, args])
-const shot = async (name) => {
-  await page.waitForTimeout(500)
-  await page.screenshot({ path: join(outDir, `${name}.png`) })
-}
 const row = (name) => page.locator('tr', { has: page.getByText(name, { exact: true }) })
 
 try {
@@ -74,7 +71,7 @@ try {
   assert.ok((await row('oc-good').textContent()).includes('OpenCode'))
   assert.ok(!(await page.locator('body').innerText()).includes(SECRET), 'a secret reached the page')
   assert.ok(!JSON.stringify(await inv('mcp:list', ids.crew)).includes(SECRET), 'a secret reached the IPC result')
-  await shot('mcp')
+  await shot(page, 'mcp')
 
   // Add through the CLI, with a secret that is masked afterwards.
   await page.getByRole('button', { name: 'Add server' }).click()
@@ -124,7 +121,7 @@ try {
   assert.ok(!('playwright' in (JSON.parse(readFileSync(join(claudeDir, '.claude.json'), 'utf8')).mcpServers ?? {})), 'nothing may be added before Add is clicked')
   assert.ok(await page.getByRole('button', { name: 'Add Git MCP' }).isDisabled())
   await page.getByText(/uvx is not installed/).waitFor()
-  await shot('mcp-optional')
+  await shot(page, 'mcp-optional')
   await page.getByRole('button', { name: 'Add Playwright MCP' }).click()
   await page.getByRole('button', { name: 'Write to the chosen CLIs' }).click()
   await page.getByText('Added by Operant', { exact: true }).waitFor()

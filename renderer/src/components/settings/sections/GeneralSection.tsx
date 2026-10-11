@@ -1,4 +1,5 @@
 import { Download, Loader2, RefreshCw } from 'lucide-react'
+import { CURRENCIES, type CurrencyCode } from '@shared/currency'
 import type { UpdateStatus } from '@shared/types'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
@@ -8,7 +9,7 @@ import { bridge } from '@/lib/bridge'
 import { timeAgo } from '@/lib/format'
 import { useSaveSettings, useSettings, useUpdateStatus } from '@/lib/queries'
 import { cn } from '@/lib/utils'
-import { Row } from '../parts'
+import { NumberField, Row } from '../parts'
 import { UiScaleSelect } from '../UiScaleControl'
 import { useState } from 'react'
 
@@ -88,6 +89,25 @@ export function GeneralSection() {
           <Row label="UI scale" htmlFor="ui-scale">
             <UiScaleSelect id="ui-scale" className="w-36" />
           </Row>
+          <Row label="Currency" hint="Costs, spend and budgets are shown in this currency. Amounts are kept in US dollars; there is no online lookup, so type the rate yourself." htmlFor="currency">
+            <Select value={s.currency.code} onValueChange={(v) => save.mutate({ currency: { code: v as CurrencyCode } })}>
+              <SelectTrigger id="currency" className="w-48">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {CURRENCIES.map((c) => (
+                  <SelectItem key={c.code} value={c.code}>
+                    {c.code} ({c.symbol})
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </Row>
+          {s.currency.code !== 'USD' && (
+            <Row label="Rate: 1 USD =" hint={`How many ${s.currency.code} one US dollar buys.`} htmlFor="currency-rate">
+              <NumberField id="currency-rate" aria-label={`Rate: 1 USD in ${s.currency.code}`} min={0.0001} max={1000000} step="0.0001" value={s.currency.rate} onCommit={(v) => save.mutate({ currency: { rate: v } })} />
+            </Row>
+          )}
         </CardContent>
       </Card>
 

@@ -90,9 +90,27 @@ export interface ClaudeTileState {
   updatedAt: number
 }
 
+export const runningSubagentCount = (subagents: readonly { status: string }[]): number => subagents.filter((a) => a.status === 'running').length
+
+export type TileStatusTone = 'exited' | 'warn' | 'working' | 'done' | 'idle'
+
+// The pill label for a Claude tile. While a sub-agent still runs, a finished/idle/waiting main session reads as waiting on it.
+export function tileStatusLabel(
+  phase: ClaudePhase,
+  waitingType: string | null | undefined,
+  runningSubagents: number,
+): { label: string; tone: TileStatusTone } | null {
+  if (runningSubagents > 0 && (phase === 'done' || phase === 'idle' || phase === 'waiting')) return { label: 'Waiting on subagents', tone: 'working' }
+  if (phase === 'waiting') return { label: waitingType === 'permission_prompt' ? 'Needs you' : 'Waiting', tone: 'warn' }
+  if (phase === 'working') return { label: 'Working', tone: 'working' }
+  if (phase === 'done') return { label: 'Done', tone: 'done' }
+  if (phase === 'idle') return { label: 'Idle', tone: 'idle' }
+  return null
+}
+
 // The Claude mods. `subagents` is Operant's own panel (it reads Operant's hook events); every other mod is a native Claude
 // Code mod, a plugin under plugin/mods/<id> that Operant passes to Claude Code with --plugin-dir while it is enabled.
-export const MOD_IDS = ['subagents', 'promptEnhancer', 'designPicker', 'ideaShelf', 'folderTracker', 'plainEnglish'] as const
+export const MOD_IDS = ['subagents', 'promptEnhancer', 'ideaShelf', 'folderTracker', 'plainEnglish'] as const
 export type ModId = (typeof MOD_IDS)[number]
 // The sub-agent panel is on for new installs.
 export const MOD_DEFAULT_ENABLED: Record<ModId, boolean> = Object.fromEntries(MOD_IDS.map((id) => [id, id === 'subagents'])) as Record<ModId, boolean>

@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import type { ChatState, ContextRowId, ContextUsage } from '@shared/claude-chat'
 import { bridge } from '@/lib/bridge'
-import { usd } from '@/lib/format'
+import { useMoney } from '@/lib/useMoney'
 import { useSettings } from '@/lib/queries'
 import { cn } from '@/lib/utils'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
@@ -41,6 +41,7 @@ function pctOf(state: ChatState | null, usage: ContextUsage | null): number | nu
 // The card: header, one segmented bar with the compaction tick, the legend, and the session cost. The only place the
 // chat shows context, tokens and cost.
 export function ContextCard({ state, usage, warn, danger }: { state: ChatState; usage: ContextUsage | null; warn: number; danger: number }) {
+  const { money } = useMoney()
   const pct = pctOf(state, usage)
   const tone = contextTone(pct ?? 0, warn, danger)
   const running = state.turn.phase === 'working'
@@ -88,7 +89,7 @@ export function ContextCard({ state, usage, warn, danger }: { state: ChatState; 
       )}
       <div className="text-muted-foreground border-border mt-3 flex justify-between border-t pt-2.5 text-xs">
         <span>This session</span>
-        <b className="text-foreground font-normal">{state.costUsd === null ? '—' : state.costUsd > 0 && state.costUsd < 0.01 ? '<$0.01' : usd(state.costUsd)}</b>
+        <b className="text-foreground font-normal">{state.costUsd === null ? '—' : money(state.costUsd)}</b>
       </div>
     </div>
   )

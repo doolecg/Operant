@@ -1,7 +1,7 @@
 {
   "name": "operant2",
   "productName": "Operant 3",
-  "version": "3.0.3",
+  "version": "3.1.0",
   "description": "Run coding agents across your projects from one dashboard.",
   "license": "MIT",
   "private": true,
@@ -29,6 +29,7 @@
   },
   "dependencies": {
     "@colbymchenry/codegraph": "^1.6.1",
+    "@huggingface/transformers": "^4.3.1",
     "@lydell/node-pty": "^1.2.0-beta.15",
     "@playwright/mcp": "^0.0.83",
     "playwright-core": "^1.64.0",

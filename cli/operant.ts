@@ -2,6 +2,7 @@
 // tile's token, prints the answer and exits with its code. Built on its own to out/cli/operant.cjs and
 // run by the app binary as Node; it has no dependencies and imports nothing from the app.
 import { connect } from 'node:net'
+import { resolve } from 'node:path'
 
 export const EXIT_USAGE = 2
 export const EXIT_UNREACHABLE = 7
@@ -20,6 +21,8 @@ const COMMANDS: Record<string, CommandSpec> = {
   // The project's Hindsight memory (the project of the tile the command runs in).
   'memory.recall': { pos: ['query...'], flags: {}, usage: 'operant memory recall <query|->' },
   'memory.retain': { pos: ['text...'], flags: { tag: 'strs' }, usage: 'operant memory retain <text|-> [--tag T ...]' },
+  // Saves a screenshot; the app answers with the saved path. The file is sent as an absolute path.
+  shot: { pos: ['file'], flags: { kind: 'str' }, usage: 'operant shot <file> [--kind K]' },
 }
 
 // Text values that may be `-` (read from stdin).
@@ -61,7 +64,7 @@ export function parseArgs(argv: string[]): Parsed {
   const args: Record<string, unknown> = {}
   const pos: string[] = []
   try {
-    for (let i = 2; i < words.length; i++) {
+    for (let i = first === 'memory' ? 2 : 1; i < words.length; i++) {
       const a = words[i]!
       if (a === '--json') {
         json = true
@@ -100,6 +103,7 @@ export function parseArgs(argv: string[]): Parsed {
     args[key] = value
   }
   if (pos.length) return { kind: 'error', message: `Unexpected "${pos[0]}". Usage: ${spec.usage}` }
+  if (name === 'shot') args.file = resolve(String(args.file))
   const dashes = Object.keys(args).filter((k) => args[k] === '-' && TEXT.has(k))
   if (dashes.length > 1) return { kind: 'error', message: 'Only one value can be read from stdin' }
   return { kind: 'request', cmd: name, args, json, stdin: dashes[0] ?? null }

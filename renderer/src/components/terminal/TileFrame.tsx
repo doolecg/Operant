@@ -71,34 +71,38 @@ export function TileFrame({ id, title, badge, icon, heading, subtitle, status, f
       )}
     >
       {strip !== 'hide' && (
-        <div className={cn('flex shrink-0 items-center text-xs', strip === 'compact' ? 'h-7 gap-1.5 pr-1.5 pl-2' : 'h-10 gap-2 pr-2 pl-3')}>
-          {icon}
-          <h2 title={title} className="min-w-0 shrink-0 truncate text-[13px] font-semibold">
-            {heading ?? title}
-          </h2>
-          {strip !== 'compact' && subtitle && <span className="text-muted-foreground min-w-0 truncate text-xs">· {subtitle}</span>}
-          {badge}
-          <span className="flex-1" />
-          {status}
-          <button
-            type="button"
-            aria-label={fullscreen ? `Leave fullscreen for ${title}` : `Fullscreen ${title}`}
-            onClick={onFullscreen}
-            className="text-muted-foreground hover:bg-accent hover:text-foreground grid size-7 place-items-center rounded-full"
-          >
-            {fullscreen ? <Minimize2 className="size-3.5" /> : <Maximize2 className="size-3.5" />}
-          </button>
-          {onClose && (
+        // A narrow tile wraps the controls onto a second row instead of clipping them.
+        <div className={cn('flex shrink-0 flex-wrap items-center text-xs', strip === 'compact' ? 'min-h-7 gap-x-1.5 gap-y-0.5 pr-1.5 pl-2' : 'min-h-10 gap-x-2 gap-y-1 py-1.5 pr-2 pl-3')}>
+          <div className={cn('flex min-w-0 items-center', strip === 'compact' ? 'gap-1.5' : 'gap-2')}>
+            {icon}
+            <h2 title={title} className="min-w-0 truncate text-[13px] font-semibold">
+              {heading ?? title}
+            </h2>
+            {strip !== 'compact' && subtitle && <span className="text-muted-foreground min-w-0 shrink-[999] truncate text-xs">· {subtitle}</span>}
+            {badge}
+          </div>
+          <div className={cn('ml-auto flex min-w-0 flex-wrap items-center justify-end', strip === 'compact' ? 'gap-x-1.5 gap-y-0.5' : 'gap-x-2 gap-y-1')}>
+            {status}
             <button
               type="button"
-              aria-label={`Close ${title}`}
-              title="Close this tile"
-              onClick={onClose}
-              className="text-muted-foreground hover:bg-accent hover:text-foreground grid size-7 place-items-center rounded-full"
+              aria-label={fullscreen ? `Leave fullscreen for ${title}` : `Fullscreen ${title}`}
+              onClick={onFullscreen}
+              className="text-muted-foreground hover:bg-accent hover:text-foreground grid size-7 shrink-0 place-items-center rounded-full"
             >
-              <X className="size-3.5" />
+              {fullscreen ? <Minimize2 className="size-3.5" /> : <Maximize2 className="size-3.5" />}
             </button>
-          )}
+            {onClose && (
+              <button
+                type="button"
+                aria-label={`Close ${title}`}
+                title="Close this tile"
+                onClick={onClose}
+                className="text-muted-foreground hover:bg-accent hover:text-foreground grid size-7 shrink-0 place-items-center rounded-full"
+              >
+                <X className="size-3.5" />
+              </button>
+            )}
+          </div>
         </div>
       )}
       {info}

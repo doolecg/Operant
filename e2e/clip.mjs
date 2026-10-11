@@ -10,6 +10,7 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
 import { _electron as electron } from 'playwright-core'
+import { shot } from './lib/shot.mjs'
 import { claudeHome, e2eEnv } from './fixtures/real-claude.mjs'
 
 const phase = process.argv[2] ?? 'after'
@@ -81,7 +82,6 @@ try {
     }
   }
 
-  const shot = (name) => page.screenshot({ path: join(outDir, `clip-${phase}-${name}.png`) })
   const setScale = (s) => inv('settings:set', { uiScale: s })
 
   await page.getByText('Welcome to Operant 3').waitFor()
@@ -105,7 +105,7 @@ try {
     console.log(`${label}: terminals ${list.length} (claude ${claude}) rows ${list.map((t) => t.rows).join(' ')} problems ${problems.length}`)
     for (const { t, p } of problems) console.log(`  ${t.tile}: ${p} (rows ${t.rows}, overflow ${t.overflowPx.toFixed(1)}px, slack ${t.slackPx.toFixed(1)}px)`)
     failures.push(...problems.map((x) => `${label} ${x.t.tile}: ${x.p}`))
-    if (shotName) await shot(shotName)
+    if (shotName) await shot(page, shotName)
   }
 
   for (const scale of SCALES) {

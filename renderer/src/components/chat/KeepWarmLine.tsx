@@ -20,11 +20,13 @@ export function KeepWarmLine({ state }: { state: ChatState }) {
   if (!show || !kw) return null
   const line = keepWarmLine(kw, kw.active ? now : Date.now())
   return (
-    <span role="status" aria-label="Keep-warm status" data-chat="keepwarm-line" className="bg-muted/60 text-muted-foreground ml-auto inline-flex min-w-0 items-center gap-1.5 rounded-full px-2.5 py-1 text-[13px]">
-      <Box className="size-3.5 shrink-0" aria-hidden />
-      <span>keep-warm</span>
-      <span className={cn('rounded-full px-2 py-px text-xs font-semibold', BADGE[line.badge])}>{line.badge === 'off' ? 'off' : line.badge}</span>
-      <span className="min-w-0 truncate">{kw.active ? '· ' : ''}{line.parts.join(' · ')}</span>
+    <span role="status" aria-label="Keep-warm status" data-chat="keepwarm-line" className="bg-muted/60 text-muted-foreground inline-flex max-w-full flex-wrap items-center justify-end gap-x-1.5 gap-y-0.5 rounded-[13px] px-2.5 py-1 text-[13px]">
+      <Box className="size-3.5 shrink-0 whitespace-nowrap" aria-hidden />
+      <span className="shrink-0 whitespace-nowrap">keep-warm</span>
+      <span className={cn('shrink-0 rounded-full px-2 py-px text-xs font-semibold whitespace-nowrap', BADGE[line.badge])}>{line.badge === 'off' ? 'off' : line.badge}</span>
+      {line.parts.map((p, i) => (
+        <span key={i} className="whitespace-nowrap">{kw.active || i > 0 ? '· ' : ''}{p}</span>
+      ))}
     </span>
   )
 }

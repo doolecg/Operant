@@ -1,17 +1,19 @@
 import type { UsageRowOut, UsageTotals, UsageTrend } from '@shared/types'
-import { compact, usd } from '@/lib/format'
+import { compact } from '@/lib/format'
+import { useMoney } from '@/lib/useMoney'
 import { KIND_COLORS } from './palette'
 
 const num = (n: number) => n.toLocaleString()
 
 // The five totals every view starts with; each is the sum of the rows below.
 export function TotalsCards({ totals, trend }: { totals: UsageTotals; trend?: UsageTrend | null }) {
+  const { money } = useMoney()
   const cards: Array<{ label: string; value: string; title: string; color?: string }> = [
     { label: 'Input', value: compact(totals.inputTokens), title: num(totals.inputTokens), color: KIND_COLORS.input },
     { label: 'Output', value: compact(totals.outputTokens), title: num(totals.outputTokens), color: KIND_COLORS.output },
     { label: 'Cache read', value: compact(totals.cacheRead), title: num(totals.cacheRead), color: KIND_COLORS.cacheRead },
     { label: 'Cache write', value: compact(totals.cacheWrite), title: num(totals.cacheWrite), color: KIND_COLORS.cacheWrite },
-    { label: 'Cost', value: usd(totals.costUsd), title: `${usd(totals.costUsd)} over ${totals.turns} turns` },
+    { label: 'Cost', value: money(totals.costUsd), title: `${money(totals.costUsd)} over ${totals.turns} turns` },
   ]
   return (
     <section aria-label="Usage totals" className="space-y-1.5">
@@ -33,8 +35,8 @@ export function TotalsCards({ totals, trend }: { totals: UsageTotals; trend?: Us
           <>
             {'. '}
             {trend.deltaPct == null
-              ? `Previous period: ${usd(trend.previous.costUsd)}`
-              : `${trend.deltaUsd >= 0 ? '+' : '-'}${usd(Math.abs(trend.deltaUsd))} (${trend.deltaPct >= 0 ? '+' : ''}${Math.round(trend.deltaPct)}%) against the previous period of the same length`}
+              ? `Previous period: ${money(trend.previous.costUsd)}`
+              : `${trend.deltaUsd >= 0 ? '+' : '-'}${money(Math.abs(trend.deltaUsd))} (${trend.deltaPct >= 0 ? '+' : ''}${Math.round(trend.deltaPct)}%) against the previous period of the same length`}
           </>
         )}
       </p>
@@ -56,6 +58,7 @@ export function UsageTable({
   firstHeading: string
   caption: string
 }) {
+  const { money } = useMoney()
   if (rows.length === 0) return <p className="text-muted-foreground px-1 text-xs">No usage matches these filters.</p>
   return (
     <div className="bg-card overflow-x-auto rounded-lg border">
@@ -84,7 +87,7 @@ export function UsageTable({
               <td className={td} title={num(r.outputTokens)}>{compact(r.outputTokens)}</td>
               <td className={td} title={num(r.cacheRead)}>{compact(r.cacheRead)}</td>
               <td className={td} title={num(r.cacheWrite)}>{compact(r.cacheWrite)}</td>
-              <td className={`${td} font-medium`}>{usd(r.costUsd)}</td>
+              <td className={`${td} font-medium`}>{money(r.costUsd)}</td>
               <td className={td}>{r.turns}</td>
             </tr>
           ))}
@@ -96,7 +99,7 @@ export function UsageTable({
             <td className={td}>{compact(totals.outputTokens)}</td>
             <td className={td}>{compact(totals.cacheRead)}</td>
             <td className={td}>{compact(totals.cacheWrite)}</td>
-            <td className={td}>{usd(totals.costUsd)}</td>
+            <td className={td}>{money(totals.costUsd)}</td>
             <td className={td}>{totals.turns}</td>
           </tr>
         </tfoot>

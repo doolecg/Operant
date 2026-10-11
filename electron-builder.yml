@@ -51,8 +51,9 @@ win:
   artifactName: Operant3-${version}-windows-${arch}.${ext}
 
 msi:
-  oneClick: false
-  perMachine: false
+  # oneClick: true skips the assisted wizard, so no install-folder page; perMachine installs to C:\Program Files\Operant 3.
+  oneClick: true
+  perMachine: true
   createDesktopShortcut: true
   createStartMenuShortcut: true
   shortcutName: Operant 3

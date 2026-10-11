@@ -4,7 +4,7 @@ import { decodeIpcError } from '@shared/ipc'
 import type { ImportCounts, ImportPreview, ImportResult, ImportSource } from '@shared/types'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import { usd } from '@/lib/format'
+import { useMoney } from '@/lib/useMoney'
 import { pickImportFile, useExportAllData, useImportApply, useImportPreview } from '@/lib/queries'
 
 const KINDS: Array<{ key: 'projects' | 'usage' | 'presets' | 'settings'; label: string }> = [
@@ -18,6 +18,7 @@ const day = (t: number | null) => (t == null ? '' : new Date(t).toLocaleDateStri
 const sum = (p: ImportPreview, f: keyof ImportCounts) => KINDS.reduce((a, k) => a + p[k.key][f], 0)
 
 function PreviewView({ p, applied }: { p: ImportPreview; applied: boolean }) {
+  const { money } = useMoney()
   const toAdd = sum(p, 'add')
   return (
     <div className="space-y-3" aria-label={applied ? 'Import result' : 'Import preview'} role="region">
@@ -56,7 +57,7 @@ function PreviewView({ p, applied }: { p: ImportPreview; applied: boolean }) {
           </table>
           {p.usage.add + p.usage.existing > 0 && (
             <p className="text-muted-foreground text-xs">
-              Usage history: {usd(p.usageCostUsd)}
+              Usage history: {money(p.usageCostUsd)}
               {p.usageFrom != null && ` from ${day(p.usageFrom)} to ${day(p.usageTo)}`}. Rows from 2.8.2 carry cost only, not token kinds.
             </p>
           )}

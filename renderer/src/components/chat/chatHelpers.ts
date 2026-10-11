@@ -27,6 +27,21 @@ export function kTokens(n: number): string {
   return String(Math.round(n))
 }
 
+// " · 4.8k tokens" for the end of a Done or Thought row; "" when the count is unknown. `approx` marks an estimate.
+export function tokensSuffix(n: number | null | undefined, approx = false): string {
+  if (n == null || !Number.isFinite(n) || n <= 0) return ''
+  return ` · ${approx ? '~' : ''}${kTokens(n)} tokens`
+}
+
+// "operant-image-20261011-142305-2.png" from the image's media type, when it was sent and its place in the message.
+export function imageFileName(mediaType: string, at: Date, index = 0): string {
+  const sub = (mediaType.split('/')[1] ?? '').toLowerCase().replace(/\+.*$/, '')
+  const ext = sub === 'jpeg' ? 'jpg' : /^[a-z0-9]{2,5}$/.test(sub) ? sub : 'png'
+  const p = (v: number) => String(v).padStart(2, '0')
+  const stamp = `${at.getFullYear()}${p(at.getMonth() + 1)}${p(at.getDate())}-${p(at.getHours())}${p(at.getMinutes())}${p(at.getSeconds())}`
+  return `operant-image-${stamp}${index > 0 ? `-${index + 1}` : ''}.${ext}`
+}
+
 export const capitalize = (s: string): string => (s ? s.charAt(0).toUpperCase() + s.slice(1) : s)
 
 // ---- permission modes
@@ -186,10 +201,12 @@ export function highlightParts(text: string, query: string): Array<{ text: strin
 }
 
 // Which icon a notice chip gets (the renderer maps the key to an icon).
-export type ChipIcon = 'cube' | 'hook' | 'gauge' | 'compact' | 'stop' | 'alert' | 'plug' | 'info'
+export type ChipIcon = 'cube' | 'hook' | 'gauge' | 'compact' | 'stop' | 'alert' | 'plug' | 'info' | 'camera'
 export function noticeChipIcon(source: string, tone: string): ChipIcon {
   if (tone === 'error' || source === 'crash' || source === 'error') return 'alert'
   switch (source) {
+    case 'shot':
+      return 'camera'
     case 'ping':
     case 'keepwarm':
       return 'cube'

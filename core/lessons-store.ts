@@ -1,6 +1,8 @@
 import type { DatabaseSync } from 'node:sqlite'
 import type { DraftStatus, LearnRunInfo, LearnSkip, LearnStore, Lesson, LessonFilter, LessonKind, LessonPatch, LessonScope, LessonStatus, SkillDraft } from '../shared/learn'
 
+import type { LessonLookup } from './memory-recall'
+
 // Appended to MIGRATIONS in store.ts (additive).
 export const LESSONS_MIGRATION = `CREATE TABLE lessons (
      id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -53,6 +55,10 @@ export const SKILL_FIX_MIGRATION = `ALTER TABLE skill_drafts ADD COLUMN target_p
    ALTER TABLE skill_drafts ADD COLUMN previous_body TEXT NOT NULL DEFAULT '';
    ALTER TABLE skill_drafts ADD COLUMN lesson_id INTEGER NOT NULL DEFAULT 0;`
 
+// Related lessons and the lesson one was consolidated into (additive).
+export const LESSON_LINKS_MIGRATION = `ALTER TABLE lessons ADD COLUMN related TEXT NOT NULL DEFAULT '[]';
+   ALTER TABLE lessons ADD COLUMN consolidated_into INTEGER;`
+
 type Row = Record<string, unknown>
 
 const list = (v: unknown): string[] => {
@@ -77,6 +83,8 @@ const toLesson = (r: Row): Lesson => ({
   stores: list(r.stores) as LearnStore[],
   status: r.status as LessonStatus,
   hits: Number(r.hits),
+  related: nums(r.related ?? '[]'),
+  consolidatedInto: r.consolidated_into == null ? null : Number(r.consolidated_into),
   createdAt: Number(r.created_at),
   updatedAt: Number(r.updated_at),
 })
@@ -122,7 +130,7 @@ export interface NewLesson {
   status: LessonStatus
 }
 
-export type LessonUpdate = LessonPatch & { scope?: LessonScope; sourceJobs?: number[]; stores?: LearnStore[]; status?: LessonStatus; hits?: number }
+export type LessonUpdate = LessonPatch & { scope?: LessonScope; sourceJobs?: number[]; stores?: LearnStore[]; status?: LessonStatus; hits?: number; related?: number[]; consolidatedInto?: number | null }
 
 const defined = (o: object): object => Object.fromEntries(Object.entries(o).filter(([, v]) => v !== undefined))
 
@@ -141,7 +149,7 @@ export class LessonsDb {
     try {
       this.db.exec('DELETE FROM lessons; DELETE FROM skill_drafts')
       const ins = this.db.prepare(
-        'INSERT INTO lessons (id, crew_id, text, kind, scope, files, symbols, source_jobs, stores, status, hits, created_at, updated_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)',
+        'INSERT INTO lessons (id, crew_id, text, kind, scope, files, symbols, source_jobs, stores, status, hits, related, consolidated_into, created_at, updated_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)',
       )
       let nl = 0
       for (const l of lessons) {
@@ -149,7 +157,7 @@ export class LessonsDb {
           dropped++
           continue
         }
-        ins.run(l.id, l.crewId, l.text, l.kind, l.scope, JSON.stringify(l.files), JSON.stringify(l.symbols), JSON.stringify(l.sourceJobs), JSON.stringify(l.stores), l.status, l.hits, l.createdAt, l.updatedAt)
+        ins.run(l.id, l.crewId, l.text, l.kind, l.scope, JSON.stringify(l.files), JSON.stringify(l.symbols), JSON.stringify(l.sourceJobs), JSON.stringify(l.stores), l.status, l.hits, JSON.stringify(l.related ?? []), l.consolidatedInto ?? null, l.createdAt, l.updatedAt)
         nl++
       }
       const insD = this.db.prepare(
@@ -204,8 +212,8 @@ export class LessonsDb {
     if (!cur) throw new Error(`No lesson ${id}`)
     const n = { ...cur, ...defined(p) } as Lesson
     this.db
-      .prepare('UPDATE lessons SET text=?, kind=?, scope=?, files=?, symbols=?, source_jobs=?, stores=?, status=?, hits=?, updated_at=? WHERE id=?')
-      .run(n.text, n.kind, n.scope, JSON.stringify(n.files), JSON.stringify(n.symbols), JSON.stringify(n.sourceJobs), JSON.stringify(n.stores), n.status, n.hits, this.now(), id)
+      .prepare('UPDATE lessons SET text=?, kind=?, scope=?, files=?, symbols=?, source_jobs=?, stores=?, status=?, hits=?, related=?, consolidated_into=?, updated_at=? WHERE id=?')
+      .run(n.text, n.kind, n.scope, JSON.stringify(n.files), JSON.stringify(n.symbols), JSON.stringify(n.sourceJobs), JSON.stringify(n.stores), n.status, n.hits, JSON.stringify(n.related), n.consolidatedInto, this.now(), id)
     return this.getLesson(id)!
   }
 
@@ -255,5 +263,23 @@ export class LessonsDb {
       ? this.db.prepare('SELECT * FROM learn_runs ORDER BY id DESC LIMIT 1').get()
       : this.db.prepare('SELECT * FROM learn_runs WHERE crew_id = ? ORDER BY id DESC LIMIT 1').get(crewId)) as Row | undefined
     return r ? toRun(r) : null
+  }
+}
+
+// The recall filter over the lessons db: a lesson is live when it is active and was not folded into another;
+// related() gives the texts of up to two active related lessons. A lesson the db does not know is not live.
+export function lessonLookup(db: Pick<LessonsDb, 'getLesson'>): LessonLookup {
+  const live = (l: Lesson | null): l is Lesson => l != null && l.status === 'active' && l.consolidatedInto == null
+  return {
+    isLive: (id) => live(db.getLesson(id)),
+    related: (id) => {
+      const out: string[] = []
+      for (const r of db.getLesson(id)?.related ?? []) {
+        const l = db.getLesson(r)
+        if (live(l)) out.push(l.text)
+        if (out.length === 2) break
+      }
+      return out
+    },
   }
 }

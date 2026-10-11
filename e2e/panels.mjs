@@ -8,6 +8,7 @@ import { mkdirSync, mkdtempSync, writeFileSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
 import { _electron as electron } from 'playwright-core'
+import { shot } from './lib/shot.mjs'
 import { claudeHome, e2eEnv } from './fixtures/real-claude.mjs'
 
 const outDir = resolve(process.argv[2] ?? 'docs/specs/screenshots')
@@ -36,7 +37,6 @@ async function launch() {
   await page.waitForFunction(() => !!window.operant)
 }
 const inv = (channel, ...args) => page.evaluate(([c, a]) => window.operant.invoke(c, ...a), [channel, args])
-const shot = async (name) => (await page.waitForTimeout(500), page.screenshot({ path: join(outDir, `${name}.png`) }))
 const poll = async (label, fn, timeout = 10_000) => {
   for (const end = Date.now() + timeout; Date.now() < end; await page.waitForTimeout(150)) if (await fn()) return
   throw new Error(`timed out waiting for ${label}`)
@@ -74,7 +74,7 @@ try {
   assert.equal(await page.getByTestId('terminal-drawer').count(), 0, 'a new shell is a tile, not a drawer tab')
   assert.equal(await page.getByRole('region', { name: 'Workspace panels' }).count(), 0, 'the side panel is gone')
   assert.equal(await page.getByRole('button', { name: /side panel/i }).count(), 0, 'no side panel button')
-  await shot('terminal-tiles')
+  await shot(page, 'terminal-tiles')
 
   // Alt+B hides the project list and remembers it; the top-bar button brings it back.
   await page.keyboard.press('Alt+B')
@@ -86,7 +86,7 @@ try {
   assert.equal((await layout()).sidebarHidden, false)
   await page.keyboard.press('Alt+B')
   await sidebar().waitFor({ state: 'detached' })
-  await shot('panels-hidden')
+  await shot(page, 'panels-hidden')
 
   // The choice survives a restart (the project list stays hidden).
   await app.close()

@@ -31,7 +31,7 @@ const num = (v: unknown): number | undefined => (typeof v === 'number' && Number
 const str = (v: unknown): string | undefined => (typeof v === 'string' && v !== '' ? v : undefined)
 
 // The command a hook or status line runs. Forward slashes keep it valid in the bash that Claude Code uses on Windows.
-export function modsCommand(paths: ModsPaths, mode: 'hook' | 'status'): string | null {
+export function modsCommand(paths: ModsPaths, mode: 'hook' | 'status' | 'recall'): string | null {
   const parts = [paths.node, paths.script, paths.eventsDir]
   if (parts.some((p) => UNSAFE_PATH.test(p) || p === '')) return null
   const [node, script, dir] = parts.map((p) => `"${p.replace(/\\/g, '/')}"`)
@@ -41,7 +41,7 @@ export function modsCommand(paths: ModsPaths, mode: 'hook' | 'status'): string |
 // The hooks Operant's sub-agent panel reads: the session phase events and the sub-agent events. Registered only while
 // the subagents mod is on. The status line is set while Claude mods are on (the info bar and context card read it).
 // Null when Claude mods are off or a path cannot be quoted safely: the tile then starts without them.
-export function claudeModsConfig(paths: ModsPaths, settings: ClaudeModsSettings): { hooks: Record<string, unknown[]>; statusLine: { type: 'command'; command: string } } | null {
+export function claudeModsConfig(paths: ModsPaths, settings: ClaudeModsSettings, recall = false): { hooks: Record<string, unknown[]>; statusLine: { type: 'command'; command: string } } | null {
   if (!settings.enabled) return null
   const hook = modsCommand(paths, 'hook')
   const status = modsCommand(paths, 'status')
@@ -53,6 +53,9 @@ export function claudeModsConfig(paths: ModsPaths, settings: ClaudeModsSettings)
     hooks.PreToolUse = [entry('Agent')]
     hooks.PostToolUse = [entry('Agent')]
   }
+  // Session-start memory: a second SessionStart hook that hands the project's recall file to Claude as context.
+  const recallCmd = recall ? modsCommand(paths, 'recall') : null
+  if (recallCmd) hooks.SessionStart = [...(hooks.SessionStart ?? []), { hooks: [{ type: 'command', command: recallCmd }] }]
   return { hooks, statusLine: { type: 'command', command: status } }
 }
 

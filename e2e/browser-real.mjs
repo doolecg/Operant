@@ -8,6 +8,7 @@ import { copyFileSync, mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSy
 import { homedir, tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
 import { _electron as electron } from 'playwright-core'
+import { shot } from './lib/shot.mjs'
 import { startSite } from './fixtures/site/server.mjs'
 
 const MODEL = 'claude-haiku-5-5'
@@ -57,7 +58,6 @@ try {
   await page.setViewportSize({ width: 1920, height: 1080 })
   await page.waitForFunction(() => !!window.operant)
   const inv = (c, ...a) => page.evaluate(([ch, args]) => window.operant.invoke(ch, ...args), [c, a])
-  const shot = async (n) => (await sleep(400), page.screenshot({ path: join(outDir, `browser-real-${n}.png`) }))
   await inv('settings:set', { mainCli: 'claude', browser: { homeUrl: `${base}/`, autonomy: 'full' } })
   const crew = await inv('crews:create', { name: 'alpha', folder: cwd })
   await page.locator('[data-crew-row]').getByText('alpha', { exact: true }).click({ position: { x: 4, y: 4 } })
@@ -98,7 +98,7 @@ try {
       `Use ONLY the operant-browser MCP tools. Open ${base}/, log in with username test and password test, then call the console messages tool for errors and take one screenshot. Reply with one line: DONE then the console error text.`,
     )
     await poll('the AI pill', async () => (await page.getByRole('status').filter({ hasText: 'AI is controlling' }).count()) > 0, 90_000)
-    await shot('ai-controlling')
+    await shot(page, 'ai-controlling')
     await idle(240_000)
     const s = await snap()
     const used = tools(s, r1)
@@ -111,7 +111,7 @@ try {
     ok(b.tabs.some((t) => t.url.includes('/welcome')), `the browser is not on the logged-in page: ${b.tabs.map((t) => t.url).join(',')}`)
     ok(!b.ai.paused, 'still paused')
     console.log(`  cost so far: ${s.costUsd ?? 'n/a'} USD`)
-    await shot('after-run-1')
+    await shot(page, 'after-run-1')
   })
 
   await check('after the AI finishes the user can keep browsing in the same session', async () => {
@@ -129,7 +129,7 @@ try {
     await poll('AI active', async () => (await inv('browser:state', crew.id)).ai.active, 90_000)
     await page.getByRole('button', { name: 'Take control' }).click()
     await poll('paused', async () => (await inv('browser:state', crew.id)).ai.paused, 10_000)
-    await shot('paused')
+    await shot(page, 'paused')
     const doneAtPause = (await snap()).items.slice(from).filter((i) => i.kind === 'tool' && i.status === 'done').length
     await sleep(6000)
     const doneLater = (await snap()).items.slice(from).filter((i) => i.kind === 'tool' && i.status === 'done').length
@@ -141,7 +141,7 @@ try {
     ok(/DONE/i.test(lastText(s)), `the agent did not finish: ${lastText(s).slice(0, 200)}`)
     const b = await inv('browser:state', crew.id)
     ok(b.open && !b.ai.paused, 'browser closed or still paused at the end')
-    await shot('after-run-2')
+    await shot(page, 'after-run-2')
     console.log(`  total cost: ${s.costUsd ?? 'n/a'} USD`)
   })
 
@@ -154,7 +154,7 @@ try {
     for (let i = 0; i < 6; i++) {
       const asked = await allow.waitFor({ timeout: i === 0 ? 120_000 : 15_000 }).then(() => true, () => false)
       if (!asked) break
-      if (i === 0) await shot('confirm-bar')
+      if (i === 0) await shot(page, 'confirm-bar')
       await allow.click()
     }
     await idle(240_000)

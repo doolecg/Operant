@@ -13,7 +13,7 @@ describe('settings reset and the new learn, memory and aux settings', () => {
   it('puts one section back to its defaults and keeps the others', () => {
     const next = resetSettings(changed, 'learn')
     expect(next.learn).toEqual(DEFAULT_LEARN_SETTINGS)
-    expect(next.learn.mode).toBe('suggest')
+    expect(next.learn.mode).toBe('advanced')
     expect(next.memory).toEqual(changed.memory)
     expect(next.dailyBudgetUsd).toBe(12)
   })
@@ -35,8 +35,8 @@ describe('settings reset and the new learn, memory and aux settings', () => {
       auxModels: { extraction: { cli: 'claude', model: 'bad model;rm', effort: 'high' }, retrieval: { cli: 'local', model: 'qwen', localUrl: 'http://127.0.0.1:1234' } },
       aux: { maxCallsPerDay: -1, retryLimit: 99, onLimit: 'confirm' },
     })
-    expect(s.learn).toMatchObject({ mode: 'suggest', maxCallsPerReview: 0, minTokens: DEFAULT_LEARN_SETTINGS.minTokens, onLimit: 'stop' })
-    expect(s.memory).toMatchObject({ recallMode: 'on-demand', topK: 1, maxTokens: 20000 })
+    expect(s.learn).toMatchObject({ mode: 'advanced', maxCallsPerReview: 0, minTokens: DEFAULT_LEARN_SETTINGS.minTokens, onLimit: 'stop' })
+    expect(s.memory).toMatchObject({ recallMode: 'session-start', topK: 1, maxTokens: 20000 })
     expect(s.auxModels.extraction).toEqual({ cli: 'claude', model: '', effort: 'high', localUrl: '' })
     expect(s.auxModels.retrieval).toEqual({ cli: 'local', model: 'qwen', effort: '', localUrl: 'http://127.0.0.1:1234' })
     expect(s.aux).toMatchObject({ maxCallsPerDay: 0, retryLimit: 5, onLimit: 'confirm' })

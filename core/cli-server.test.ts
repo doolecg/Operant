@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { CliServer } from './cli-server'
 
-const target = { identify: () => ({ crewId: 1 }), run: async () => ({ exit: 0 }) }
+const target = { identify: () => ({ crewId: 1, tileId: 1 }), run: async () => ({ exit: 0 }) }
 
 describe('CliServer token identity', () => {
   it('whoIs maps a token to its tile and refuses others', () => {

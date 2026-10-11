@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react'
 import { Pencil } from 'lucide-react'
-import { LEARN_STORES, LESSON_KINDS, type LearnStore, type Lesson, type LessonFilter, type LessonKind } from '@shared/learn'
+import { LEARN_STORES, LESSON_KINDS, type ConsolidateResult, type LearnStore, type Lesson, type LessonFilter, type LessonKind } from '@shared/learn'
 import type { Crew } from '@shared/types'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -11,7 +11,7 @@ import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Textarea } from '@/components/ui/textarea'
 import { timeAgo } from '@/lib/format'
-import { useEditLesson, useLessons, useMergeLessons, useMoveLesson, useSetLessonStatus } from '@/lib/queries'
+import { useConsolidate, useEditLesson, useLessons, useMergeLessons, useMoveLesson, useSetLessonStatus } from '@/lib/queries'
 import { Empty, ErrorLine, KIND_LABEL, STORE_LABEL, StatusBadge } from './ui'
 
 const csv = (s: string) => s.split(',').map((x) => x.trim()).filter(Boolean)
@@ -156,6 +156,13 @@ function MergeDialog({ lessons, onClose, onDone }: { lessons: Lesson[]; onClose:
   )
 }
 
+export function consolidateSummary(r: ConsolidateResult): string {
+  const parts = [`${r.merged} merged`, `${r.improved} improved`, `${r.proposed} proposed`]
+  if (r.failed) parts.push(`${r.failed} failed`)
+  const line = parts.join(', ')
+  return r.skipped ? `Nothing done: ${r.skipped}` : line
+}
+
 function LessonRow({
   lesson,
   crewName,
@@ -163,6 +170,7 @@ function LessonRow({
   onSelect,
   onEdit,
   onDelete,
+  onJump,
 }: {
   lesson: Lesson
   crewName: string
@@ -170,6 +178,7 @@ function LessonRow({
   onSelect: (v: boolean) => void
   onEdit: () => void
   onDelete: () => void
+  onJump: (id: number) => void
 }) {
   const setStatus = useSetLessonStatus()
   const move = useMoveLesson()
@@ -195,6 +204,21 @@ function LessonRow({
               {crewName} · {lesson.sourceJobs.length > 0 ? `${lesson.sourceJobs.length} source${lesson.sourceJobs.length === 1 ? '' : 's'} · ` : ''}seen {lesson.hits}x · {timeAgo(lesson.updatedAt)}
             </span>
           </div>
+          {lesson.status === 'deleted' && lesson.consolidatedInto != null && (
+            <p className="text-xs">
+              <Badge variant="outline">Merged into #{lesson.consolidatedInto}</Badge>
+            </p>
+          )}
+          {lesson.related.length > 0 && (
+            <div className="flex flex-wrap items-center gap-1.5 text-xs" role="group" aria-label={`Lessons related to lesson ${lesson.id}`}>
+              <span className="text-muted-foreground">Related</span>
+              {lesson.related.slice(0, 5).map((id) => (
+                <Button key={id} size="sm" variant="outline" className="h-5 px-1.5 font-mono text-[11px]" aria-label={`Go to related lesson ${id}`} onClick={() => onJump(id)}>
+                  #{id}
+                </Button>
+              ))}
+            </div>
+          )}
           {(lesson.files.length > 0 || lesson.symbols.length > 0) && (
             <p className="text-muted-foreground font-mono text-[11px]">{[...lesson.files, ...lesson.symbols].join('  ')}</p>
           )}
@@ -250,15 +274,19 @@ function LessonRow({
   )
 }
 
-export function LessonsList({ filter, crews }: { filter: LessonFilter; crews: Crew[] }) {
+export function LessonsList({ filter, crews, crewId }: { filter: LessonFilter; crews: Crew[]; crewId?: number | null }) {
   const lessons = useLessons(filter)
   const [selected, setSelected] = useState<number[]>([])
   const [editing, setEditing] = useState<Lesson | null>(null)
   const [deleting, setDeleting] = useState<Lesson | null>(null)
   const [merging, setMerging] = useState(false)
+  const consolidate = useConsolidate()
+  const [result, setResult] = useState<ConsolidateResult | null>(null)
   const list = useMemo(() => (lessons.data ?? []).filter((l) => filter.status || l.status !== 'deleted'), [lessons.data, filter.status])
   const picked = list.filter((l) => selected.includes(l.id))
   const sameCrew = new Set(picked.map((l) => l.crewId)).size <= 1
+  const mergedCount = (lessons.data ?? []).filter((l) => l.status === 'deleted' && l.consolidatedInto != null).length
+  const jump = (id: number) => document.querySelector(`[data-lesson="${id}"]`)?.scrollIntoView({ block: 'center' })
   const name = (id: number) => crews.find((c) => c.id === id)?.name ?? `project ${id}`
 
   return (
@@ -266,7 +294,18 @@ export function LessonsList({ filter, crews }: { filter: LessonFilter; crews: Cr
       <div className="flex items-center justify-between gap-3">
         <p className="text-muted-foreground text-xs" aria-live="polite">
           {lessons.isPending ? 'Loading…' : `${list.length} ${list.length === 1 ? 'lesson' : 'lessons'}`}
+          {mergedCount > 0 && ` · ${mergedCount} merged`}
         </p>
+        {crewId != null && (
+          <Button
+            size="sm"
+            variant="outline"
+            disabled={consolidate.isPending}
+            onClick={() => consolidate.mutate([crewId], { onSuccess: setResult })}
+          >
+            {consolidate.isPending ? 'Consolidating…' : 'Consolidate now'}
+          </Button>
+        )}
         <Button
           size="sm"
           variant="outline"
@@ -277,6 +316,12 @@ export function LessonsList({ filter, crews }: { filter: LessonFilter; crews: Cr
           Merge selected ({picked.length})
         </Button>
       </div>
+      {result && !consolidate.isPending && (
+        <p className="text-xs" role="status">
+          {consolidateSummary(result)}
+        </p>
+      )}
+      <ErrorLine error={consolidate.error} />
       <ErrorLine error={lessons.error} />
       {list.length === 0 && !lessons.isPending ? (
         <Empty>No lessons match. They appear here after a finished session is learned from.</Empty>
@@ -291,6 +336,7 @@ export function LessonsList({ filter, crews }: { filter: LessonFilter; crews: Cr
               onSelect={(v) => setSelected((s) => (v ? [...s, l.id] : s.filter((i) => i !== l.id)))}
               onEdit={() => setEditing(l)}
               onDelete={() => setDeleting(l)}
+              onJump={jump}
             />
           ))}
         </ul>

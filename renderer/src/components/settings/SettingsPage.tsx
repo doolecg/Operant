@@ -3,7 +3,8 @@ import { X } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { ScrollArea } from '@/components/ui/scroll-area'
-import { useAppInfo, useSettings } from '@/lib/queries'
+import { hiddenSections } from '@shared/install'
+import { useAppInfo, useInstallStatus, useSettings } from '@/lib/queries'
 import { cn } from '@/lib/utils'
 import { SECTION_COMPONENTS } from './sections'
 import { SettingsNavContext } from './nav-context'
@@ -19,6 +20,7 @@ const subsectionHit = (p: Page, q: string) => (q && !p.label.toLowerCase().inclu
 export function SettingsPage({ initialSection, onClose }: { initialSection?: string; onClose: () => void }) {
   const settings = useSettings()
   const info = useAppInfo()
+  const hidden = hiddenSections(useInstallStatus().data, settings.data?.mainCli)
   const [target, setTarget] = useState<Target>(() => resolveSettingsTarget(initialSection) ?? { page: SETTINGS_PAGES[0]! })
   const [query, setQuery] = useState('')
   const q = query.trim().toLowerCase()
@@ -56,9 +58,11 @@ export function SettingsPage({ initialSection, onClose }: { initialSection?: str
     const next = resolveSettingsTarget(section)
     if (next) setTarget(next)
   }
-  const categories = SETTINGS_CATEGORIES.map((c) => ({ ...c, pages: c.pages.filter((p) => !q || settingsSearchText(p).includes(q)) })).filter((c) => c.pages.length > 0)
+  const shown = (p: Page) => p.subsections.some((s) => !hidden.includes(s.id))
+  const categories = SETTINGS_CATEGORIES.map((c) => ({ ...c, pages: c.pages.filter((p) => shown(p) && (!q || settingsSearchText(p).includes(q))) })).filter((c) => c.pages.length > 0)
+  const visibleSubsections = current.subsections.filter((s) => !hidden.includes(s.id))
   const openPage = (p: Page) => setTarget({ page: p, section: subsectionHit(p, q) })
-  const multi = current.subsections.length > 1
+  const multi = visibleSubsections.length > 1
 
   return (
     <SettingsNavContext.Provider value={goTo}>
@@ -143,7 +147,8 @@ export function SettingsPage({ initialSection, onClose }: { initialSection?: str
               <h2 className="text-lg font-semibold">{current.label}</h2>
               <p className="text-muted-foreground text-sm">{current.description}</p>
             </div>
-            {current.subsections.map((sub, i) => {
+            {visibleSubsections.length === 0 && <p className="text-muted-foreground text-sm">This needs a tool that is not installed. Install it from the Install page.</p>}
+            {visibleSubsections.map((sub, i) => {
               const Section = SECTION_COMPONENTS[sub.id]
               return (
                 <section key={sub.id} id={`settings-${sub.id}`} className={cn('scroll-mt-6 space-y-6', multi && i > 0 && 'border-t pt-8')}>

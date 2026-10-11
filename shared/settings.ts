@@ -8,6 +8,7 @@ import { DEFAULT_BROWSER_SETTINGS, type BrowserSettings } from './browser'
 import { sanitizePerCrew } from './browser-compat'
 import { MOD_DEFAULT_ENABLED, MOD_IDS, type ModId } from './claude-mods'
 import { CLAUDE_EFFORTS } from './models'
+import { DEFAULT_CURRENCY, sanitizeCurrency, type CurrencySetting } from './currency'
 
 export type HindsightMode = 'local' | 'lan' | 'remote'
 
@@ -34,6 +35,8 @@ export type KeyAction =
   | 'zoomIn'
   | 'zoomOut'
   | 'zoomReset'
+  | 'dictate'
+  | 'toggleNotes'
 
 export type TileLayout = 'dwindle' | 'master'
 export type MainCli = 'claude' | 'opencode'
@@ -59,6 +62,8 @@ export interface Settings {
   auxModels: AuxModels
   // Daily budget for every learn and memory model call (counts, USD), the retries and what a limit does.
   aux: AuxSettings
+  // The currency money is shown in; amounts are stored in USD and shown as USD x rate (the rate is typed by the user).
+  currency: CurrencySetting
   // Daily spend budget in USD across all crews; 0 turns the budget off.
   dailyBudgetUsd: number
   // The same across the last 5 hours and the last 7 days; 0 turns each off.
@@ -95,7 +100,8 @@ export interface Settings {
   appearance: Appearance
   // The project list width in px that the user dragged; 0 keeps the built-in size. The window clamps it live.
   // sidebarHidden remembers whether the user hid the project list.
-  layout: { sidebarWidth: number; sidebarHidden: boolean }
+  // notesOpen shows the Notes panel beside the tiles; notesWidth is its dragged width (0 keeps the built-in 260).
+  layout: { sidebarWidth: number; sidebarHidden: boolean; notesOpen: boolean; notesWidth: number }
   // Terminal text: copy once on mouseup, font size in px, scrollback lines, Ctrl+click file paths, dropped files type their paths.
   terminal: { copyOnSelect: boolean; fontSize: number; scrollback: number; fileLinks: boolean; dropPaths: boolean }
   // The tiles surface: layout kind, gap in px and the strip's size.
@@ -110,6 +116,10 @@ export interface Settings {
   confirm: { closeTile: boolean; closeApp: boolean }
   // Windows notifications for a Claude turn that finished and for Claude waiting on the owner.
   notify: { finished: boolean; needs: boolean }
+  // Dictation in the Chat view: off hides the microphone button and ignores the dictation shortcut.
+  dictation: { enabled: boolean }
+  // True once the first-start setup (optional installs) was shown and answered; "Show setup again" in Settings reopens it.
+  setupDone: boolean
   tokens: {
     // Percent of a cap at which the warning fires.
     capWarnPct: number
@@ -147,6 +157,8 @@ export const KEY_ACTIONS: Array<{ id: KeyAction; label: string }> = [
   { id: 'zoomIn', label: 'Zoom in (UI scale)' },
   { id: 'zoomOut', label: 'Zoom out (UI scale)' },
   { id: 'zoomReset', label: 'Reset the UI scale to automatic' },
+  { id: 'dictate', label: 'Start or stop dictation' },
+  { id: 'toggleNotes', label: 'Toggle notes' },
 ]
 
 export const DEFAULT_SETTINGS: Settings = {
@@ -154,6 +166,7 @@ export const DEFAULT_SETTINGS: Settings = {
   memory: DEFAULT_MEMORY_SETTINGS,
   auxModels: DEFAULT_AUX_MODELS,
   aux: DEFAULT_AUX_SETTINGS,
+  currency: DEFAULT_CURRENCY,
   dailyBudgetUsd: 0,
   fiveHourBudgetUsd: 0,
   weeklyBudgetUsd: 0,
@@ -163,6 +176,7 @@ export const DEFAULT_SETTINGS: Settings = {
   infoBar: true,
   contextWarnPct: 60,
   contextDangerPct: 85,
+  setupDone: false,
   hindsightUrl: '',
   hindsight: { mode: 'local', bindHost: '127.0.0.1', port: 9077, url: '', openBind: false },
   shell: { file: '', args: '' },
@@ -191,16 +205,19 @@ export const DEFAULT_SETTINGS: Settings = {
     zoomIn: 'Mod+=',
     zoomOut: 'Mod+-',
     zoomReset: 'Mod+0',
+    dictate: 'Alt+D',
+    toggleNotes: 'Alt+N',
   },
   uiScale: 0,
   appearance: DEFAULT_APPEARANCE,
-  layout: { sidebarWidth: 0, sidebarHidden: false },
+  layout: { sidebarWidth: 0, sidebarHidden: false, notesOpen: false, notesWidth: 0 },
   terminal: { copyOnSelect: false, fontSize: 13, scrollback: 5000, fileLinks: true, dropPaths: true },
   tiles: { layout: 'dwindle', gaps: 6, strip: 'normal' },
   claudeMods: { enabled: true, mods: { ...MOD_DEFAULT_ENABLED }, keepWarm: true, commandMenu: true },
   browser: { ...DEFAULT_BROWSER_SETTINGS },
   confirm: { closeTile: true, closeApp: true },
   notify: { finished: true, needs: true },
+  dictation: { enabled: true },
   topBar: {
     mediaControls: typeof process !== 'undefined' && process.platform === 'win32',
     mediaSize: 'full',
@@ -280,6 +297,7 @@ export function sanitizeSettings(raw: unknown): Settings {
   const browser = r.browser ?? {}
   const confirm = r.confirm ?? {}
   const notify = r.notify ?? {}
+  const dictation = r.dictation ?? {}
   const learn = r.learn ?? {}
   const layout = r.layout ?? {}
   const term = r.terminal ?? {}
@@ -312,13 +330,16 @@ export function sanitizeSettings(raw: unknown): Settings {
       minUserTurns: Math.round(num(learn.minUserTurns, d.learn.minUserTurns, 0, 100)),
       minTokens: Math.round(num(learn.minTokens, d.learn.minTokens, 0, 10_000_000)),
       idleMinutes: Math.round(num(learn.idleMinutes, d.learn.idleMinutes, 0, 1440)),
+      consolidateAt: Math.round(num(learn.consolidateAt, d.learn.consolidateAt, 5, 500)),
     },
     memory: sanitizeMemory(r.memory),
     auxModels: sanitizeAuxModels(r.auxModels),
     aux: sanitizeAux(r.aux),
+    currency: sanitizeCurrency(r.currency),
     dailyBudgetUsd: num(r.dailyBudgetUsd, d.dailyBudgetUsd, 0, 100_000),
     fiveHourBudgetUsd: num(r.fiveHourBudgetUsd, d.fiveHourBudgetUsd, 0, 100_000),
     weeklyBudgetUsd: num(r.weeklyBudgetUsd, d.weeklyBudgetUsd, 0, 100_000),
+    setupDone: flag(r.setupDone, d.setupDone),
     ...hindsightSettings(r),
     defaultModels: { claude: str(models.claude, d.defaultModels.claude) || d.defaultModels.claude },
     defaultEfforts: { claude: CLAUDE_EFFORTS.includes(str(efforts.claude, '', 40)) ? str(efforts.claude, '', 40) : '' },
@@ -344,6 +365,8 @@ export function sanitizeSettings(raw: unknown): Settings {
     layout: {
       sidebarWidth: Math.round(num(layout.sidebarWidth, d.layout.sidebarWidth, 0, 4000)),
       sidebarHidden: flag(layout.sidebarHidden, d.layout.sidebarHidden),
+      notesOpen: flag(layout.notesOpen, d.layout.notesOpen),
+      notesWidth: Math.round(num(layout.notesWidth, d.layout.notesWidth, 0, 4000)),
     },
     terminal: {
       copyOnSelect: flag(term.copyOnSelect, d.terminal.copyOnSelect),
@@ -380,6 +403,7 @@ export function sanitizeSettings(raw: unknown): Settings {
       finished: flag(notify.finished, d.notify.finished),
       needs: flag(notify.needs, d.notify.needs),
     },
+    dictation: { enabled: flag(dictation.enabled, d.dictation.enabled) },
     tokens: {
       capWarnPct: num(tokens.capWarnPct, d.tokens.capWarnPct, 1, 100),
       coldThresholdPct: num(tokens.coldThresholdPct, d.tokens.coldThresholdPct, 1, 100),

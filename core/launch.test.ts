@@ -30,6 +30,14 @@ const tile = (over: Partial<ScratchTerminal> = {}): ScratchTerminal => ({
 })
 
 describe('tile launches', () => {
+  it('adds a CodeGraph MCP config file only when codegraphMcp is set', () => {
+    const on = buildScratchLaunch(tile(), { ...ctx, codegraphMcp: true })
+    const f = on.files.find((x) => x.path.endsWith('codegraph-mcp.json'))
+    expect(JSON.parse(f!.content)).toEqual({ mcpServers: { codegraph: { command: 'codegraph', args: ['serve', '--mcp'] } } })
+    expect(on.args).toContain(f!.path)
+    expect(buildScratchLaunch(tile(), ctx).files.some((x) => x.path.endsWith('codegraph-mcp.json'))).toBe(false)
+  })
+
   it('passes one --plugin-dir per enabled native Claude mod, and none when there are none', () => {
     const on = buildScratchLaunch(tile(), { ...ctx, modPlugins: ['/app/plugin/mods/ideaShelf', '/app/plugin/mods/folderTracker'] })
     expect(on.args.filter((a) => a === '--plugin-dir')).toHaveLength(3)
@@ -77,6 +85,20 @@ describe('tile launches', () => {
     expect(merged.mcp.servers['operant-browser'].type).toBe('remote')
     expect(opencodeConfigContent({}, base)).toBe(base)
     expect(opencodeConfigContent({})).toBeNull()
+  })
+
+  it('adds the recall file and the CodeGraph server to the OpenCode overlay only when asked', () => {
+    expect(opencodeConfigContent({ recallFile: undefined, codegraphMcp: false })).toBeNull()
+    const both = JSON.parse(opencodeConfigContent({ recallFile: '/data/recall/abc.txt', codegraphMcp: true }) ?? '{}')
+    expect(both.instructions).toEqual(['/data/recall/abc.txt'])
+    expect(both.mcp.servers.codegraph).toEqual({ type: 'local', command: ['codegraph', 'serve', '--mcp'] })
+    const recallOnly = JSON.parse(opencodeConfigContent({ recallFile: '/data/recall/abc.txt' }) ?? '{}')
+    expect(recallOnly.mcp).toBeUndefined()
+    const cgOnly = JSON.parse(opencodeConfigContent({ codegraphMcp: true }, JSON.stringify({ instructions: ['x.md'] })) ?? '{}')
+    expect(cgOnly.instructions).toEqual(['x.md'])
+    expect(cgOnly).not.toHaveProperty('instructions.1')
+    const merged = JSON.parse(opencodeConfigContent({ recallFile: '/r.txt' }, JSON.stringify({ instructions: ['x.md'] })) ?? '{}')
+    expect(merged.instructions).toEqual(['x.md', '/r.txt'])
   })
 
   it('starts a Claude tile with the plugin dir and the CLI token placeholders', () => {

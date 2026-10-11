@@ -1,14 +1,26 @@
+import { useState } from 'react'
+import { Loader2 } from 'lucide-react'
+import { Badge } from '@/components/ui/badge'
+import { Button } from '@/components/ui/button'
+import { ConfirmDialog } from '@/components/ui/confirm-dialog'
+import { commandText, installItem, statusLabel } from '@shared/install'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Switch } from '@/components/ui/switch'
 import type { ModId } from '@shared/claude-mods'
 import { CLAUDE_MODS } from '@/components/mods/registry'
-import { useCapabilities, useSaveSettings, useSettings } from '@/lib/queries'
+import { useAppInfo, useCapabilities, useInstallRun, useInstallStatus, useSaveSettings, useSettings } from '@/lib/queries'
 import { NumberField, Row } from '../parts'
 
 export function ModsSection() {
   const settings = useSettings()
   const save = useSaveSettings()
   const caps = useCapabilities().data?.claude
+  const run = useInstallRun()
+  const speech = useInstallStatus().data?.find((x) => x.id === 'dictation')
+  const platform = useAppInfo().data?.platform ?? 'win32'
+  const [confirm, setConfirm] = useState(false)
+  const [installing, setInstalling] = useState(false)
+  const [installError, setInstallError] = useState<string | null>(null)
   const s = settings.data
   if (!s) return null
   const m = s.claudeMods
@@ -16,6 +28,11 @@ export function ModsSection() {
 
   return (
     <>
+      {s.mainCli === 'opencode' && (
+        <p className="text-muted-foreground text-xs" role="note">
+          Claude mods only run in Claude Code tiles. OpenCode tiles do not load them.
+        </p>
+      )}
       <Card>
         <CardHeader>
           <CardTitle className="text-base">Claude Mods</CardTitle>
@@ -68,6 +85,46 @@ export function ModsSection() {
           </Card>
         )
       })}
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base">Dictation</CardTitle>
+          <CardDescription>The microphone button in the Chat composer. Speech is turned into text on this device.</CardDescription>
+        </CardHeader>
+        <CardContent className="divide-y">
+          <Row label="Enable dictation" hint="Off hides the microphone button and the dictation shortcut does nothing." htmlFor="dictation-enabled">
+            <Switch id="dictation-enabled" checked={s.dictation.enabled} onCheckedChange={(v) => save.mutate({ dictation: { enabled: v } })} />
+          </Row>
+          <Row label="Shortcut" hint="Change it in Shortcuts.">
+            <kbd className="bg-muted rounded px-2 py-0.5 font-mono text-xs">{s.keybinds.dictate || 'unbound'}</kbd>
+          </Row>
+          <Row label="Speech model" hint={installError ?? installItem('dictation').enables}>
+            <div className="flex items-center gap-2">
+              <Badge variant={speech?.state === 'installed' ? 'secondary' : 'outline'}>{statusLabel(speech)}</Badge>
+              <Button size="sm" variant="outline" aria-label="Install Dictation speech model" disabled={installing || speech?.state === 'installed'} onClick={() => setConfirm(true)}>
+                {installing && <Loader2 className="animate-spin" />}
+                {installing ? 'Installing' : 'Install'}
+              </Button>
+            </div>
+          </Row>
+        </CardContent>
+      </Card>
+      <ConfirmDialog
+        open={confirm}
+        title="Install Dictation speech model?"
+        description={<p>{commandText('dictation', platform)}</p>}
+        confirmLabel="Run the install"
+        testId="install-confirm"
+        onConfirm={async () => {
+          setConfirm(false)
+          setInstalling(true)
+          setInstallError(null)
+          const r = await run.mutateAsync('dictation')
+          setInstalling(false)
+          if (!r.ok) setInstallError(r.error)
+        }}
+        onCancel={() => setConfirm(false)}
+      />
 
       <Card>
         <CardHeader>

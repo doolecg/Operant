@@ -1,5 +1,5 @@
 import { memo, useState } from 'react'
-import { AlertCircle, Bot, Box, BrainCircuit, ChevronRight, Copy, FileText, Gauge, Globe, Info, ListChecks, Minimize2, Network, Pencil, Plug, Search, Sparkles, Square, SquareTerminal, Webhook, Wrench, type LucideIcon } from 'lucide-react'
+import { AlertCircle, Bot, Box, BrainCircuit, Camera, ChevronRight, Copy, FileText, Gauge, Globe, Info, ListChecks, Minimize2, Network, Pencil, Plug, Search, Sparkles, Square, SquareTerminal, Webhook, Wrench, type LucideIcon } from 'lucide-react'
 import {
   partialTarget,
   type CommandItem,
@@ -14,7 +14,8 @@ import {
 } from '@shared/claude-chat'
 import { Markdown, CopyTextButton } from '@/components/ui/markdown'
 import { cn } from '@/lib/utils'
-import { agentContext, agentRowFor, agentTitle, agentTldr, firstLines, formatDuration, isToolRunning, kTokens, noticeChipIcon, toolIconKey, toolRowParts, type ChipIcon, type ToolIconKey } from './chatHelpers'
+import { agentContext, agentRowFor, agentTitle, agentTldr, firstLines, formatDuration, isToolRunning, kTokens, noticeChipIcon, toolIconKey, tokensSuffix, toolRowParts, type ChipIcon, type ToolIconKey } from './chatHelpers'
+import { ImageModal } from './ImageModal'
 
 const TOOL_ICONS: Record<ToolIconKey, LucideIcon> = {
   memory: BrainCircuit,
@@ -92,18 +93,28 @@ function Pre({ text, className }: { text: string; className?: string }) {
 // ---------------------------------------------------------------- messages
 
 export const UserBubble = memo(function UserBubble({ item, small }: { item: UserItem; small?: boolean }) {
+  const [shown, setShown] = useState<number | null>(null)
+  const many = item.images.length > 1
   return (
     <div className="group/user flex flex-col items-end gap-1" style={{ maxWidth: small ? '92%' : '76%' }}>
       <div className={cn('bg-bubble rounded-[18px] px-[15px] py-[9px] leading-[1.55] break-words whitespace-pre-wrap', small ? 'text-[13px]' : 'text-[15px]')}>
         {item.images.length > 0 && (
           <div className="mb-2 flex flex-wrap gap-1.5">
             {item.images.map((im, i) => (
-              <a key={i} href={im.dataUrl} target="_blank" rel="noreferrer" onClick={(e) => (e.preventDefault(), window.open(im.dataUrl))} title="Open image">
-                <img src={im.dataUrl} alt="Attached" className="size-16 rounded-lg object-cover" />
-              </a>
+              <button
+                key={i}
+                type="button"
+                aria-label={many ? `Open image ${i + 1}` : 'Open image'}
+                title="Open image"
+                onClick={() => setShown(i)}
+                className="focus-visible:ring-ring rounded-lg focus-visible:ring-2 focus-visible:outline-none"
+              >
+                <img src={im.dataUrl} alt="" className="size-16 rounded-lg object-cover" />
+              </button>
             ))}
           </div>
         )}
+        <ImageModal image={shown === null ? null : (item.images[shown] ?? null)} at={item.at} index={shown ?? 0} onClose={() => setShown(null)} />
         {item.text}
       </div>
       <div className="text-muted-foreground flex h-4 items-center gap-2 text-xs">
@@ -141,7 +152,7 @@ const rowBtn = 'text-muted-foreground hover:text-foreground flex w-full items-ce
 export const ThinkingRow = memo(function ThinkingRow({ item }: { item: ThinkingItem }) {
   const [open, setOpen] = useState(false)
   const done = item.endedAt !== null
-  const label = done ? `Thought for ${formatDuration(item.endedAt! - item.startedAt)}` : 'Thinking…'
+  const label = (done ? `Thought for ${formatDuration(item.endedAt! - item.startedAt)}` : 'Thinking…') + tokensSuffix(item.tokens, true)
   const canOpen = item.text.trim().length > 0
   return (
     <div>
@@ -149,7 +160,7 @@ export const ThinkingRow = memo(function ThinkingRow({ item }: { item: ThinkingI
         type="button"
         disabled={!canOpen}
         aria-expanded={canOpen ? open : undefined}
-        title={item.tokens ? `About ${item.tokens} tokens` : undefined}
+        title={item.tokens ? `About ${item.tokens} thinking tokens (Claude Code's estimate)` : undefined}
         onClick={() => setOpen((o) => !o)}
         className={cn(rowBtn, !canOpen && 'cursor-default hover:text-muted-foreground')}
       >
@@ -164,6 +175,8 @@ export const ThinkingRow = memo(function ThinkingRow({ item }: { item: ThinkingI
 
 function ToolDetails({ t }: { t: ToolItem }) {
   const [all, setAll] = useState(false)
+  const [shownImage, setShownImage] = useState<number | null>(null)
+  const resultImages = t.result?.images ?? []
   const input = t.input && typeof t.input === 'object' ? (t.input as Record<string, unknown>) : {}
   const command = typeof input.command === 'string' ? input.command : null
   const text = t.result?.text ?? ''
@@ -183,7 +196,24 @@ function ToolDetails({ t }: { t: ToolItem }) {
           )}
         </div>
       )}
-      {t.result?.images.map((src, i) => <img key={i} src={src} alt="Tool result" className="max-h-60 rounded-[10px]" />)}
+      {resultImages.map((src, i) => (
+        <button
+          key={i}
+          type="button"
+          aria-label={resultImages.length > 1 ? `Open image ${i + 1}` : 'Open image'}
+          title="Open image"
+          onClick={() => setShownImage(i)}
+          className="focus-visible:ring-ring block rounded-[10px] focus-visible:ring-2 focus-visible:outline-none"
+        >
+          <img src={src} alt="Tool result" className="max-h-60 rounded-[10px]" />
+        </button>
+      ))}
+      <ImageModal
+        image={shownImage === null || !resultImages[shownImage] ? null : { mediaType: /^data:([^;,]+)/.exec(resultImages[shownImage])?.[1] ?? 'image/png', dataUrl: resultImages[shownImage] }}
+        at={t.startedAt}
+        index={shownImage ?? 0}
+        onClose={() => setShownImage(null)}
+      />
       {!t.diff && !text && !command && !isToolRunning(t) && !t.blockedByHook && <p className="text-muted-foreground text-xs">No output</p>}
     </div>
   )
@@ -282,7 +312,7 @@ export const CommandRow = memo(function CommandRow({ item }: { item: CommandItem
   )
 })
 
-const CHIP_ICONS: Record<ChipIcon, LucideIcon> = { cube: Box, hook: Webhook, gauge: Gauge, compact: Minimize2, stop: Square, alert: AlertCircle, plug: Plug, info: Info }
+const CHIP_ICONS: Record<ChipIcon, LucideIcon> = { cube: Box, hook: Webhook, gauge: Gauge, compact: Minimize2, stop: Square, alert: AlertCircle, plug: Plug, info: Info, camera: Camera }
 
 const chipBase = 'inline-flex max-w-full items-center gap-1.5 px-2.5 py-1 text-[12.5px] leading-snug'
 
@@ -308,6 +338,7 @@ function PingChip({ item }: { item: NoticeItem }) {
 
 export const NoticeRow = memo(function NoticeRow({ item, onRestart, onTerminal }: { item: NoticeItem; onRestart: () => void; onTerminal: () => void }) {
   const [open, setOpen] = useState(false)
+  const [shownImage, setShownImage] = useState<number | null>(null)
   if (item.ping) return <PingChip item={item} />
   const Icon = CHIP_ICONS[noticeChipIcon(item.source, item.tone)]
   const tone = item.tone === 'error' ? 'bg-destructive/10 text-destructive' : item.tone === 'warn' ? 'bg-warning/10 text-warning' : 'bg-muted/60 text-muted-foreground'
@@ -335,10 +366,32 @@ export const NoticeRow = memo(function NoticeRow({ item, onRestart, onTerminal }
         )}
       </div>
       {open && item.detail && <Pre text={item.detail} className="text-muted-foreground mt-1.5 max-h-48" />}
+      {item.images && item.images.length > 0 && (
+        <div className="mt-1.5 flex flex-wrap gap-1.5">
+          {item.images.map((im, i) => (
+            <button
+              key={i}
+              type="button"
+              aria-label={item.images && item.images.length > 1 ? `Open image ${i + 1}` : 'Open image'}
+              title="Open image"
+              onClick={() => setShownImage(i)}
+              className="focus-visible:ring-ring block rounded-[10px] focus-visible:ring-2 focus-visible:outline-none"
+            >
+              <img src={im.dataUrl} alt="" className="max-h-60 rounded-[10px]" />
+            </button>
+          ))}
+        </div>
+      )}
+      <ImageModal image={shownImage === null ? null : (item.images?.[shownImage] ?? null)} at={item.at} index={shownImage ?? 0} onClose={() => setShownImage(null)} />
     </div>
   )
 })
 
 export const TurnRow = memo(function TurnRow({ item }: { item: TurnItem }) {
-  return <div className="text-muted-foreground/70 text-xs">{item.ok ? 'Done' : 'Stopped'} in {formatDuration(item.durationMs)}</div>
+  return (
+    <div className="text-muted-foreground/70 text-xs" title={item.outputTokens ? `${item.outputTokens} output tokens this turn` : undefined}>
+      {item.ok ? 'Done' : 'Stopped'} in {formatDuration(item.durationMs)}
+      {tokensSuffix(item.outputTokens)}
+    </div>
+  )
 })

@@ -1,4 +1,4 @@
-import type { Lesson } from '../shared/learn'
+import { lessonNeedsReview, type Lesson } from '../shared/learn'
 
 // Pure helpers over lesson text: comparing, matching and rendering for a brief.
 
@@ -46,3 +46,62 @@ export const slug = (text: string, max = 40): string =>
     .replace(/^-+|-+$/g, '')
     .slice(0, max)
     .replace(/-+$/, '') || 'lesson'
+
+export const CLUSTER_FLOOR = 0.35
+export const LINK_FLOOR = 0.3
+
+const eligible = (l: Lesson): boolean => l.status === 'active' && l.consolidatedInto == null
+
+// Groups of 2 to 6 related, not-yet-duplicate active lessons (same project, scope and kind, same code) for the model to fold into one.
+// Lessons that need review are left out. Greedy from the oldest lesson; largest groups first.
+export function clusterLessons(lessons: Lesson[], opts: { min?: number; max?: number } = {}): Lesson[][] {
+  const min = opts.min ?? 2
+  const max = opts.max ?? 6
+  const pool = lessons.filter((l) => eligible(l) && !lessonNeedsReview(l.text)).sort((a, b) => a.id - b.id)
+  const used = new Set<number>()
+  const groups: Lesson[][] = []
+  for (const seed of pool) {
+    if (used.has(seed.id)) continue
+    const group = [seed]
+    for (const c of pool) {
+      if (group.length >= max) break
+      if (c.id === seed.id || used.has(c.id)) continue
+      if (c.crewId !== seed.crewId || c.scope !== seed.scope || c.kind !== seed.kind) continue
+      if (!sameTargets(seed, c)) continue
+      const s = similarity(seed.text, c.text)
+      if (s >= CLUSTER_FLOOR && s < DUPLICATE_AT) group.push(c)
+    }
+    if (group.length < min) continue
+    for (const g of group) used.add(g.id)
+    groups.push(group)
+  }
+  return groups.sort((a, b) => b.length - a.length)
+}
+
+// Symmetric links between active lessons of one project and scope that share a file or symbol, or read alike
+// (similarity of at least 0.3). At most `cap` per lesson, strongest first, ties by lower id. Only linked lessons have an entry.
+export function buildLinks(lessons: Lesson[], cap = 5): Map<number, number[]> {
+  const pool = lessons.filter(eligible).sort((a, b) => a.id - b.id)
+  const pairs: Array<{ a: number; b: number; score: number }> = []
+  for (let i = 0; i < pool.length; i++) {
+    for (let j = i + 1; j < pool.length; j++) {
+      const x = pool[i]!
+      const y = pool[j]!
+      if (x.id === y.id || x.crewId !== y.crewId || x.scope !== y.scope) continue
+      const [xf, yf, xs, ys] = [lower(x.files), lower(y.files), lower(x.symbols), lower(y.symbols)]
+      const shared = xf.filter((f) => yf.includes(f)).length + xs.filter((s) => ys.includes(s)).length
+      const sim = similarity(x.text, y.text)
+      if (!shared && sim < LINK_FLOOR) continue
+      pairs.push({ a: x.id, b: y.id, score: sim + (shared ? 1 + shared / 100 : 0) })
+    }
+  }
+  pairs.sort((p, q) => q.score - p.score || p.a - q.a || p.b - q.b)
+  const out = new Map<number, number[]>()
+  const add = (from: number, to: number) => out.set(from, [...(out.get(from) ?? []), to])
+  for (const p of pairs) {
+    if ((out.get(p.a)?.length ?? 0) >= cap || (out.get(p.b)?.length ?? 0) >= cap) continue
+    add(p.a, p.b)
+    add(p.b, p.a)
+  }
+  return out
+}

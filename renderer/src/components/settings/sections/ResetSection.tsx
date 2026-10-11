@@ -12,6 +12,7 @@ const LABELS: Record<keyof Settings, string> = {
   memory: 'Memory recall',
   auxModels: 'Auxiliary models',
   aux: 'Auxiliary calls and limits',
+  currency: 'Currency',
   dailyBudgetUsd: 'Daily budget',
   fiveHourBudgetUsd: '5-hour budget',
   weeklyBudgetUsd: 'Weekly budget',
@@ -36,8 +37,10 @@ const LABELS: Record<keyof Settings, string> = {
   topBar: 'Top bar',
   confirm: 'Close confirmations',
   notify: 'Notifications',
+  dictation: 'Dictation',
   tokens: 'Tokens and cache',
   browser: 'Browser',
+  setupDone: 'First-start setup',
 }
 
 const SECTIONS = Object.keys(DEFAULT_SETTINGS) as Array<keyof Settings>

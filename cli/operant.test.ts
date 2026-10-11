@@ -1,7 +1,24 @@
 import { describe, expect, it } from 'vitest'
-import { parseArgs, render } from './operant'
+import { resolve } from 'node:path'
+import { HELP, main, parseArgs, render } from './operant'
 
 describe('operant CLI', () => {
+  it('sends a shot file as an absolute path and passes kind through', () => {
+    const p = parseArgs(['shot', 'out/a.png', '--kind', 'chat'])
+    expect(p).toEqual({ kind: 'request', cmd: 'shot', args: { file: resolve('out/a.png'), kind: 'chat' }, json: false, stdin: null })
+    expect(parseArgs(['shot', 'out/a.png'])).toMatchObject({ kind: 'request', args: { file: resolve('out/a.png') } })
+  })
+
+  it('treats a missing shot file as a usage error (exit 2)', async () => {
+    const r = await main(['shot'], {})
+    expect(r.code).toBe(2)
+    expect(r.stderr).toContain('Missing <file>')
+  })
+
+  it('lists shot in --help', () => {
+    expect(HELP).toContain('operant shot <file> [--kind K]')
+  })
+
   it('parses memory recall into the query text', () => {
     const p = parseArgs(['memory', 'recall', 'how', 'we', 'deploy'])
     expect(p).toEqual({ kind: 'request', cmd: 'memory.recall', args: { query: 'how we deploy' }, json: false, stdin: null })

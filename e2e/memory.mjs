@@ -9,6 +9,7 @@ import { DatabaseSync } from 'node:sqlite'
 import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
 import { _electron as electron } from 'playwright-core'
+import { shot } from './lib/shot.mjs'
 import { claudeHome, e2eEnv } from './fixtures/real-claude.mjs'
 
 const outDir = resolve(process.argv[2] ?? 'docs/specs/screenshots')
@@ -45,10 +46,6 @@ async function launch() {
   await page.waitForFunction(() => !!window.operant)
 }
 const inv = (channel, ...args) => page.evaluate(([c, a]) => window.operant.invoke(c, ...a), [channel, args])
-const shot = async (name) => {
-  await page.waitForTimeout(500)
-  await page.screenshot({ path: join(outDir, `${name}.png`) })
-}
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
 async function until(label, fn, timeout = 60_000) {
   const end = Date.now() + timeout
@@ -165,7 +162,7 @@ try {
     const t = await inv('learn:test')
     assert.equal(t.cli, 'opencode')
     assert.ok(t.ok || t.error.length > 0, 'a failed test explains itself')
-    await shot('learning-ai')
+    await shot(page, 'learning-ai')
     await inv('settings:set', { learn: { cli: 'claude', model: '', effort: '' } })
     await card.getByTestId('learn-ai-resolved').getByText('claude-haiku-5-5').waitFor()
   })
@@ -201,7 +198,7 @@ try {
       // A plain-http host outside the LAN is refused until confirmed.
       await inv('settings:set', { learn: { localUrl: 'http://example.com:1234' } })
       assert.match((await inv('learn:ai')).error, /unencrypted/)
-      await shot('learning-ai-local')
+      await shot(page, 'learning-ai-local')
     } finally {
       await new Promise((r) => srv.close(r))
       await inv('settings:set', { learn: { cli: 'claude', model: '', effort: '', localUrl: 'http://127.0.0.1:1234' } })
@@ -229,7 +226,7 @@ try {
     assert.ok(!JSON.stringify(await inv('settings:get')).includes('test-key-12345'), 'the key is not in settings')
     await page.getByRole('button', { name: 'Test connection' }).click()
     await page.getByRole('status', { name: 'Test result' }).waitFor()
-    await shot('settings-hindsight-remote')
+    await shot(page, 'settings-hindsight-remote')
     await inv('hindsight:clearKey', 'remote')
   })
 
@@ -251,7 +248,7 @@ try {
     await pick('Status', 'Any status')
     await until('all back', async () => (await page.locator('[data-lesson]').count()) === 4)
     await page.setViewportSize({ width: 1440, height: 1500 })
-    await shot('memory-manager')
+    await shot(page, 'memory-manager')
     await page.setViewportSize({ width: 1440, height: 900 })
   })
 
@@ -367,7 +364,7 @@ try {
     await panel.locator('[data-store="memory"]').getByText('Off', { exact: true }).waitFor()
     await panel.getByRole('switch', { name: 'Personal memory on or off' }).click()
     await until('memory on', async () => (await inv('settings:get')).learn.memory === true)
-    await shot('learning-status')
+    await shot(page, 'learning-status')
   })
 
   await step('header badge shows learning health and opens the Memory page', async () => {

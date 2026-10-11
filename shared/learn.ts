@@ -24,6 +24,10 @@ export interface Lesson {
   stores: LearnStore[]
   status: LessonStatus
   hits: number
+  // Ids of lessons about the same code or subject.
+  related: number[]
+  // The lesson this one was folded into by consolidation (null when it was not).
+  consolidatedInto: number | null
   createdAt: number
   updatedAt: number
 }
@@ -118,7 +122,7 @@ export interface LearnSettings {
   hindsight: boolean
   codegraph: boolean
   memory: boolean
-  // 'queue' (the default) keeps new lessons pending (not written, not in briefs) until the user approves them.
+  // 'auto' (the default) applies new lessons at once; 'queue' keeps them pending (not written, not in briefs) until the user approves them.
   // Even 'auto' queues a lesson that mentions a command, a URL, or 'always' / 'never' (see lessonNeedsReview).
   review: LearnReview
   // The AI that reads the session. Empty model = a cheap default for the CLI (resolved when it runs); empty effort = the model's own.
@@ -146,6 +150,8 @@ export interface LearnSettings {
   // Minutes a Claude session must sit quiet before the app learns from it on its own (the app's timer, no model call to
   // decide); 0 turns it off. A tile whose turn has finished (the finished flag) is learned from after a few seconds of quiet. Closing a tile still learns.
   idleMinutes: number
+  // Active lessons in a project before consolidation runs (5 to 500).
+  consolidateAt: number
 }
 
 export type LearnMode = 'off' | 'suggest' | 'controlled' | 'advanced'
@@ -180,16 +186,17 @@ export const lessonNeedsReview = (text: string): boolean => RISKY_LESSON.test(te
 
 export const DEFAULT_LEARN_SETTINGS: LearnSettings = {
   enabled: true,
-  hindsight: true,
-  codegraph: true,
+  // Hindsight and CodeGraph are opt-in (Settings, Memory): learning and memory do not use them until switched on.
+  hindsight: false,
+  codegraph: false,
   memory: true,
-  review: 'queue',
+  review: 'auto',
   cli: 'claude',
   model: '',
   effort: '',
   localUrl: 'http://127.0.0.1:1234',
   localInsecureOk: false,
-  mode: 'suggest',
+  mode: 'advanced',
   maxCallsPerReview: 3,
   maxTokensPerReview: 60_000,
   maxChangesPerReview: 5,
@@ -197,8 +204,9 @@ export const DEFAULT_LEARN_SETTINGS: LearnSettings = {
   dailyUsdBudget: 0,
   onLimit: 'stop',
   minUserTurns: 3,
-  minTokens: 2000,
+  minTokens: 500,
   idleMinutes: 5,
+  consolidateAt: 40,
 }
 
 // A recorded automatic change (or a proposal waiting for review): what it was, what it became, and why.
@@ -233,4 +241,16 @@ export interface MemoryFile {
   description: string
   type: string
   body: string
+}
+
+export interface ConsolidateResult {
+  // Lessons folded into another (retired).
+  merged: number
+  // Single lessons tightened.
+  improved: number
+  // Results queued for review (suggest mode, or a risky text).
+  proposed: number
+  failed: number
+  // Why the pass did nothing or stopped early ('' when it ran through).
+  skipped: string
 }

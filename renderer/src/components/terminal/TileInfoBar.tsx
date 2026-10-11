@@ -1,8 +1,9 @@
 import { useQuery } from '@tanstack/react-query'
 import { Folder, GitBranch } from 'lucide-react'
-import type { ClaudeSessionStatus } from '@shared/claude-mods'
+import { runningSubagentCount, tileStatusLabel, type ClaudeSessionStatus, type TileStatusTone } from '@shared/claude-mods'
 import type { Crew } from '@shared/types'
-import { compact, usd } from '@/lib/format'
+import { compact } from '@/lib/format'
+import { useMoney } from '@/lib/useMoney'
 import { call, useClaudeTileState, useGitInfo, usePresets, useSettings } from '@/lib/queries'
 import { cn } from '@/lib/utils'
 import { pill } from '@/components/topbar/pill'
@@ -19,8 +20,6 @@ function contextTokens(s: ClaudeSessionStatus | null): number | null {
   return (u.inputTokens ?? 0) + (u.cacheCreationTokens ?? 0) + (u.cacheReadTokens ?? 0)
 }
 
-const costText = (n: number) => (n > 0 && n < 0.01 ? '<$0.01' : usd(n))
-
 // Only the folder and branch shrink (and truncate); the others keep their width so no text runs into the next item.
 function Item({ label, children, title, shrink }: { label: string; children: React.ReactNode; title?: string; shrink?: boolean }) {
   return (
@@ -32,6 +31,14 @@ function Item({ label, children, title, shrink }: { label: string; children: Rea
 }
 
 // The thin row under a tile's title: model, context, tokens, cost, folder and branch. Values Operant cannot observe show as n/a.
+const TONE_DOT: Record<TileStatusTone, string> = {
+  exited: 'bg-destructive',
+  warn: 'bg-warning',
+  working: 'bg-working animate-pulse',
+  done: 'bg-success',
+  idle: 'bg-muted-foreground/60',
+}
+
 // The state pill in a tile's header. Claude tiles follow the hook-derived phase; the others only show "Exited".
 export function TileStatus({ tile }: { tile: TerminalTab }) {
   const claude = tile.kind === 'claude'
@@ -41,10 +48,9 @@ export function TileStatus({ tile }: { tile: TerminalTab }) {
   if (tile.exited || (claude && state?.ptyRunning === false)) [dot, label] = ['bg-destructive', 'Exited']
   else if (claude && state) {
     const { phase, waiting } = state.session
-    if (phase === 'waiting') [dot, label] = ['bg-warning', waiting?.type === 'permission_prompt' ? 'Needs you' : 'Waiting']
-    else if (phase === 'working') [dot, label] = ['bg-working animate-pulse', 'Working']
-    else if (phase === 'done') [dot, label] = ['bg-success', 'Done']
-    else if (phase === 'idle') [dot, label] = ['bg-muted-foreground/60', 'Idle']
+    const running = runningSubagentCount(state.subagents)
+    const s = tileStatusLabel(phase, waiting?.type, running)
+    if (s) [dot, label] = [TONE_DOT[s.tone], s.label]
   }
   if (!dot) return null
   return (
@@ -56,6 +62,7 @@ export function TileStatus({ tile }: { tile: TerminalTab }) {
 }
 
 export function TileInfoBar({ tile, crew }: { tile: TerminalTab; crew: Crew | undefined }) {
+  const { money } = useMoney()
   const enabled = useSettings().data?.infoBar ?? true
   const warn = useSettings().data?.contextWarnPct ?? 60
   const danger = useSettings().data?.contextDangerPct ?? 85
@@ -88,7 +95,7 @@ export function TileInfoBar({ tile, crew }: { tile: TerminalTab; crew: Crew | un
   const tone = pct === null ? '' : pct >= danger ? 'bg-red-500' : pct >= warn ? 'bg-amber-400' : 'bg-primary'
 
   return (
-    <div aria-label="Tile info" className="text-muted-foreground flex h-7 shrink-0 items-center gap-3 overflow-hidden border-b px-3 pb-1 font-mono text-[11px] whitespace-nowrap">
+    <div aria-label="Tile info" className="text-muted-foreground flex min-h-7 shrink-0 flex-wrap items-center gap-x-3 gap-y-0.5 overflow-hidden border-b px-3 pb-1 font-mono text-[11px] whitespace-nowrap">
       <Item label="Model">{claude ? (status?.model ?? NA) : NA}</Item>
       <Item label="Context" title={claude ? undefined : 'Context is not reported by OpenCode'}>
         {claude ? (
@@ -115,7 +122,7 @@ export function TileInfoBar({ tile, crew }: { tile: TerminalTab; crew: Crew | un
           : 'unavailable'}
       </Item>
       <Item label="Cost" title={claude ? undefined : 'Spend over the last 24 hours'}>
-        {cost === undefined ? NA : costText(cost)}
+        {cost === undefined ? NA : money(cost)}
         {!claude && cost !== undefined && <span className="text-muted-foreground/70"> 24h</span>}
       </Item>
       {folder && (

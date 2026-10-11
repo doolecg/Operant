@@ -25,6 +25,7 @@ export const SETTINGS_SECTION_IDS = [
   'shortcuts',
   'browser',
   'reset',
+  'install',
 ] as const
 
 export type SettingsSectionId = (typeof SETTINGS_SECTION_IDS)[number]
@@ -152,6 +153,18 @@ export const SETTINGS_CATEGORIES: SettingsCategory[] = [
           { id: 'import', label: 'Import and export' },
           { id: 'reset', label: 'Reset' },
         ],
+      },
+    ],
+  },
+  {
+    label: 'Install',
+    pages: [
+      {
+        id: 'install',
+        label: 'Install',
+        description: 'The tools Operant can use, whether each is installed, and a button to install it.',
+        keywords: 'install setup uv opencode codegraph playwright superpowers dictation claude winget npm',
+        subsections: [{ id: 'install', label: 'Tools' }],
       },
     ],
   },

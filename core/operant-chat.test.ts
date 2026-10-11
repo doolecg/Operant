@@ -1,5 +1,5 @@
 import { EventEmitter } from 'node:events'
-import { appendFileSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
+import { appendFileSync, existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -9,6 +9,7 @@ import type { LearnService } from './learn'
 import { Operant, type CliAccess, type Scheduler } from './operant'
 import { SessionManager, type Pty, type PtyFactory } from './sessions'
 import { Store } from './store'
+import type { CliTarget } from './cli-server'
 import type { ChatOp } from '../shared/claude-chat'
 
 class FakePty implements Pty {
@@ -64,7 +65,9 @@ describe('Operant: Chat view tiles', () => {
   let children: Array<{ spawn: { file: string; args: string[]; env: Record<string, string>; shell: boolean }; child: FakeChatChild }>
   let bin: string
   let learned: Array<[number, string | null]>
+  let consolidated: number[]
   let pushed: Array<{ scratchId: number; ops: ChatOp[] }>
+  let target: CliTarget
 
   beforeEach(() => {
     bin = mkdtempSync(join(tmpdir(), 'operant-bin-'))
@@ -74,6 +77,7 @@ describe('Operant: Chat view tiles', () => {
     ptys = []
     children = []
     learned = []
+    consolidated = []
     pushed = []
     const spawn: PtyFactory = (file, _args, opts) => {
       const p = new FakePty(file, opts)
@@ -86,11 +90,15 @@ describe('Operant: Chat view tiles', () => {
       indexes,
       pluginDir: '/plugin',
       transcriptFile: (_cwd, id) => join(bin, `${id}.jsonl`),
-      cliServer: () => cli,
+      cliServer: (t) => ((target = t), cli),
       scheduler,
       now: () => Date.now(),
       learnModel: async () => '[]',
-      learn: { learnNow: async (crewId: number, sessionId: string | null) => void learned.push([crewId, sessionId]) } as unknown as LearnService,
+      learn: {
+        learnNow: async (crewId: number, sessionId: string | null) => void learned.push([crewId, sessionId]),
+        consolidateNow: async (crewId: number) => (consolidated.push(crewId), { merged: 2, improved: 0, proposed: 1, failed: 0, skipped: '' }),
+        lessonLookup: () => ({ isLive: () => true, related: () => [] }),
+      } as unknown as LearnService,
       launch: { platform: 'linux', launchDir: '/data/launch', rolesDir: '/data/roles', cliDir: '/app/cli', operantNode: '/app/operant', baseEnv: { PATH: bin }, writer: { mkdir: () => {}, writeFile: () => {} } },
       chatSpawn: (spec) => {
         const child = new FakeChatChild()
@@ -111,6 +119,29 @@ describe('Operant: Chat view tiles', () => {
     return op.handlers['scratch:create']({ crewId: crew.id, title: 'work', agent, model: 'claude-sonnet-5-5' }) as { id: number; view: string }
   }
   const lastChild = () => children.at(-1)!
+
+  it('operant shot saves the file and shows a shot notice with the image in the tile chat', async () => {
+    const folder = mkdtempSync(join(tmpdir(), 'operant-shot-proj-'))
+    try {
+      const crew = store.createCrew('shots', folder)
+      const t = op.handlers['scratch:create']({ crewId: crew.id, title: 'work', agent: 'claude', model: 'claude-sonnet-5-5' }) as { id: number }
+      op.startScratch(t.id)
+      const file = join(bin, 'x.png')
+      writeFileSync(file, 'png-bytes')
+      const who = target.identify(t.id)!
+      expect(who.tileId).toBe(t.id)
+      const r = await target.run(who, { cmd: 'shot', args: { file, kind: 'Home' } })
+      expect(r.exit).toBe(0)
+      expect(existsSync(r.out!)).toBe(true)
+      const notice = (await op.handlers['chat:snapshot'](t.id)).items.find((i) => i.kind === 'notice' && i.source === 'shot')
+      expect(notice).toMatchObject({ tone: 'info', images: [{ mediaType: 'image/png' }] })
+      expect(notice?.kind === 'notice' && notice.text).toMatch(/^Screenshot saved: docs\/specs\/screenshots\/home-/)
+      const bad = await target.run(who, { cmd: 'shot', args: { file: 'rel.png' } })
+      expect(bad.exit).toBe(1)
+    } finally {
+      rmSync(folder, { recursive: true, force: true })
+    }
+  })
 
   it('opens new Claude tiles in the Chat view, other tiles in the Terminal view', () => {
     expect(makeTile().view).toBe('chat')
@@ -163,14 +194,54 @@ describe('Operant: Chat view tiles', () => {
     expect(() => op.handlers['chat:setEffort'](t.id, 'galaxy')).toThrow()
   })
 
-  it('closing the tile ends the process and runs the learn step once', async () => {
+  it('closing the tile asks before learning, and learns only when the owner says yes', async () => {
     const t = makeTile()
     op.startScratch(t.id)
     const sessionId = store.getScratch(t.id)!.sessionId
+    const asks: unknown[] = []
+    op.on('learn:askOnClose', (e) => void asks.push(e))
     op.stopScratch(t.id)
     await op.chat.stop(t.id)
     expect(op.scratchStatus(t.id).running).toBe(false)
+    expect(learned).toEqual([])
+    expect(asks).toEqual([{ scratchId: t.id, title: store.getScratch(t.id)!.title, crewId: store.getScratch(t.id)!.crewId, sessionId }])
+    op.handlers['learn:answerClose'](t.id, true)
+    op.handlers['learn:answerClose'](t.id, true)
     expect(learned).toEqual([[store.getScratch(t.id)!.crewId, sessionId]])
+  })
+
+  it('skipping the close prompt learns nothing, and a tile learned from already is not asked', async () => {
+    const t = makeTile()
+    op.startScratch(t.id)
+    const asks: unknown[] = []
+    op.on('learn:askOnClose', (e) => void asks.push(e))
+    op.stopScratch(t.id)
+    await op.chat.stop(t.id)
+    op.handlers['learn:answerClose'](t.id, false)
+    expect(learned).toEqual([])
+
+    const u = makeTile()
+    op.startScratch(u.id)
+    await op.handlers['learn:runNow'](u.id)
+    op.stopScratch(u.id)
+    await op.chat.stop(u.id)
+    expect(asks).toHaveLength(1)
+  })
+
+  it('learn:consolidate runs the consolidation pass for the project and returns its result', async () => {
+    const crew = store.createCrew('shop2', '/code/shop2')
+    expect(await op.handlers['learn:consolidate'](crew.id)).toEqual({ merged: 2, improved: 0, proposed: 1, failed: 0, skipped: '' })
+    expect(consolidated).toEqual([crew.id])
+  })
+
+  it('chat:steer writes a note into the running turn and shows it as a steer item', async () => {
+    const t = makeTile()
+    op.startScratch(t.id)
+    op.handlers['chat:send'](t.id, { text: 'go' })
+    op.handlers['chat:steer'](t.id, '  use tabs  ')
+    expect(() => op.handlers['chat:steer'](t.id, '   ')).toThrow()
+    const items = (await op.handlers['chat:snapshot'](t.id)).items
+    expect(items.filter((i) => i.kind === 'user').map((i) => [i.kind === 'user' && i.text, i.kind === 'user' && i.steer])).toEqual([['go', undefined], ['use tabs', true]])
   })
 
   it('switches Chat -> Terminal -> Chat between turns on the same session, without learning', async () => {

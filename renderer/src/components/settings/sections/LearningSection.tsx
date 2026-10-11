@@ -12,7 +12,9 @@ import { STORE_LABEL, errorText } from '@/components/memory/ui'
 import { Button } from '@/components/ui/button'
 import { ModelEffortSelect } from '@/components/settings/ModelEffortSelect'
 import { useClearRecords, useLearnAi, useLearnRecords, useLocalKey, useLocalModels, useMutate, useRollbackChange, useSaveSettings, useSetLocalKey, useSettings, useTestLearnAi } from '@/lib/queries'
+import { useMoney } from '@/lib/useMoney'
 import { CommitInput, ConfirmDialog, NumberField, Row } from '../parts'
+import { MemoryToolsWarning } from '../MemoryToolsWarning'
 
 const STORE_HINT: Record<LearnStore, string> = {
   hindsight: "Writes each lesson to the project's Hindsight memory bank.",
@@ -32,6 +34,7 @@ const fail = (e: unknown) => toast(decodeIpcError(e).message, true)
 
 function RecordRow({ change }: { change: LearnChange }) {
   const rollback = useRollbackChange()
+  const { money } = useMoney()
   return (
     <li className="space-y-1 py-3">
       <div className="flex items-start justify-between gap-3">
@@ -47,7 +50,7 @@ function RecordRow({ change }: { change: LearnChange }) {
                 {change.model ? ` ${change.model}` : ''}
               </span>
             )}
-            <span className="tabular-nums">${change.usd.toFixed(4)}</span>
+            <span className="tabular-nums">{money(change.usd, true)}</span>
           </div>
         </div>
         {change.status === 'applied' && (
@@ -111,6 +114,7 @@ function RecordsCard() {
 
 export function LearningSection() {
   const settings = useSettings()
+  const { symbol, toField, fromField } = useMoney()
   const save = useSaveSettings()
   const ai = useLearnAi()
   const test = useTestLearnAi()
@@ -131,6 +135,7 @@ export function LearningSection() {
 
   return (
     <>
+      <MemoryToolsWarning />
       <Card>
         <CardHeader>
           <CardTitle className="text-base">Learning</CardTitle>
@@ -217,8 +222,8 @@ export function LearningSection() {
           <Row label="Validation retries" htmlFor="learn-retries">
             <NumberField id="learn-retries" value={l.validationRetries} min={0} max={5} onCommit={(n) => save.mutate({ learn: { validationRetries: n } })} />
           </Row>
-          <Row label="Daily USD budget" hint="0 means no cap." htmlFor="learn-usd">
-            <NumberField id="learn-usd" value={l.dailyUsdBudget} min={0} max={100000} step="0.01" onCommit={(n) => save.mutate({ learn: { dailyUsdBudget: n } })} />
+          <Row label={`Daily budget (${symbol})`} hint="0 means no cap." htmlFor="learn-usd">
+            <NumberField id="learn-usd" value={toField(l.dailyUsdBudget)} min={0} max={10000000} step="0.01" onCommit={(n) => save.mutate({ learn: { dailyUsdBudget: fromField(n) } })} />
           </Row>
           <Row label="When a limit is hit" hint="Stop ends the run. Confirm stops it and waits for you." htmlFor="learn-onlimit">
             <Select value={l.onLimit} onValueChange={(v) => save.mutate({ learn: { onLimit: v as LearnOnLimit } })}>

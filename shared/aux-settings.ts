@@ -10,7 +10,7 @@ export interface MemorySettings {
   includeSoul: boolean
 }
 
-export const DEFAULT_MEMORY_SETTINGS: MemorySettings = { recallMode: 'on-demand', topK: 5, maxTokens: 1500, includeSoul: true }
+export const DEFAULT_MEMORY_SETTINGS: MemorySettings = { recallMode: 'session-start', topK: 5, maxTokens: 1500, includeSoul: true }
 
 export const AUX_TASKS = ['extraction', 'consolidation', 'retrieval', 'skillEval', 'skillImprove', 'compression', 'promptEnhance'] as const
 export type AuxTask = (typeof AUX_TASKS)[number]
@@ -84,7 +84,7 @@ export function sanitizeAux(raw: unknown): AuxSettings {
   const d = DEFAULT_AUX_SETTINGS
   return {
     maxCallsPerDay: int(r.maxCallsPerDay, d.maxCallsPerDay, 0, 100_000),
-    maxUsdPerDay: int(r.maxUsdPerDay, d.maxUsdPerDay, 0, 100_000),
+    maxUsdPerDay: typeof r.maxUsdPerDay === 'number' && Number.isFinite(r.maxUsdPerDay) ? Math.min(100_000, Math.max(0, r.maxUsdPerDay)) : d.maxUsdPerDay,
     retryLimit: int(r.retryLimit, d.retryLimit, 0, 5),
     backoffMs: int(r.backoffMs, d.backoffMs, 0, 60_000),
     onLimit: r.onLimit === 'confirm' ? 'confirm' : 'stop',

@@ -208,3 +208,25 @@
   border-radius: 9999px; border: 2px solid transparent; background-clip: padding-box;
 }
 .op-term .xterm .xterm-scrollable-element > .shadow { display: none; }
+
+/* Chat box: a soft, gently breathing orange and pink glow while Claude works or dictation is busy. */
+@keyframes chat-ai-glow {
+  0%, 100% { opacity: .55; }
+  50% { opacity: .85; }
+}
+.chat-ai-border {
+  position: relative;
+}
+.chat-ai-border::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  box-shadow: -6px 0 16px rgba(255, 106, 26, .35), 6px 0 16px rgba(236, 72, 153, .35), 0 -4px 14px rgba(245, 158, 11, .25), 0 4px 14px rgba(236, 72, 153, .3);
+  opacity: .7;
+  animation: chat-ai-glow 2.4s ease-in-out infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+  .chat-ai-border::before { animation: none; }
+}

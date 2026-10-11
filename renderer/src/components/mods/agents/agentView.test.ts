@@ -1,14 +1,14 @@
 import { describe, expect, it } from 'vitest'
 import type { ChatItem } from '@shared/claude-chat'
 import { buildRows } from '@shared/claude-chat'
-import { CUTE_NAMES, HATS, TINTS, critterFor, cuteName, effortInfo, mcpRows, mcpSummary, mcpTiles, metricsOf, progressOf, sessionRows, shortModel, skillSummary, skillTiles, summarize, todoProgress } from './agentView'
+import { CUTE_NAMES, SCREEN_NAMES, agentName, nameRef, HATS, TINTS, critterFor, cuteName, effortInfo, mcpRows, mcpSummary, mcpTiles, metricsOf, progressOf, sessionRows, shortModel, skillSummary, skillTiles, summarize, todoProgress } from './agentView'
 
 const notice = (over: Record<string, unknown>): ChatItem => ({ kind: 'notice', id: 'n1', parent: null, source: 'info', tone: 'info', text: 'x', at: 0, ...over }) as ChatItem
 
 describe('agent names and critters', () => {
   it('is deterministic and from the list', () => {
     expect(cuteName('toolu_abc')).toBe(cuteName('toolu_abc'))
-    expect(CUTE_NAMES).toContain(cuteName('toolu_xyz'))
+    expect([...CUTE_NAMES, ...SCREEN_NAMES.map((n) => n.name)]).toContain(cuteName('toolu_xyz'))
     expect(CUTE_NAMES.length).toBeGreaterThanOrEqual(60)
   })
   it('picks a stable hat and tint', () => {
@@ -17,6 +17,33 @@ describe('agent names and critters', () => {
     expect(HATS).toContain(c.hat)
     expect(TINTS).toContain(c.tint)
     expect(new Set(Array.from({ length: 80 }, (_, i) => critterFor(`id${i}`).hat)).size).toBe(HATS.length)
+  })
+})
+
+describe('screen names', () => {
+  it('has at least 60 entries, each with a reference', () => {
+    expect(SCREEN_NAMES.length).toBeGreaterThanOrEqual(60)
+    for (const s of SCREEN_NAMES) {
+      expect(s.name.length).toBeGreaterThan(0)
+      expect(s.from.trim().length).toBeGreaterThan(0)
+    }
+  })
+  it('has no duplicate names across both lists', () => {
+    const all = [...CUTE_NAMES, ...SCREEN_NAMES.map((s) => s.name)]
+    expect(new Set(all.map((n) => n.toLowerCase())).size).toBe(all.length)
+  })
+  it('is stable per id, mixes both kinds, and screen names carry a reference', () => {
+    const ids = Array.from({ length: 200 }, (_, i) => `toolu_${i}`)
+    for (const id of ids) {
+      expect(agentName(id)).toEqual(agentName(id))
+      expect(nameRef(id)).toBe(agentName(id).ref)
+      expect(cuteName(id)).toBe(agentName(id).name)
+    }
+    const screen = ids.map(agentName).filter((a) => a.ref !== null)
+    expect(screen.length).toBeGreaterThan(50)
+    expect(screen.length).toBeLessThan(150)
+    for (const a of screen) expect(SCREEN_NAMES.some((n) => n.name === a.name && n.from === a.ref)).toBe(true)
+    expect(ids.map(agentName).filter((a) => a.ref === null).every((a) => CUTE_NAMES.includes(a.name))).toBe(true)
   })
 })
 

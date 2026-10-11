@@ -1,5 +1,5 @@
 import type { ComponentType } from 'react'
-import { Bot, Command, Flame, FolderTree, Lightbulb, MessageSquareText, Palette, Sparkles, type LucideIcon } from 'lucide-react'
+import { Bot, Command, Flame, FolderTree, Lightbulb, MessageSquareText, Sparkles, type LucideIcon } from 'lucide-react'
 import type { CapabilityReport, ClaudeTileState, ModId } from '@shared/claude-mods'
 import type { Settings } from '@shared/settings'
 import { SubagentPanel } from './SubagentPanel'
@@ -63,7 +63,6 @@ export const CLAUDE_MODS: ClaudeMod[] = [
     component: SubagentPanel,
   },
   { id: 'promptEnhancer', title: 'Prompt Enhancer', description: '/enhance <rough prompt>, or start a prompt with ++, and a small model rewrites it: the skills to load, the big choices to ask you first, and what done looks like. You approve it before it is sent.', appliesTo: 'claude', icon: Sparkles, defaultEnabled: false, kind: 'native' },
-  { id: 'designPicker', title: 'Design Picker', description: 'When Claude asks you to choose a design style, it opens a preview page in your browser showing each style, so you pick by seeing. You still answer in Claude.', appliesTo: 'claude', icon: Palette, defaultEnabled: false, kind: 'native' },
   { id: 'ideaShelf', title: 'Idea Shelf', description: 'Park ideas with /idea while Claude works, without interrupting it. One shelf per project, kept after you close Claude; /ideas to edit, delete or send one as a prompt.', appliesTo: 'claude', icon: Lightbulb, defaultEnabled: false, kind: 'native' },
   { id: 'folderTracker', title: 'Same-Folder Tracker', description: 'When two sessions work in the same project, each shows what the other is editing and warns when both touch the same file.', appliesTo: 'claude', icon: FolderTree, defaultEnabled: false, kind: 'native' },
   { id: 'plainEnglish', title: 'Plain-English Claude Code', description: 'Simple language, all prose in a summary at the end with next steps, and a status line of what the session is doing. A Haiku check flags replies that miss the rules.', appliesTo: 'claude', icon: MessageSquareText, defaultEnabled: false, kind: 'native' },

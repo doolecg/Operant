@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { setActiveClaudeTile } from './activeClaudeTile'
 import { ClaudeModsHost } from '@/components/mods/ClaudeModsHost'
@@ -15,13 +15,16 @@ import { ChatHeaderControls, ChatStateBadge, ViewSwitch } from '@/components/cha
 import { CLI_SHORT, cliBlocked } from '@/lib/capabilities'
 import { call, useCapabilities, useCrews, useSettings } from '@/lib/queries'
 import { toast } from '@/lib/toast'
+import { NOTES_DEFAULT, NOTES_MAX, NOTES_MIN, NOTES_RAIL, NotesPanel, NotesRail } from '@/components/notes/NotesPanel'
 import { TileIcon } from './TileFrame'
 import { TileInfoBar, TileStatus } from './TileInfoBar'
 import { TileSurface } from './TileSurface'
 import { isScratchTile, useProjectTiles, type ScratchTileInfo, type TileInfo } from './useProjectTiles'
 import type { TerminalTab } from './useTerminals'
 
-const HEADING: Record<string, string> = { claude: 'Claude Code', opencode: 'OpenCode', shell: 'Shell' }
+const TILES_MIN_WIDTH = 480
+
+const HEADING:Record<string, string> = { claude: 'Claude Code', opencode: 'OpenCode', shell: 'Shell' }
 
 interface Props {
   crewId: number
@@ -103,8 +106,37 @@ export function TerminalView({ crewId, scratch, active, onCloseScratch, onStart 
     )
   }
 
+  // The Notes panel: when the area is too narrow for the tiles to keep 480px it shrinks to a rail (and floats open on demand).
+  const root = useRef<HTMLDivElement>(null)
+  const [areaWidth, setAreaWidth] = useState(0)
+  const [notesFloating, setNotesFloating] = useState(false)
+  useEffect(() => {
+    const el = root.current
+    if (!el) return
+    const ro = new ResizeObserver(([entry]) => entry && setAreaWidth(entry.contentRect.width))
+    ro.observe(el)
+    return () => ro.disconnect()
+  }, [])
+  const notesOpen = settings?.layout.notesOpen ?? false
+  const notesWidth = Math.min(NOTES_MAX, Math.max(NOTES_MIN, settings?.layout.notesWidth || NOTES_DEFAULT))
+  const notesNarrow = areaWidth > 0 && areaWidth - notesWidth - 12 < TILES_MIN_WIDTH
+  useEffect(() => setNotesFloating(false), [crewId, notesOpen])
+
   return (
-    <div className="relative flex h-full min-h-0">
+    <div ref={root} className="relative flex h-full min-h-0">
+      {notesOpen &&
+        (notesNarrow ? (
+          notesFloating ? (
+            <>
+              <div aria-hidden style={{ width: NOTES_RAIL + 6 }} className="shrink-0" />
+              <NotesPanel crewId={crewId} onCollapse={() => setNotesFloating(false)} />
+            </>
+          ) : (
+            <NotesRail onExpand={() => setNotesFloating(true)} />
+          )
+        ) : (
+          <NotesPanel crewId={crewId} />
+        ))}
       <section aria-label="Terminal tiles" className="flex min-w-0 flex-1 flex-col p-1.5">
         {tiles.length === 0 ? (
           <div className="grid flex-1 place-content-center gap-3 p-4 text-center">

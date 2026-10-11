@@ -5,6 +5,7 @@ import { Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle }
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Switch } from '@/components/ui/switch'
 import { useResetSettings, useSaveSettings, useSettings } from '@/lib/queries'
+import { useMoney } from '@/lib/useMoney'
 import { NumberField, Row } from '../parts'
 
 function TtlSelect({ id, value, onChange, autoLabel }: { id: string; value: CacheTtl; onChange: (v: CacheTtl) => void; autoLabel: string }) {
@@ -25,6 +26,7 @@ function TtlSelect({ id, value, onChange, autoLabel }: { id: string; value: Cach
 export function TokensSection() {
   const settings = useSettings()
   const save = useSaveSettings()
+  const { symbol, toField, fromField } = useMoney()
   const reset = useResetSettings()
   const s = settings.data
   if (!s) return null
@@ -41,21 +43,21 @@ export function TokensSection() {
           </CardDescription>
         </CardHeader>
         <CardContent className="divide-y">
-          <Row label="Daily budget (USD)" hint="All projects and scratch terminals together. 0 turns it off." htmlFor="budget">
+          <Row label={`Daily budget (${symbol})`} hint="All projects and scratch terminals together. 0 turns it off." htmlFor="budget">
             <NumberField
               id="budget"
               min={0}
-              max={100000}
+              max={10000000}
               step="0.5"
-              value={s.dailyBudgetUsd}
-              onCommit={(v) => save.mutate({ dailyBudgetUsd: v })}
+              value={toField(s.dailyBudgetUsd)}
+              onCommit={(v) => save.mutate({ dailyBudgetUsd: fromField(v) })}
             />
           </Row>
-          <Row label="5-hour budget (USD)" hint="The last 5 hours, all projects together. 0 turns it off." htmlFor="budget-5h">
-            <NumberField id="budget-5h" min={0} max={100000} step="0.5" value={s.fiveHourBudgetUsd} onCommit={(v) => save.mutate({ fiveHourBudgetUsd: v })} />
+          <Row label={`5-hour budget (${symbol})`} hint="The last 5 hours, all projects together. 0 turns it off." htmlFor="budget-5h">
+            <NumberField id="budget-5h" min={0} max={10000000} step="0.5" value={toField(s.fiveHourBudgetUsd)} onCommit={(v) => save.mutate({ fiveHourBudgetUsd: fromField(v) })} />
           </Row>
-          <Row label="Weekly budget (USD)" hint="The last 7 days, all projects together. 0 turns it off." htmlFor="budget-week">
-            <NumberField id="budget-week" min={0} max={100000} step="0.5" value={s.weeklyBudgetUsd} onCommit={(v) => save.mutate({ weeklyBudgetUsd: v })} />
+          <Row label={`Weekly budget (${symbol})`} hint="The last 7 days, all projects together. 0 turns it off." htmlFor="budget-week">
+            <NumberField id="budget-week" min={0} max={10000000} step="0.5" value={toField(s.weeklyBudgetUsd)} onCommit={(v) => save.mutate({ weeklyBudgetUsd: fromField(v) })} />
           </Row>
           <Row label="Warn at (% of a cap)" hint="Raises an activity event and an amber badge." htmlFor="warn-pct">
             <NumberField id="warn-pct" min={1} max={100} value={t.capWarnPct} onCommit={(v) => set({ capWarnPct: v })} />

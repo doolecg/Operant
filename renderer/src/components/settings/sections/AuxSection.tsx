@@ -5,6 +5,7 @@ import { Badge } from '@/components/ui/badge'
 import { errorText } from '@/components/memory/ui'
 import { useAuxStatus, useSaveSettings, useSettings } from '@/lib/queries'
 import { ModelEffortSelect } from '../ModelEffortSelect'
+import { useMoney } from '@/lib/useMoney'
 import { CommitInput, NumberField, Row } from '../parts'
 
 const TASK_LABEL: Record<AuxTask, string> = {
@@ -19,12 +20,11 @@ const TASK_LABEL: Record<AuxTask, string> = {
 
 const CLI_LABEL: Record<AuxCli, string> = { learn: 'Follow learn settings', claude: 'Claude Code', opencode: 'OpenCode', local: 'Local model server' }
 
-const usd = (n: number) => `$${n.toFixed(n < 1 ? 4 : 2)}`
-
 export function AuxSection() {
   const settings = useSettings()
   const status = useAuxStatus()
   const save = useSaveSettings()
+  const { money, symbol, toField, fromField } = useMoney()
   const s = settings.data
   if (!s) return null
   const a = s.aux
@@ -93,8 +93,8 @@ export function AuxSection() {
           <Row label="Calls per day" hint="0 means no limit." htmlFor="aux-calls">
             <NumberField id="aux-calls" value={a.maxCallsPerDay} min={0} max={100000} onCommit={(n) => setAux({ maxCallsPerDay: n })} />
           </Row>
-          <Row label="USD per day" hint="0 means no limit." htmlFor="aux-usd">
-            <NumberField id="aux-usd" value={a.maxUsdPerDay} min={0} max={100000} onCommit={(n) => setAux({ maxUsdPerDay: n })} />
+          <Row label={`Spend per day (${symbol})`} hint="0 means no limit." htmlFor="aux-usd">
+            <NumberField id="aux-usd" value={toField(a.maxUsdPerDay)} min={0} max={10000000} step="0.01" onCommit={(n) => setAux({ maxUsdPerDay: fromField(n) })} />
           </Row>
           <Row label="Retries" hint="0 to 5 retries after a failed call." htmlFor="aux-retry">
             <NumberField id="aux-retry" value={a.retryLimit} min={0} max={5} onCommit={(n) => setAux({ retryLimit: n })} />
@@ -139,14 +139,14 @@ export function AuxSection() {
               </Row>
               <Row label="Spend">
                 <span className="text-sm tabular-nums">
-                  {usd(st.total.usd)}
-                  {st.maxUsdPerDay > 0 ? ` of ${usd(st.maxUsdPerDay)}` : ''}
+                  {money(st.total.usd, true)}
+                  {st.maxUsdPerDay > 0 ? ` of ${money(st.maxUsdPerDay, true)}` : ''}
                 </span>
               </Row>
               {Object.entries(st.features).map(([name, u]) => (
                 <Row key={name} label={name}>
                   <span className="text-muted-foreground text-xs tabular-nums">
-                    {u.calls} calls · {u.tokens.toLocaleString()} tokens · {usd(u.usd)}
+                    {u.calls} calls · {u.tokens.toLocaleString()} tokens · {money(u.usd, true)}
                   </span>
                 </Row>
               ))}

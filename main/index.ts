@@ -221,6 +221,18 @@ function createWindow(): void {
     webPreferences: windowWebPreferences(),
   })
 
+  // The app window gets the microphone (dictation) and clipboard reads, only for its own page; everything else is denied.
+  // The browser panels use their own partitions with their own handlers.
+  const appWc = win.webContents
+  const appAllowed = (wc: Electron.WebContents | null, permission: string, url: string | undefined): boolean =>
+    wc === appWc && (permission === 'media' || permission === 'clipboard-read') && isAppUrl(url, appOrigin)
+  appWc.session.setPermissionRequestHandler((wc, permission, callback, details) =>
+    callback(appAllowed(wc, permission, details.requestingUrl)),
+  )
+  appWc.session.setPermissionCheckHandler((wc, permission, requestingOrigin, details) =>
+    appAllowed(wc, permission, details.requestingUrl || requestingOrigin),
+  )
+
   win.once('ready-to-show', () => (background ? win?.showInactive() : win?.show()))
 
   // The window only ever shows the app: a dropped file or a link navigating it is refused.

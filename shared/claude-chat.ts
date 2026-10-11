@@ -59,6 +59,8 @@ export interface UserItem {
   // Sent while a turn was running: shows a "Queued" tag until the next turn starts.
   queued: boolean
   at: number
+  // A short note sent into a running turn to change Claude's course (chat:steer).
+  steer?: boolean
 }
 
 // Assistant prose (Markdown). `streaming` is true while text deltas still arrive.
@@ -219,7 +221,7 @@ export interface CommandItem {
   at: number
 }
 
-export type NoticeSource = 'interrupt' | 'compaction' | 'hook' | 'error' | 'background' | 'toast' | 'pane' | 'crash' | 'effort' | 'info' | 'mcp' | 'ping' | 'keepwarm'
+export type NoticeSource = 'interrupt' | 'compaction' | 'hook' | 'error' | 'background' | 'toast' | 'pane' | 'crash' | 'effort' | 'info' | 'mcp' | 'ping' | 'keepwarm' | 'shot'
 
 export interface NoticeItem {
   kind: 'notice'
@@ -238,6 +240,8 @@ export interface NoticeItem {
   // The hook or plugin the notice came from (category 'session' and 'skill').
   origin?: string
   // A keep-warm ping turn folded into one row: `text` is the prompt, this the reply and what the call read.
+  // A test screenshot saved by `operant shot`.
+  images?: ChatImage[]
   ping?: { reply: string; ok: boolean; running: boolean; cacheRead: number; usd: number | null }
   at: number
 }
@@ -249,6 +253,8 @@ export interface TurnItem {
   durationMs: number
   ok: boolean
   costUsd: number | null
+  // Output tokens of the turn (the result's usage, else the summed main-thread messages); absent or null when unknown.
+  outputTokens?: number | null
   at: number
 }
 
@@ -507,6 +513,9 @@ export interface ChatApi {
   // Interrupt: the turn ends with an "Interrupted" notice; if Claude Code does not answer within 5 s the process is
   // killed and restarted with --resume on the next send.
   'chat:interrupt': (scratchId: number) => void
+  // A short note into the running turn: Claude Code reads it at its next step and changes course without the turn
+  // stopping. The user item carries steer: true. With no turn running it is an ordinary message.
+  'chat:steer': (scratchId: number, text: string) => void
   'chat:permission': (scratchId: number, requestId: string, decision: ChatDecision) => void
   // set_permission_mode; state.permissionMode updates when Claude Code confirms.
   'chat:setMode': (scratchId: number, mode: string) => void
@@ -532,6 +541,7 @@ export const CHAT_CHANNELS = [
   'chat:snapshot',
   'chat:send',
   'chat:interrupt',
+  'chat:steer',
   'chat:permission',
   'chat:setMode',
   'chat:setModel',

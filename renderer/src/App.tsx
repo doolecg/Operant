@@ -6,7 +6,6 @@ import { DeleteCrewDialog, EditCrewDialog, NewCrewDialog } from '@/components/da
 import { GitChangesDialog } from '@/components/dashboard/GitChangesDialog'
 import { GitDialog } from '@/components/git/GitDialog'
 import { projectActions } from '@/components/dashboard/projectActions'
-import { TerminalDrawer } from '@/components/terminal/TerminalDrawer'
 import { useTerminals } from '@/components/terminal/useTerminals'
 import { useWaitingTiles } from '@/components/terminal/useWaitingTiles'
 import { Toaster } from '@/components/ui/toaster'
@@ -35,6 +34,8 @@ import { effectiveScale, stepScale, useUiScale } from '@/lib/uiScale'
 import { useAction, useCrews, useIndexStatus, useLiveUpdates, useMoveToGroup, useSaveSettings, useSettings } from '@/lib/queries'
 import { bridge } from '@/lib/bridge'
 import { CloseAppDialog } from '@/components/terminal/CloseAppDialog'
+import { LearnOnCloseDialog } from '@/components/memory/LearnOnCloseDialog'
+import { SetupDialog } from '@/components/setup/SetupDialog'
 import { useCloseTile } from '@/components/terminal/useCloseTile'
 import type { Crew } from '@shared/types'
 import type { MainCli } from '@shared/settings'
@@ -119,6 +120,7 @@ export function App() {
   const crew = crews.data?.find((c) => c.id === crewId)
   const layout = settings.data?.layout
   const sidebarHidden = layout?.sidebarHidden ?? false
+  const notesOpen = layout?.notesOpen ?? false
   const setLayout = (patch: Partial<NonNullable<typeof layout>>) => saveSettings.mutate({ layout: patch })
   const projectScratch = terminals.tabs.filter((t) => t.crewId === crewId)
   const waitingTiles = useWaitingTiles()
@@ -135,7 +137,6 @@ export function App() {
       }),
     [],
   )
-  const terminalShown = page === 'dashboard' && mode === 'terminal' && crewId != null
   const tb = settings.data?.topBar
 
   // Once the bar is narrow, the terminal CLI pick moves into a menu next to the view switcher.
@@ -196,6 +197,7 @@ export function App() {
         [binds.newShell, () => crew && (dash(), void terminals.openTab(crew, 'shell'))],
         [binds.toggleSidebar, () => setLayout({ sidebarHidden: !sidebarHidden })],
         [binds.toggleAllPanels, () => setLayout({ sidebarHidden: !sidebarHidden })],
+        [binds.toggleNotes, () => setLayout({ notesOpen: !notesOpen })],
         [binds.openInIde, () => crew && void projectActions.openIde(crew)],
         [binds.openPlayground, () => projectMenu.openPlayground()],
         [binds.mediaPlayPause, () => mediaCommand('toggle')],
@@ -213,7 +215,7 @@ export function App() {
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [settings.data?.keybinds, settings.data?.uiScale, saveSettings, crewId, runIndex, crew, terminals.openTab, crews.data, sidebarHidden, mode])
+  }, [settings.data?.keybinds, settings.data?.uiScale, saveSettings, crewId, runIndex, crew, terminals.openTab, crews.data, sidebarHidden, notesOpen, mode])
 
   return (
     <TooltipProvider>
@@ -343,17 +345,6 @@ export function App() {
               )}
             </>
           )}
-          {terminals.open && !terminalShown && terminals.tabs.length > 0 && (
-            <TerminalDrawer
-              tabs={terminals.tabs}
-              active={terminals.active}
-              onSelect={terminals.setActive}
-              onClose={closeTile.request}
-              onNewShell={() => crew && void terminals.openTab(crew, 'shell')}
-              onNewAgent={() => crew && void terminals.openTab(crew, settings.data?.mainCli ?? 'claude')}
-              onHide={() => terminals.setOpen(false)}
-            />
-          )}
           {consoleOpen && (
             <ConsoleDrawer
               lines={bgConsole.lines}
@@ -406,6 +397,8 @@ export function App() {
       {crewId != null && <GitDialog crewId={crewId} open={gitOpen} onOpenChange={setGitOpen} />}
       {closeTile.dialog}
       <CloseAppDialog />
+      <LearnOnCloseDialog />
+      <SetupDialog />
       <Toaster />
     </TooltipProvider>
   )

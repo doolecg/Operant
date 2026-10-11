@@ -147,6 +147,32 @@ describe('update', () => {
     expect(msi).toContain(`/i "C:\\Temp\\O''2.msi" /passive`)
     expect(msi).toContain(`Test-Path -LiteralPath 'C:\\Program Files\\Operant 2\\Operant 2.exe'`)
     expect(msi).toContain('REINSTALL=ALL')
+    expect(msi).toContain('-Verb RunAs')
+    expect(msi).not.toContain('/qn')
+    expect(msi).toContain('1223')
+    expect(msi).toContain('if ($code -ne 1618) { break }')
+    expect(msi.match(/1618/g)).toHaveLength(1)
+    expect(msi.indexOf('$code -eq 1223')).toBeLessThan(msi.indexOf('REINSTALL=ALL'))
     expect(msi).toContain(`Start-Process -FilePath 'C:\\Program Files\\Operant 2\\Operant 2.exe'`)
+    expect(msi).not.toContain('Remove-Item')
+
+    const moved = msiWorkerScript({
+      pid: 9,
+      exe: 'C:\\Program Files\\Operant 3\\Operant 3.exe',
+      installDir: 'C:\\Program Files\\Operant 3',
+      msi: 'C:\\Temp\\o.msi',
+      log: 'C:\\Temp\\l.log',
+      relaunch: false,
+      oldDir: 'C:\\Users\\me\\AppData\\Local\\Programs\\Operant 3',
+    })
+    expect(moved).toContain(`$old = 'C:\\Users\\me\\AppData\\Local\\Programs\\Operant 3'`)
+    expect(moved).toContain(`$oldExe = Join-Path $old 'Operant 3.exe'`)
+    expect(moved).toContain(`-ine 'C:\\Program Files\\Operant 3'`)
+    expect(moved).toContain('Test-Path -LiteralPath $oldExe')
+    expect(moved).toContain('Remove-Item -LiteralPath $old -Recurse -Force')
+    // Only the program folder is removed, never anything under the app data folders.
+    expect(moved.match(/Remove-Item/g)).toHaveLength(1)
+    expect(moved).not.toMatch(/Roaming|\$env:/i)
+    expect(moved.indexOf('Remove-Item')).toBeGreaterThan(moved.indexOf('REINSTALL=ALL'))
   })
 })

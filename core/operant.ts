@@ -1,7 +1,7 @@
 import { EventEmitter } from 'node:events'
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
-import { join } from 'node:path'
+import { dirname, join } from 'node:path'
 import type { CoreChannel, IpcApi, IpcEvents } from '../shared/ipc'
 import { mergeSettings, sanitizeSettings, type Settings, type SettingsPatch } from '../shared/settings'
 import type {
@@ -37,9 +37,13 @@ import type { KeepWarmPersisted } from './keepwarm'
 import { LearnChangesDb } from './learn-changes'
 import { Ops } from './ops'
 import { claudeDir as claudeDirOf } from './paths'
+import { Installer, systemInstallDeps } from './install'
 import { ENHANCE_MAX_MEMORY_TOKENS, ENHANCE_MAX_SYMBOL_LINES, buildEnhancePrompt, mergeSkills, parseEnhanceReply, type EnhanceContext } from '../shared/prompt-enhance'
 import { gatherEnhanceContext } from './enhance-context'
 import { recallMemory } from './memory-recall'
+import type { LearnRunInfo } from '../shared/learn'
+import { recallFile, writeRecallFor } from './session-recall'
+import { readOpenCodeSessionText } from './opencode-session'
 import { installedSkills } from './installed-skills'
 import { SETTINGS_SECTIONS, resetSettings } from '../shared/settings'
 import type { AuxTask } from '../shared/aux-settings'
@@ -60,6 +64,8 @@ import { ChatHub, ChatSession, type ChatLaunchSpec, type ChatSpawn } from './cla
 import { listChatFiles } from './chat-files'
 import { emptyChatState, stripAnsi, type ChatState } from '../shared/claude-chat'
 import { PLAYGROUND_KEPT, type Store } from './store'
+import { createNote, deleteNote, getNote, listNotes, updateNote } from './notes'
+import { isNoteColor } from '../shared/notes'
 import { JsonlTail, parseLine, transcriptPath } from './transcripts'
 import { CapabilityProber, systemProbeDeps, type ProbeDeps } from './capabilities'
 import { ClaudeAgents } from './claude-agents'
@@ -72,6 +78,7 @@ import { exportView } from './usage-export'
 import { isColdTurn } from './usage'
 import { MemorySecretStore, type SecretStore } from './secrets'
 import { randomUUID } from 'node:crypto'
+import { saveScreenshot } from './screenshots'
 import { EXIT, type CliRequest, type CliResult, type Identity } from './cli-server'
 
 type Handlers = { [C in CoreChannel]: (...args: Parameters<IpcApi[C]>) => ReturnType<IpcApi[C]> | Promise<Awaited<ReturnType<IpcApi[C]>>> }
@@ -287,6 +294,7 @@ export class Operant extends EventEmitter<PushEvents> {
   private readonly claudeAgents: ClaudeAgents | null
   private readonly modPluginsDir: string | null
   private readonly prober: CapabilityProber
+  private readonly installer = new Installer(systemInstallDeps(claudeDirOf()))
   private readonly cli: CliAccess | null
   private readonly scheduler: Scheduler
   private readonly timers: unknown[] = []
@@ -306,6 +314,9 @@ export class Operant extends EventEmitter<PushEvents> {
   // owner closed (a chat process that ends then is the end of the session).
   private readonly switching = new Set<number>()
   private readonly closing = new Set<number>()
+  // Tiles the learn step already ran for in this app run, and closed tiles waiting for the owner's answer.
+  private readonly learnedTiles = new Set<number>()
+  private readonly learnAsks = new Map<number, { crewId: number; sessionId: string }>()
   private settings: Settings
   private budgetConfig: BudgetConfig
   private readonly fileDialogs: FileDialogs | undefined
@@ -400,9 +411,11 @@ export class Operant extends EventEmitter<PushEvents> {
         hindsight: this.hindsight,
         git: realGit,
         model: this.budgetedModel(opts.learnModel ?? claudeLearnModel(opts.launch?.supported, { settings: () => this.auxLearn('extraction'), local: this.localLlm() }), () => this.learnAiProblem('extraction')),
+        consolidationModel: this.budgetedModel(opts.learnModel ?? claudeLearnModel(opts.launch?.supported, { settings: () => this.auxLearn('consolidation'), local: this.localLlm() }), () => this.learnAiProblem('consolidation')),
         settings: () => this.settings.learn,
         log: (message, crewId) => this.log('learn', message, crewId || null),
         changes: this.changes,
+        onRunEnd: (crewId) => void this.refreshRecall(crewId),
       })
     this.ops = new Ops({
       store,
@@ -457,6 +470,7 @@ export class Operant extends EventEmitter<PushEvents> {
       ...this.modelHandlers(),
       ...this.tileHandlers(),
       ...this.scratchHandlers(),
+      ...this.notesHandlers(),
       ...this.chatHandlers(),
       ...this.usageHandlers(),
       ...this.moveHandlers(),
@@ -464,6 +478,7 @@ export class Operant extends EventEmitter<PushEvents> {
       ...this.mcpHandlers(),
       ...this.capabilityHandlers(),
       ...this.opsHandlers(),
+      ...this.installHandlers(),
     }
     // Every refusal leaves core as an OperantError with a code.
     const wrapped: Record<string, (...args: unknown[]) => unknown> = {}
@@ -836,6 +851,32 @@ export class Operant extends EventEmitter<PushEvents> {
     }
   }
 
+  private notesHandlers(): Group<'notes'> {
+    const store = this.store
+    return {
+      'notes:list': (crewId) => listNotes(store, this.requireCrew(crewId).id),
+      'notes:create': (crewId, color) => {
+        const crew = this.requireCrew(crewId)
+        if (!isNoteColor(color)) throw bad('The note colour is not valid')
+        const note = createNote(store, crew.id, color)
+        this.emit('notes:changed', { crewId: crew.id })
+        return note
+      },
+      'notes:update': (id, patch) => {
+        if (patch.color !== undefined && !isNoteColor(patch.color)) throw bad('The note colour is not valid')
+        if (patch.text !== undefined && typeof patch.text !== 'string') throw bad('The note text is not valid')
+        if (!getNote(store, id)) throw notFound('That note no longer exists')
+        const note = updateNote(store, id, patch)
+        this.emit('notes:changed', { crewId: note.crewId })
+        return note
+      },
+      'notes:delete': (id) => {
+        const crewId = deleteNote(store, id)
+        if (crewId != null) this.emit('notes:changed', { crewId })
+      },
+    }
+  }
+
   private usageHandlers(): Group<'usage'> & Group<'purge'> & Group<'budgets'> {
     const deps = () => ({ store: this.store, now: this.now })
     const checkView = (view: UsageView): UsageView => {
@@ -943,6 +984,18 @@ export class Operant extends EventEmitter<PushEvents> {
     }
   }
 
+  private installHandlers(): Group<'install'> {
+    return {
+      'install:status': () => this.installer.status(),
+      'install:run': async (id) => {
+        const r = await this.installer.run(id)
+        // A new CLI on PATH: the next capability read must probe again.
+        if (r.ok) void this.prober.refresh().catch(() => undefined)
+        return r
+      },
+    }
+  }
+
   private miscHandlers(): Group<'health'> & Group<'hindsight'> & Group<'learn'> & Group<'index'> & Group<'events'> & Group<'settings'> {
     const store = this.store
     const indexes = this.indexes
@@ -972,6 +1025,7 @@ export class Operant extends EventEmitter<PushEvents> {
       'learn:mergeLessons': (keepId, mergeIds) => this.learn.mergeLessons(keepId, mergeIds),
       'learn:setLessonStatus': (id, status) => this.learn.setLessonStatus(id, status),
       'learn:moveLesson': (id, from, to) => this.learn.moveLesson(id, from, to),
+      'learn:consolidate': (crewId) => this.learn.consolidateNow(crewId),
       'learn:hindsightEntries': (crewId, query) => this.learn.hindsightEntries(crewId, query),
       'learn:memoryFiles': (crewId) => this.learn.memoryFiles(crewId),
       'learn:drafts': (crewId, status) => this.learn.drafts(crewId).filter((d) => !status || d.status === status),
@@ -983,7 +1037,19 @@ export class Operant extends EventEmitter<PushEvents> {
         const tile = this.store.getScratch(tileId)
         if (!tile) throw notFound(`Tile ${tileId} not found`)
         if (!tile.sessionId) throw bad('This tile has no session to learn from yet')
-        return this.learn.learnNow(tile.crewId, tile.sessionId, confirm === true)
+        this.learnedTiles.add(tile.id)
+        return this.learnFrom(tile, confirm === true)
+      },
+      'learn:answerClose': (scratchId, learn) => {
+        const ask = this.learnAsks.get(scratchId)
+        if (!ask) return
+        this.learnAsks.delete(scratchId)
+        if (learn === true && !this.learnedTiles.has(scratchId)) {
+          this.learnedTiles.add(scratchId)
+          const tile = this.store.getScratch(scratchId)
+          if (tile?.agent === 'opencode') void this.learnFrom({ ...tile, sessionId: ask.sessionId })
+          else void this.learn.learnNow(ask.crewId, ask.sessionId)
+        }
       },
       'learn:records': (filter) => this.learn.changeRecords(filter ?? {}),
       'learn:rollback': (changeId) => this.learn.rollback(changeId),
@@ -1165,6 +1231,7 @@ export class Operant extends EventEmitter<PushEvents> {
     this.timers.push(this.scheduler.every(() => this.pollUsage(), USAGE_POLL_MS))
     this.timers.push(this.scheduler.every(() => void this.providers.refresh().catch(() => undefined), PROVIDER_TICK_MS))
     this.checkBudgets()
+    void this.startMemory()
   }
 
   stopTimers(): void {
@@ -1220,11 +1287,29 @@ export class Operant extends EventEmitter<PushEvents> {
       const phase = this.chat.get(id)?.snapshot().turn.phase
       if (phase && phase !== 'idle') continue
       const scratch = this.store.getScratch(id)
-      if (scratch?.agent !== 'claude' || !scratch.sessionId) continue
+      if ((scratch?.agent !== 'claude' && scratch?.agent !== 'opencode') || !scratch.sessionId) continue
       feed.activityAt = null
       feed.finished = false
-      void this.learn.learnNow(scratch.crewId, scratch.sessionId)
+      this.learnedTiles.add(id)
+      void this.learnFrom(scratch)
     }
+  }
+
+  // One learn run for a tile. An OpenCode tile has no Claude transcript, so its latest session for the folder is read from
+  // OpenCode's database; with nothing readable the step runs on the git diff alone.
+  private learnFrom(tile: ScratchTerminal, confirm = false): Promise<LearnRunInfo | null> {
+    if (tile.agent === 'opencode') {
+      const text = readOpenCodeSessionText(openCodeDbPath(), tile.cwd)
+      if (text) return this.learn.onConversationEnd(tile.crewId, tile.sessionId, text)
+    }
+    return this.learn.learnNow(tile.crewId, tile.sessionId, confirm)
+  }
+
+  // A closed Claude tile not learned from yet: ask the owner first (the tile's process is gone, so the answer is kept here).
+  private askLearnOnClose(scratch: ScratchTerminal): void {
+    if (!scratch.sessionId || this.settings.learn.mode === 'off' || this.learnedTiles.has(scratch.id)) return
+    this.learnAsks.set(scratch.id, { crewId: scratch.crewId, sessionId: scratch.sessionId })
+    this.emit('learn:askOnClose', { scratchId: scratch.id, title: scratch.title, crewId: scratch.crewId, sessionId: scratch.sessionId })
   }
 
   // Notices
@@ -1237,12 +1322,52 @@ export class Operant extends EventEmitter<PushEvents> {
     setSharedBanks(this.settings.hindsight.mode !== 'local')
     if (!this.settings.claudeMods.enabled) this.claudeAgents?.dispose()
     if (!this.settings.claudeMods.keepWarm) this.chat?.stopAllKeepWarm()
+    if (this.timers.length > 0) void this.startMemory()
+  }
+
+  // Session-start memory files live next to the events folder, in the app data folder.
+  private recallDir(): string | null {
+    return this.claudeModsPaths ? join(dirname(this.claudeModsPaths.eventsDir), 'recall') : null
+  }
+
+  // Whether Claude sessions get the recall hook: Hindsight switched on, recall set to session start.
+  private sessionRecallOn(): boolean {
+    return this.settings.learn.hindsight && this.settings.memory.recallMode === 'session-start'
+  }
+
+  // The project's recall file when session-start recall is on and the file exists (OpenCode tiles load it as an instructions file).
+  private recallFileFor(folder: string): string | undefined {
+    const dir = this.recallDir()
+    if (!dir || !this.sessionRecallOn()) return undefined
+    const file = recallFile(dir, folder)
+    return existsSync(file) ? file : undefined
+  }
+
+  // Rewrites the recall file of one project, or of every project. Needs Hindsight on; otherwise the files are cleared.
+  private async refreshRecall(crewId?: number): Promise<void> {
+    const dir = this.recallDir()
+    if (!dir) return
+    const memory = this.sessionRecallOn() ? this.settings.memory : { ...this.settings.memory, recallMode: 'off' as const }
+    for (const crew of this.store.listCrews()) {
+      if (crewId != null && crew.id !== crewId) continue
+      await writeRecallFor(dir, crew.folder, this.hindsight, memory, this.learn.lessonLookup()).catch((e) => this.log('learn', `Session memory file not written (${e instanceof Error ? e.name : 'error'})`, crew.id))
+    }
+  }
+
+  // With Hindsight switched on, starts its local server when uv is there (a missing uv is left alone: the settings warn),
+  // then writes the recall files.
+  private async startMemory(): Promise<void> {
+    if (this.settings.learn.hindsight) {
+      const st = await this.hindsight.status().catch(() => null)
+      if (st && st.state === 'stopped') await this.hindsight.act('start').catch(() => undefined)
+    }
+    await this.refreshRecall()
   }
 
   // The hooks and status line for Claude tiles, or undefined when Claude mods are off.
   private claudeModsConfig(): Record<string, unknown> | undefined {
     if (!this.claudeModsPaths) return undefined
-    return claudeModsConfig(this.claudeModsPaths, this.settings.claudeMods) ?? undefined
+    return claudeModsConfig(this.claudeModsPaths, this.settings.claudeMods, this.sessionRecallOn()) ?? undefined
   }
 
   // The learn AI for one aux task: the learn settings, with the task's own CLI and model where it has them.
@@ -1267,7 +1392,7 @@ export class Operant extends EventEmitter<PushEvents> {
     const folder = this.store.getCrew(this.requireScratch(scratchId).crewId)?.folder ?? null
     const memory = this.settings.memory
     return gatherEnhanceContext(String(text ?? ''), {
-      recall: (q) => recallMemory(this.hindsight, folder, q, { ...memory, maxTokens: Math.min(memory.maxTokens, ENHANCE_MAX_MEMORY_TOKENS) }),
+      recall: (q) => recallMemory(this.hindsight, folder, q, { ...memory, maxTokens: Math.min(memory.maxTokens, ENHANCE_MAX_MEMORY_TOKENS) }, this.learn.lessonLookup()),
       symbols: async (q) => (folder ? this.indexes.symbols(folder, q, ENHANCE_MAX_SYMBOL_LINES) : null),
     })
   }
@@ -1303,7 +1428,7 @@ export class Operant extends EventEmitter<PushEvents> {
 
   private identify(tileId: number): Identity | null {
     const tile = this.store.getScratch(tileId)
-    return tile ? { crewId: tile.crewId } : null
+    return tile ? { crewId: tile.crewId, tileId } : null
   }
 
   private async runCli(who: Identity, req: CliRequest): Promise<CliResult> {
@@ -1320,6 +1445,22 @@ export class Operant extends EventEmitter<PushEvents> {
       const tags = Array.isArray(args.tag) ? args.tag.filter((t): t is string => typeof t === 'string') : []
       const r = await this.hindsight.retain(bankFor(crew.folder), text, tags, 'Operant agent note')
       return r.ok ? { exit: EXIT.OK, out: 'retained' } : { exit: EXIT.ERROR, error: r.error ?? 'retain failed' }
+    }
+    if (req.cmd === 'shot') {
+      const file = typeof args.file === 'string' ? args.file : ''
+      const kind = typeof args.kind === 'string' ? args.kind : undefined
+      if (!file) return { exit: EXIT.USAGE, error: 'usage: operant shot <file> [kind]' }
+      let saved
+      try {
+        saved = saveScreenshot({ projectDir: crew.folder, kind, file, now: this.now() })
+      } catch (e) {
+        return { exit: EXIT.ERROR, error: e instanceof Error ? e.message : String(e) }
+      }
+      const session = this.chat.get(who.tileId)
+      if (!session) return { exit: EXIT.OK, out: 'saved (not shown: Terminal view)' }
+      const text = `Screenshot saved: ${saved.relPath}${saved.image ? '' : ' (too large to preview)'}`
+      session.addNotice({ source: 'shot', tone: 'info', text, ...(saved.image ? { images: [saved.image] } : {}) })
+      return { exit: EXIT.OK, out: saved.path }
     }
     return { exit: EXIT.USAGE, error: `unknown command ${req.cmd}` }
   }
@@ -1352,6 +1493,8 @@ export class Operant extends EventEmitter<PushEvents> {
       mods: this.claudeModsConfig(),
       modPlugins: this.settings.claudeMods.enabled ? this.modPluginDirs() : [],
       browserMcp: browserUrl ? { url: browserUrl } : undefined,
+      codegraphMcp: this.settings.learn.codegraph && onPath('codegraph', this.launch.baseEnv ?? process.env, process.platform),
+      recallFile: this.recallFileFor(crewFolder),
     }
   }
 
@@ -1450,8 +1593,8 @@ export class Operant extends EventEmitter<PushEvents> {
     this.emit('scratch:exit', { scratchId, exitCode, switching: this.switching.has(scratchId) })
     const scratch = this.store.getScratch(scratchId)
     if (scratch) this.log('scratch', `Tile ${scratch.title} closed${exitCode ? ` (exit ${exitCode})` : ''}`, scratch.crewId)
-    // The learn step for a finished Claude session; it does nothing when learning is off.
-    if (scratch?.agent === 'claude' && scratch.sessionId && this.settings.learn.mode !== 'off' && !this.switching.has(scratchId)) void this.learn.learnNow(scratch.crewId, scratch.sessionId)
+    // A finished Claude session not learned from yet: the owner is asked (nothing when learning is off).
+    if ((scratch?.agent === 'claude' || scratch?.agent === 'opencode') && !this.switching.has(scratchId)) this.askLearnOnClose(scratch)
   }
 
   // ---- Chat view (claude-chat.ts)
@@ -1532,8 +1675,8 @@ export class Operant extends EventEmitter<PushEvents> {
     const scratch = this.store.getScratch(scratchId)
     const closing = this.closing.delete(scratchId)
     if (scratch) this.log('scratch', `Tile ${scratch.title} ${info.expected ? 'closed' : 'stopped unexpectedly'}${info.code ? ` (exit ${info.code})` : ''}`, scratch.crewId)
-    // The end of a session the owner closed (not a crash, a restart or a view switch) runs the learn step once.
-    if (closing && info.expected && !this.switching.has(scratchId) && scratch?.agent === 'claude' && scratch.sessionId && this.settings.learn.mode !== 'off') void this.learn.learnNow(scratch.crewId, scratch.sessionId)
+    // The end of a session the owner closed (not a crash, a restart or a view switch) asks whether to run the learn step.
+    if (closing && info.expected && !this.switching.has(scratchId) && (scratch?.agent === 'claude' || scratch?.agent === 'opencode')) this.askLearnOnClose(scratch)
   }
 
   private startChat(scratch: ScratchTerminal, opts: { resume?: boolean }): ScratchStatus {
@@ -1628,6 +1771,10 @@ export class Operant extends EventEmitter<PushEvents> {
         live(scratchId).send(input)
       },
       'chat:interrupt': (scratchId) => live(scratchId).interrupt(),
+      'chat:steer': (scratchId, text) => {
+        if (typeof text !== 'string' || !text.trim()) throw bad('A steer note needs text')
+        live(scratchId).steer(text)
+      },
       'chat:permission': (scratchId, requestId, decision) => {
         if (typeof requestId !== 'string' || !decision || typeof decision.kind !== 'string') throw bad('Not a valid answer')
         if (!live(scratchId).answer(requestId, decision)) throw conflict('That prompt is no longer waiting')

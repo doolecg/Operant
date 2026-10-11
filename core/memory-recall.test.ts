@@ -9,7 +9,7 @@ import { SOUL_BANK, bankFor, type RecallResult } from './hindsight'
 import { LearnService } from './learn'
 import { PersonalMemory } from './learn-memory'
 import { LessonsDb } from './lessons-store'
-import { recallMemory } from './memory-recall'
+import { lessonIdOf, recallMemory } from './memory-recall'
 import { exportMemory, memoryDiagnostics, resetMemory, type MemoryAdminDeps } from './memory-admin'
 import { Store } from './store'
 
@@ -62,6 +62,45 @@ describe('recallMemory', () => {
     expect(failing).toMatchObject({ items: [], error: 'connection refused' })
     const partial = await recallMemory(src({ [SOUL_BANK]: { ok: false, error: 'down' }, [bankFor(FOLDER)]: { ok: true, items: ['ok'] } }), FOLDER, 'cart', cfg())
     expect(partial).toMatchObject({ items: [{ bank: 'project', text: 'ok' }], error: '' })
+  })
+})
+
+describe('recallMemory with lessons', () => {
+  const proj = bankFor(FOLDER)
+  const src = (items: string[]) => ({ recall: async (bank: string) => (bank === proj ? { ok: true as const, items } : { ok: true as const, items: [] }) })
+  const cfg = (o: Partial<MemorySettings> = {}): MemorySettings => ({ ...DEFAULT_MEMORY_SETTINGS, includeSoul: false, ...o })
+  const lookup = (live: number[], related: Record<number, string[]> = {}) => ({ isLive: (id: number) => live.includes(id), related: (id: number) => related[id] ?? [] })
+
+  it('parses the marker', () => {
+    expect(lessonIdOf('LESSON #12 [pitfall] text')).toBe(12)
+    expect(lessonIdOf('plain text')).toBeNull()
+    expect(lessonIdOf('see LESSON #3 [x] later')).toBeNull()
+  })
+
+  it('drops retired items, keeps unmarked ones and strips the marker', async () => {
+    const out = await recallMemory(src(['LESSON #1 [pitfall] gone', 'LESSON #2 [convention] stays', 'old unmarked']), FOLDER, 'q', cfg({ topK: 2 }), lookup([2]))
+    expect(out.items.map((i) => i.text)).toEqual(['stays', 'old unmarked'])
+    expect(out.text).toBe('stays\n\nold unmarked')
+    expect(out.truncated).toBe(false)
+  })
+
+  it('adds at most two related lessons, without duplicates, within topK', async () => {
+    const rel = { 2: ['stays', 'rel one', 'rel two', 'rel three'] }
+    const out = await recallMemory(src(['LESSON #2 [convention] stays']), FOLDER, 'q', cfg({ topK: 10 }), lookup([2], rel))
+    expect(out.items).toEqual([
+      { bank: 'project', text: 'stays' },
+      { bank: 'project', text: 'rel one' },
+      { bank: 'project', text: 'rel two' },
+    ])
+    const tight = await recallMemory(src(['LESSON #2 [convention] stays']), FOLDER, 'q', cfg({ topK: 2 }), lookup([2], rel))
+    expect(tight.items.map((i) => i.text)).toEqual(['stays', 'rel one'])
+    const small = await recallMemory(src(['LESSON #2 [convention] stays']), FOLDER, 'q', cfg({ topK: 10, maxTokens: 3 }), lookup([2], { 2: ['x'.repeat(100)] }))
+    expect(small.items.map((i) => i.text)).toEqual(['stays'])
+  })
+
+  it('leaves behaviour unchanged without a lessons argument', async () => {
+    const out = await recallMemory(src(['LESSON #1 [pitfall] kept', 'plain']), FOLDER, 'q', cfg())
+    expect(out.items.map((i) => i.text)).toEqual(['kept', 'plain'])
   })
 })
 

@@ -8,13 +8,4 @@ export function timeAgo(at: number, now = Date.now()): string {
   return new Date(at).toLocaleDateString()
 }
 
-export const usd = (n: number) =>
-  n.toLocaleString(undefined, {
-    style: 'currency',
-    currency: 'USD',
-    currencyDisplay: 'narrowSymbol',
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  })
-
 export const compact = (n: number) => n.toLocaleString(undefined, { notation: 'compact', maximumFractionDigits: 1 })

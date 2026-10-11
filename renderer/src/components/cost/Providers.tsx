@@ -3,7 +3,8 @@ import { decodeIpcError } from '@shared/ipc'
 import type { ProviderState, ProviderStatus, ProviderWindow } from '@shared/types'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import { compact, timeAgo, usd } from '@/lib/format'
+import { compact, timeAgo } from '@/lib/format'
+import { useMoney } from '@/lib/useMoney'
 import { useProviders, useRefreshProviders } from '@/lib/queries'
 
 export const LIMIT_ALERT_PCT = 80
@@ -61,6 +62,7 @@ function WindowBar({ w, providerName }: { w: ProviderWindow; providerName: strin
 }
 
 function ProviderCard({ p }: { p: ProviderStatus }) {
+  const { money } = useMoney()
   const noData = p.windows.length === 0 && p.rows.length === 0 && p.balance == null
   return (
     <section aria-label={`${p.name} usage`} className="bg-card space-y-2 rounded-lg border px-3.5 py-3">
@@ -75,7 +77,7 @@ function ProviderCard({ p }: { p: ProviderStatus }) {
       ))}
       {p.balance && (
         <p className="text-xs">
-          Balance <span className="font-medium tabular-nums">{p.balance.currency === 'USD' ? usd(p.balance.amount) : `${p.balance.amount} ${p.balance.currency}`}</span>
+          Balance <span className="font-medium tabular-nums">{p.balance.currency === 'USD' ? money(p.balance.amount) : `${p.balance.amount} ${p.balance.currency}`}</span>
         </p>
       )}
       {p.rows.length > 0 && (
@@ -96,7 +98,7 @@ function ProviderCard({ p }: { p: ProviderStatus }) {
                 <td className="py-1 text-right tabular-nums">{compact(r.inputTokens)}</td>
                 <td className="py-1 text-right tabular-nums">{compact(r.outputTokens)}</td>
                 <td className="py-1 text-right tabular-nums">
-                  {usd(r.costUsd)}
+                  {money(r.costUsd)}
                   {r.estimate && <span className="text-muted-foreground"> (estimate)</span>}
                 </td>
               </tr>

@@ -1,11 +1,14 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, type ClipboardEvent, type DragEvent, type KeyboardEvent } from 'react'
 import { KeepWarmLine } from './KeepWarmLine'
+import { DictationButton } from './DictationButton'
+import { useDictation } from './useDictation'
+import { matches } from '@/lib/keys'
 import { useQueryClient } from '@tanstack/react-query'
-import { ArrowUp, Check, ChevronDown, Command, CornerDownLeft, Loader2, Plus, Sparkles, Square, Undo2, X } from 'lucide-react'
+import { ArrowUp, Check, ChevronDown, Command, CornerDownLeft, Loader2, Plus, Sparkles, Square, StickyNote, Undo2, X } from 'lucide-react'
 import type { ChatState } from '@shared/claude-chat'
 import { describeEnhanceContext } from '@shared/prompt-enhance'
 import { bridge } from '@/lib/bridge'
-import { useSettings } from '@/lib/queries'
+import { useInstallStatus, useSaveSettings, useSettings } from '@/lib/queries'
 import { toast } from '@/lib/toast'
 import { cn } from '@/lib/utils'
 import { ContextMenu, ContextMenuContent, ContextMenuItem, ContextMenuTrigger } from '@/components/ui/context-menu'
@@ -14,6 +17,7 @@ import { applySuggestion, currentModel, filterCommands, highlightParts, modeLabe
 import { EffortPopover } from './EffortPopover'
 import { setActivity } from './activityStore'
 import { CommandMenu } from './CommandMenu'
+import { LearnPill, SteerPill } from './ComposerPills'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { chatActions } from './useChat'
 
@@ -86,6 +90,9 @@ export function Composer({ scratchId, state, launchEffort, tileModel, disabled, 
   const [sel, setSel] = useState(0)
   const [dismissed, setDismissed] = useState<string | null>(null)
   const [recall, setRecall] = useState(-1)
+  const appSettings = useSettings().data
+  const saveSettings = useSaveSettings()
+  const notesOpen = appSettings?.layout.notesOpen ?? false
   const keepWarmOn = useSettings().data?.claudeMods.keepWarm ?? true
   const commandMenuOn = useSettings().data?.claudeMods.commandMenu ?? true
   const allCommands = withLocalCommands(state.commands, keepWarmOn)
@@ -280,13 +287,41 @@ export function Composer({ scratchId, state, launchEffort, tileModel, disabled, 
     }
   }
 
+  function insertAtCaret(words: string) {
+    const el = area.current
+    const at = el ? el.selectionStart : text.length
+    const end = el ? el.selectionEnd : text.length
+    const before = text.slice(0, at)
+    const piece = `${before && !/\s$/.test(before) ? ' ' : ''}${words}`
+    setText(`${before}${piece}${text.slice(end)}`)
+    setCaret(at + piece.length)
+    el?.focus()
+  }
+
+  const dictation = useDictation(insertAtCaret)
+  const dictateKey = useSettings().data?.keybinds.dictate ?? ''
+  const dictationOn = useSettings().data?.dictation.enabled ?? true
+  const speechReady = useInstallStatus().data?.find((s) => s.id === 'dictation')?.state === 'installed' && dictationOn
+  const toggleDictation = dictation.toggle
+  useEffect(() => {
+    if (!dictateKey || !speechReady) return
+    const onKey = (e: globalThis.KeyboardEvent) => {
+      if (document.activeElement !== area.current || !matches(e, dictateKey)) return
+      e.preventDefault()
+      toggleDictation()
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [dictateKey, speechReady, toggleDictation])
+
   const blocked = state.process === 'blocked'
   const placeholder = state.process === 'starting' ? 'Starting Claude Code…' : 'Type / for commands'
   const canSend = (text.trim() !== '' || images.length > 0) && !disabled
 
   return (
     <div className="shrink-0 px-4 pt-1.5 pb-3.5" onDragOver={(e) => e.preventDefault()} onDrop={onDrop}>
-      <div className="mx-auto mb-1.5 flex max-w-[720px] items-center gap-2 px-1">
+      <div className="mx-auto mb-1.5 flex max-w-[720px] flex-wrap items-center gap-x-2 gap-y-1 px-1">
+        <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
         {enhancing ? (
           <button type="button" onClick={cancelEnhance} title="Cancel" aria-label="Cancel enhancing" className="bg-accent text-foreground inline-flex h-[26px] items-center gap-1.5 rounded-full px-3 text-[13px]">
             <Loader2 className="size-3.5 animate-spin" aria-hidden /> {phase === 'context' ? 'Gathering context…' : 'Enhancing…'}
@@ -317,7 +352,12 @@ export function Composer({ scratchId, state, launchEffort, tileModel, disabled, 
           </button>
         )}
         {undo !== null && !enhancing && usedNote && <span className="text-muted-foreground/70 text-[11px]">{usedNote}</span>}
-        <KeepWarmLine state={state} />
+        </div>
+        <div className="ml-auto flex max-w-full flex-wrap items-center justify-end gap-x-2 gap-y-1">
+          <KeepWarmLine state={state} />
+          <LearnPill scratchId={scratchId} />
+          <SteerPill scratchId={scratchId} running={running} />
+        </div>
       </div>
       <div className="relative mx-auto max-w-[720px]">
         {suggesting && (
@@ -345,7 +385,7 @@ export function Composer({ scratchId, state, launchEffort, tileModel, disabled, 
             ))}
           </div>
         )}
-        <div className="border-border bg-popover rounded-[18px] border py-1.5 pr-2 pl-[18px] shadow-[0_10px_30px_rgba(0,0,0,.18)] dark:shadow-[0_10px_30px_rgba(0,0,0,.45)]">
+        <div className={cn('border-border bg-popover rounded-[18px] border py-1.5 pr-2 pl-[18px] shadow-[0_10px_30px_rgba(0,0,0,.18)] dark:shadow-[0_10px_30px_rgba(0,0,0,.45)]', (running || dictation.state !== 'idle') && 'chat-ai-border')}>
           {images.length > 0 && (
             <div className="mb-2 flex flex-wrap gap-1.5">
               {images.map((im, i) => (
@@ -371,7 +411,7 @@ export function Composer({ scratchId, state, launchEffort, tileModel, disabled, 
               onSelect={(e) => setCaret(e.currentTarget.selectionStart)}
               onKeyDown={onKeyDown}
               onPaste={onPaste}
-              className="placeholder:text-muted-foreground/70 min-h-[23px] flex-1 resize-none self-center border-0 bg-transparent p-0 text-[15px] leading-[23px] outline-none"
+              className={cn('placeholder:text-muted-foreground/70 min-h-[23px] flex-1 resize-none self-center border-0 bg-transparent p-0 text-[15px] leading-[23px] outline-none', (running || dictation.state !== 'idle') && 'pr-6')}
             />
             {running ? (
               <button type="button" aria-label="Stop" title="Stop (Esc)" onClick={() => chatActions.interrupt(scratchId)} className="bg-foreground text-background grid size-[30px] shrink-0 place-items-center rounded-full hover:opacity-90">
@@ -390,6 +430,12 @@ export function Composer({ scratchId, state, launchEffort, tileModel, disabled, 
               </button>
             )}
           </div>
+          {(running || dictation.state !== 'idle') && (
+            <span role="status" className="text-muted-foreground pointer-events-none absolute top-1/2 right-[46px] -translate-y-1/2">
+              <Loader2 className="size-4 animate-spin" aria-hidden />
+              <span className="sr-only">{running ? 'Claude is working' : dictation.state === 'recording' ? 'Listening' : dictation.state === 'loading' ? 'Loading speech model' : 'Transcribing'}</span>
+            </span>
+          )}
         </div>
         <div className="text-muted-foreground mt-1.5 flex items-center gap-0.5 px-1">
           <DropdownMenu>
@@ -402,6 +448,8 @@ export function Composer({ scratchId, state, launchEffort, tileModel, disabled, 
             </DropdownMenuContent>
           </DropdownMenu>
           <input ref={picker} type="file" multiple hidden onChange={(e) => (void addFiles([...(e.target.files ?? [])]), (e.target.value = ''))} />
+
+          {speechReady && <DictationButton dictation={dictation} />}
 
           {commandMenuOn && (
             <Popover
@@ -428,6 +476,17 @@ export function Composer({ scratchId, state, launchEffort, tileModel, disabled, 
               </PopoverContent>
             </Popover>
           )}
+
+          <button
+            type="button"
+            className={cn(toolbarBtn, 'w-[26px] justify-center px-0')}
+            aria-label={notesOpen ? 'Hide notes' : 'Show notes'}
+            aria-pressed={notesOpen}
+            title={`Notes (${appSettings?.keybinds.toggleNotes || 'unbound'})`}
+            onClick={() => saveSettings.mutate({ layout: { notesOpen: !notesOpen } })}
+          >
+            <StickyNote className="size-3.5" aria-hidden />
+          </button>
 
           <DropdownMenu>
             <DropdownMenuTrigger className={toolbarBtn} aria-label={`Permission mode: ${modeLabel(state.permissionMode)}`} title="Permission mode (Shift+Tab)">

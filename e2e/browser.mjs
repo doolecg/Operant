@@ -10,6 +10,7 @@ import { networkInterfaces, tmpdir } from 'node:os'
 import { connect } from 'node:net'
 import { join, resolve } from 'node:path'
 import { _electron as electron } from 'playwright-core'
+import { shot } from './lib/shot.mjs'
 import { MODEL, claudeHome, e2eEnv } from './fixtures/real-claude.mjs'
 import { COOKIE_VALUE, startSite } from './fixtures/site/server.mjs'
 
@@ -82,7 +83,6 @@ const poll = async (label, fn, timeout = 15_000) => {
   }
   throw new Error(`timed out waiting for ${label}`)
 }
-const shot = async (name) => (await sleep(400), page.screenshot({ path: join(outDir, `browser-${name}.png`) }))
 // Read-only look at the app's web contents from main: the app UI and the browser panel views.
 const contents = () => app.evaluate(({ webContents }) => webContents.getAllWebContents().map((w) => ({ id: w.id, url: w.getURL(), title: w.getTitle() })))
 const panelRun = (id, code) => app.evaluate(({ webContents }, [i, c]) => webContents.fromId(i).executeJavaScript(c, true), [id, code])
@@ -164,7 +164,7 @@ try {
     }
     await address().waitFor({ timeout: 10_000 })
     await waitState('home page loaded', crewA, (s) => s.open && s.tabs.length === 1 && s.tabs[0].url === `${base}/` && !s.tabs[0].loading)
-    await shot('open')
+    await shot(page, 'open')
   })
 
   // The real claude tile (Haiku) starts now and warms up while the no-AI checks run.
@@ -392,7 +392,7 @@ try {
     await addr.fill('fixture page')
     const group = page.getByRole('group', { name: 'Address suggestions' })
     await group.waitFor({ timeout: 5000 })
-    await shot('suggestions')
+    await shot(page, 'suggestions')
     await group.getByRole('button', { name: /Fixture Page Two/ }).click()
     await waitState('suggestion opened', crewA, async (s) => s.tabs.some((t) => t.url === `${base}/page2`))
     await goto(`${base}/long`)
@@ -546,7 +546,7 @@ try {
       const perCrew = JSON.stringify((await inv('settings:get')).browser.perCrew)
       throw new Error(`${e.message.split('\n')[0]}; settings perCrew=${perCrew}; menus open=${await page.getByRole('menu').count()}; text has "CORS relaxed": ${(await page.locator('body').innerText()).includes('CORS relaxed')}`)
     })
-    await shot('relaxed')
+    await shot(page, 'relaxed')
   })
   await check('E relaxCors turned off again blocks the fetch and removes the badge', async () => {
     await setCompat(null)

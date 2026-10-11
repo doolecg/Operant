@@ -18,6 +18,7 @@ export const EXIT = {
 // Who a request runs for: the project of the tile whose token sent it.
 export interface Identity {
   crewId: number
+  tileId: number
 }
 
 export interface CliRequest {

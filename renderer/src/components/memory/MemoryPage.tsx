@@ -152,7 +152,7 @@ export function MemoryPage({ crewId }: { crewId: number | null }) {
             <TabsTrigger value="memory">Personal memory</TabsTrigger>
             <TabsTrigger value="drafts">Skill drafts{pendingDrafts ? ` (${pendingDrafts})` : ''}</TabsTrigger>
           </TabsList>
-          <TabsContent value="lessons">{tab === 'lessons' && <LessonsList filter={filter} crews={crews.data ?? []} />}</TabsContent>
+          <TabsContent value="lessons">{tab === 'lessons' && <LessonsList filter={filter} crews={crews.data ?? []} crewId={readCrew} />}</TabsContent>
           <TabsContent value="hindsight">{tab === 'hindsight' && <HindsightTab crewId={readCrew} search={search} />}</TabsContent>
           <TabsContent value="codegraph">
             {tab === 'codegraph' && (
@@ -160,7 +160,7 @@ export function MemoryPage({ crewId }: { crewId: number | null }) {
                 <p className="text-muted-foreground text-xs">
                   CodeGraph has no notes API, so these notes live in Operant, tagged to the files and symbols they name.
                 </p>
-                <LessonsList filter={filter} crews={crews.data ?? []} />
+                <LessonsList filter={filter} crews={crews.data ?? []} crewId={readCrew} />
               </div>
             )}
           </TabsContent>

@@ -1,4 +1,4 @@
-<p align="center"><img src="build/icon.png" width="128" alt="Operant 3"></p>
+<p align="center"><img src="docs/logo.png" width="160" alt="Operant 3"></p>
 
 # Operant 3
 

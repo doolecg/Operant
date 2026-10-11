@@ -222,10 +222,10 @@ export class ChatMapper {
 
   // The owner sent a message: shows the bubble at once (queued when a turn is running).
   // `read`: Claude reads it right away (a plan denial's comment), so it never shows the Queued tag.
-  noteUserMessage(text: string, images: ChatImage[], read = false): ChatOp[] {
+  noteUserMessage(text: string, images: ChatImage[], read = false, steer = false): ChatOp[] {
     const queued = this.turnActive && !read
     const id = `u:${this.now()}:${this.seq++}`
-    this.addItem({ kind: 'user', id, parent: null, text, images, queued, at: this.now() })
+    this.addItem({ kind: 'user', id, parent: null, text, images, queued, at: this.now(), ...(steer ? { steer: true } : {}) })
     if (queued) this.queuedAwaitTurn = false
     this.commandName = text.startsWith('/') ? text.split(/\s+/)[0]! : ''
     this.beginTurn()
@@ -243,7 +243,7 @@ export class ChatMapper {
 
   // A notice raised by the process layer (crash, restart limits, refused requests).
   noteNotice(n: Omit<NoticeItem, 'kind' | 'id' | 'parent' | 'at'>): ChatOp[] {
-    this.notice(n.source, n.tone, n.text, n.detail, n.actions)
+    this.notice(n.source, n.tone, n.text, n.detail, n.actions, null, undefined, n.images)
     return this.drain()
   }
 
@@ -442,8 +442,8 @@ export class ChatMapper {
     this.out.push({ op: 'append', id: item.id, text })
   }
 
-  private notice(source: NoticeSource, tone: NoticeItem['tone'], text: string, detail?: string, actions?: NoticeItem['actions'], parent: string | null = null, tag?: Pick<NoticeItem, 'category' | 'origin'>): void {
-    this.addItem<NoticeItem>({ kind: 'notice', id: `n:${this.now()}:${this.seq++}`, parent, source, tone, text, ...(tag?.category ? tag : {}), ...(detail ? { detail } : {}), ...(actions?.length ? { actions } : {}), at: this.now() })
+  private notice(source: NoticeSource, tone: NoticeItem['tone'], text: string, detail?: string, actions?: NoticeItem['actions'], parent: string | null = null, tag?: Pick<NoticeItem, 'category' | 'origin'>, images?: ChatImage[]): void {
+    this.addItem<NoticeItem>({ kind: 'notice', id: `n:${this.now()}:${this.seq++}`, parent, source, tone, text, ...(tag?.category ? tag : {}), ...(detail ? { detail } : {}), ...(actions?.length ? { actions } : {}), ...(images?.length ? { images } : {}), at: this.now() })
   }
 
   private trim(): void {
@@ -1143,7 +1143,9 @@ export class ChatMapper {
       case 'turn_duration': {
         if (!this.history) break
         const ms = num(o.durationMs)
-        if (ms !== undefined) this.addItem({ kind: 'turn', id: `turn:${str(o.uuid) || this.seq++}`, durationMs: ms, ok: true, costUsd: null, at: Date.parse(str(o.timestamp)) || this.now() })
+        const out = this.sumTokens()
+        this.msgTokens.clear()
+        if (ms !== undefined) this.addItem({ kind: 'turn', id: `turn:${str(o.uuid) || this.seq++}`, durationMs: ms, ok: true, costUsd: null, outputTokens: out || null, at: Date.parse(str(o.timestamp)) || this.now() })
         break
       }
       case 'api_retry':
@@ -1217,7 +1219,8 @@ export class ChatMapper {
     this.compacting = false
     if (aborted) this.markInterrupted()
     if (!local) {
-      this.addItem({ kind: 'turn', id: `turn:${str(o.uuid) || this.seq++}`, durationMs: duration, ok: !isError && subtype === 'success' && !aborted, costUsd: cost ?? null, at: this.now() })
+      const out = num(rec(o.usage).output_tokens) ?? this.lastTurnOut
+      this.addItem({ kind: 'turn', id: `turn:${str(o.uuid) || this.seq++}`, durationMs: duration, ok: !isError && subtype === 'success' && !aborted, costUsd: cost ?? null, outputTokens: out || null, at: this.now() })
       if ((isError || subtype !== 'success') && !aborted) {
         const detail = arr(o.errors).map(String).join('\n')
         this.notice('error', 'error', str(o.result) || errorText(subtype), detail || undefined)

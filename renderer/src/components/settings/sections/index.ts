@@ -8,6 +8,7 @@ import { BudgetsSection } from "./BudgetsSection";
 import { CodegraphSection } from "./CodegraphSection";
 import { GeneralSection } from "./GeneralSection";
 import { HindsightSection } from "./HindsightSection";
+import { InstallSection } from "./InstallSection";
 import { ImportExportSection } from "./ImportExportSection";
 import { LearningSection } from "./LearningSection";
 import { McpSection } from "./McpSection";
@@ -50,4 +51,5 @@ export const SECTION_COMPONENTS: Record<SettingsSectionId, ComponentType> = {
   shortcuts: ShortcutsSection,
   browser: BrowserSection,
   reset: ResetSection,
+  install: InstallSection,
 };

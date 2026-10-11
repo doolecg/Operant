@@ -12,7 +12,9 @@ import { Textarea } from '@/components/ui/textarea'
 import { KIND_LABEL } from '@/components/memory/ui'
 import { toast } from '@/lib/toast'
 import { useCrews, useLessons, useMemoryDelete, useMemoryDiagnostics, useMemoryEdit, useMemoryExport, useMemoryReset, useSaveSettings, useSettings } from '@/lib/queries'
+import { useMoney } from '@/lib/useMoney'
 import { ConfirmDialog, NumberField, Row } from '../parts'
+import { MemoryToolsWarning } from '../MemoryToolsWarning'
 
 const RECALL_LABEL: Record<RecallMode, string> = { off: 'Off', 'on-demand': 'On demand', 'session-start': 'Session start' }
 const RECALL_HINT: Record<RecallMode, string> = {
@@ -21,7 +23,6 @@ const RECALL_HINT: Record<RecallMode, string> = {
   'session-start': 'Relevant memory is added when a session starts.',
 }
 
-const usd = (n: number) => `$${n.toFixed(n < 1 ? 4 : 2)}`
 const fail = (e: unknown) => toast(decodeIpcError(e).message, true)
 
 function LessonRow({ lesson, crewName }: { lesson: Lesson; crewName: string }) {
@@ -86,6 +87,7 @@ function LessonRow({ lesson, crewName }: { lesson: Lesson; crewName: string }) {
 
 export function MemorySection() {
   const settings = useSettings()
+  const { money } = useMoney()
   const save = useSaveSettings()
   const diag = useMemoryDiagnostics()
   const crews = useCrews()
@@ -132,6 +134,21 @@ export function MemorySection() {
 
   return (
     <>
+      <MemoryToolsWarning />
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base">Tools</CardTitle>
+          <CardDescription>Both are off until you switch them on. When on and installed, every Claude session Operant starts uses them.</CardDescription>
+        </CardHeader>
+        <CardContent className="divide-y">
+          <Row label="Use Hindsight" hint="Lessons are kept in Hindsight and recalled when a session starts. Starts the local server with the app." htmlFor="mem-use-hindsight">
+            <Switch id="mem-use-hindsight" checked={s.learn.hindsight} onCheckedChange={(v) => save.mutate({ learn: { hindsight: v } }, { onError: fail })} />
+          </Row>
+          <Row label="Use CodeGraph" hint="Adds the CodeGraph MCP server to each session." htmlFor="mem-use-codegraph">
+            <Switch id="mem-use-codegraph" checked={s.learn.codegraph} onCheckedChange={(v) => save.mutate({ learn: { codegraph: v } }, { onError: fail })} />
+          </Row>
+        </CardContent>
+      </Card>
       <Card>
         <CardHeader>
           <CardTitle className="text-base">Memory provider</CardTitle>
@@ -278,7 +295,7 @@ export function MemorySection() {
               </Row>
               <Row label="Spend today" hint={d.spend.blocked ?? undefined}>
                 <span className="text-xs tabular-nums">
-                  {d.spend.total.calls} calls · {d.spend.total.tokens.toLocaleString()} tokens · {usd(d.spend.total.usd)}
+                  {d.spend.total.calls} calls · {d.spend.total.tokens.toLocaleString()} tokens · {money(d.spend.total.usd, true)}
                   {d.spend.label ? ` · ${d.spend.label}` : ''}
                 </span>
               </Row>

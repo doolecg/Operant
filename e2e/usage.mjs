@@ -8,6 +8,7 @@ import { DatabaseSync } from 'node:sqlite'
 import { tmpdir } from 'node:os'
 import { delimiter, join, resolve } from 'node:path'
 import { _electron as electron } from 'playwright-core'
+import { shot } from './lib/shot.mjs'
 
 const outDir = resolve(process.argv[2] ?? 'docs/specs/screenshots')
 mkdirSync(outDir, { recursive: true })
@@ -60,10 +61,6 @@ const page = await app.firstWindow()
 page.on('console', (m) => m.type() === 'error' && consoleNotes.push(`console.error: ${m.text()}`))
 page.on('pageerror', (e) => consoleNotes.push(`pageerror: ${e.message}`))
 const inv = (channel, ...args) => page.evaluate(([c, a]) => window.operant.invoke(c, ...a), [channel, args])
-const shot = async (name) => {
-  await page.waitForTimeout(500)
-  await page.screenshot({ path: join(outDir, `${name}.png`) })
-}
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
 async function until(label, fn, timeout = 30_000) {
   for (const end = Date.now() + timeout; Date.now() < end; await sleep(250)) if (await fn()) return
@@ -137,7 +134,7 @@ try {
   await table.locator('tfoot').getByText(money(report.totals.costUsd)).waitFor()
   assert.equal(await table.locator('tbody tr').count(), report.rows.length, 'one table row per day')
   await page.getByRole('region', { name: 'Spend trend' }).getByRole('img').waitFor()
-  await shot('usage')
+  await shot(page, 'usage')
 
   // Grouping switch and filters.
   const group = page.getByRole('group', { name: 'Group by' })
@@ -180,7 +177,7 @@ try {
   const zai = page.getByRole('region', { name: 'z.ai usage' })
   await zai.getByText(/^No data/).waitFor()
   await page.getByRole('region', { name: 'Provider usage' }).scrollIntoViewIfNeeded()
-  await shot('usage-providers')
+  await shot(page, 'usage-providers')
   assert.equal(await page.getByText('e2e-not-a-real-token').count(), 0, 'keys are never shown')
 
   // Esc closes the popout; the sidebar badge (at least 80% used) opens it from anywhere.
@@ -202,7 +199,7 @@ try {
   await until('project cap saved', async () => (await inv('budgets:get')).config.projectDailyUsd[String(crew.id)] === 0.5)
   await until('project progress', async () => (await inv('budgets:get')).projects.find((p) => p.crewId === crew.id)?.capUsd === 0.5, 20_000)
   await page.getByRole('progressbar', { name: 'Project shop spend against cap' }).waitFor()
-  await shot('budgets')
+  await shot(page, 'budgets')
   await page.getByLabel('Project shop cap in USD').fill('0')
   await page.getByLabel('Project shop cap in USD').blur()
   await until('project cap cleared', async () => ((await inv('budgets:get')).config.projectDailyUsd[String(crew.id)] ?? 0) === 0)
@@ -220,7 +217,7 @@ try {
   assert.equal(before.projects.skipped, 1)
   await preview.getByRole('region', { name: 'Skipped rows' }).waitFor()
   await preview.getByText(/folder not found/).waitFor()
-  await shot('import')
+  await shot(page, 'import')
   const usageBefore = (await inv('usage:report', { groupBy: [] })).totals.turns
   await page.getByRole('button', { name: /^Apply: add/ }).click()
   await page.getByRole('region', { name: 'Import result' }).waitFor()

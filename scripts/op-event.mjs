@@ -3,11 +3,14 @@
 //
 //   node op-event.mjs hook <eventsDir>    appends one line {ts, tile, ...payload} to <eventsDir>/<session_id>.jsonl
 //   node op-event.mjs status <eventsDir>  writes the latest payload to <eventsDir>/status-<session_id>.json and prints one line
+//   node op-event.mjs recall <eventsDir>  SessionStart only: prints the project's memory file (<eventsDir>/../recall/<key>.txt,
+//                                         written by the app) as hookSpecificOutput.additionalContext; nothing when it is missing
 //
 // Only tiles Operant launched (OPERANT_SOURCE=operant) write anything. It always exits 0, so a failed write never
 // blocks Claude Code.
-import { appendFileSync, mkdirSync, renameSync, writeFileSync } from 'node:fs'
-import { join } from 'node:path'
+import { createHash } from 'node:crypto'
+import { appendFileSync, mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs'
+import { dirname, join } from 'node:path'
 
 const SAFE_ID = /^[A-Za-z0-9_-]{1,128}$/
 const MAX_STRING = 2000
@@ -45,9 +48,25 @@ function statusText(payload) {
   return parts.join(' | ')
 }
 
+// The same key core/session-recall.ts writes the file under: the folder, slashes forward, no trailing slash, lower case.
+const recallKey = (folder) => createHash('sha1').update(folder.replace(/[\\]/g, '/').replace(/\/+$/, '').toLowerCase()).digest('hex').slice(0, 16)
+
+function recall(eventsDir, payload) {
+  if (payload.hook_event_name !== 'SessionStart' || typeof payload.cwd !== 'string' || !payload.cwd) return
+  let text
+  try {
+    text = readFileSync(join(dirname(eventsDir), 'recall', `${recallKey(payload.cwd)}.txt`), 'utf8').trim()
+  } catch {
+    return
+  }
+  if (!text) return
+  process.stdout.write(`${JSON.stringify({ hookSpecificOutput: { hookEventName: 'SessionStart', additionalContext: text } })}
+`)
+}
+
 async function main() {
   const [mode, eventsDir] = process.argv.slice(2)
-  if (process.env.OPERANT_SOURCE !== 'operant' || !eventsDir || (mode !== 'hook' && mode !== 'status')) return
+  if (process.env.OPERANT_SOURCE !== 'operant' || !eventsDir || (mode !== 'hook' && mode !== 'status' && mode !== 'recall')) return
   let payload
   try {
     payload = JSON.parse(await readStdin())
@@ -55,6 +74,7 @@ async function main() {
     return
   }
   if (!payload || typeof payload !== 'object' || Array.isArray(payload)) return
+  if (mode === 'recall') return recall(eventsDir, payload)
   const sessionId = payload.session_id
   if (typeof sessionId !== 'string' || !SAFE_ID.test(sessionId)) return
   mkdirSync(eventsDir, { recursive: true })

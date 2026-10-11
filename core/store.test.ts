@@ -1,5 +1,9 @@
+import { mkdtempSync, rmSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
-import { Store } from './store'
+import { LessonsDb } from './lessons-store'
+import { MIGRATIONS, Store } from './store'
 
 describe('store', () => {
   let store: Store
@@ -7,6 +11,34 @@ describe('store', () => {
     store = new Store(':memory:')
   })
   afterEach(() => store.close())
+
+  it('adds the lesson link columns to a database that already has lessons', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'operant-lessons-'))
+    const file = join(dir, 'a.db')
+    try {
+      const old = new Store(file)
+      const crew = old.createCrew('alpha', '/code/alpha')
+      old.db.exec('ALTER TABLE lessons DROP COLUMN related; ALTER TABLE lessons DROP COLUMN consolidated_into')
+      old.db.exec(`PRAGMA user_version = ${MIGRATIONS.length - 1}`)
+      old.db
+        .prepare("INSERT INTO lessons (crew_id, text, kind, scope, created_at, updated_at) VALUES (?, 'keep it small', 'convention', 'project', 1, 1)")
+        .run(crew.id)
+      old.close()
+      const s = new Store(file)
+      try {
+        expect(s.schemaVersion).toBe(MIGRATIONS.length)
+        const db = new LessonsDb(s.db)
+        const [l] = db.listLessons()
+        expect(l).toMatchObject({ text: 'keep it small', related: [], consolidatedInto: null })
+        expect(db.updateLesson(l!.id, { related: [7, 9], consolidatedInto: 3 })).toMatchObject({ related: [7, 9], consolidatedInto: 3 })
+        expect(db.updateLesson(l!.id, { consolidatedInto: null }).consolidatedInto).toBeNull()
+      } finally {
+        s.close()
+      }
+    } finally {
+      rmSync(dir, { recursive: true, force: true })
+    }
+  })
 
   it('keeps projects, their order and the Playground', () => {
     const a = store.createCrew('alpha', '/code/alpha')

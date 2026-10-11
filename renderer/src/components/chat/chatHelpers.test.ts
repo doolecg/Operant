@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { ChatCommand, ChatItem, ChatModel, SubagentItem, ToolItem } from '@shared/claude-chat'
-import { agentContext, agentElapsed, agentTitle, agentTldr, agentList, applySuggestion, capItems, contextHeadline, contextTone, currentModel, effortDisabledReason, effortStops, filterCommands, formatDuration, highlightParts, kTokens, noticeChipIcon, withLocalCommands, mainThread, modeLabel, modeOptions, nextMode, toolRowParts, triggerAt } from './chatHelpers'
+import { agentContext, agentElapsed, agentTitle, agentTldr, agentList, applySuggestion, capItems, contextHeadline, contextTone, currentModel, effortDisabledReason, effortStops, filterCommands, formatDuration, highlightParts, imageFileName, kTokens, tokensSuffix, noticeChipIcon, withLocalCommands, mainThread, modeLabel, modeOptions, nextMode, toolRowParts, triggerAt } from './chatHelpers'
 
 const model = (over: Partial<ChatModel> = {}): ChatModel => ({ value: 'opus', displayName: 'Opus 5.5', description: '', resolvedModel: 'claude-opus-5-5', supportsEffort: true, efforts: ['low', 'medium', 'high', 'xhigh', 'max'], supportsAutoMode: true, ...over })
 
@@ -13,6 +13,25 @@ const agent = (over: Partial<SubagentItem> = {}): SubagentItem => ({
 })
 
 describe('formatting', () => {
+  it('formats token suffixes and leaves unknown counts empty', () => {
+    expect(tokensSuffix(4800)).toBe(' · 4.8k tokens')
+    expect(tokensSuffix(950)).toBe(' · 950 tokens')
+    expect(tokensSuffix(1_250_000)).toBe(' · 1.3M tokens')
+    expect(tokensSuffix(1200, true)).toBe(' · ~1.2k tokens')
+    expect(tokensSuffix(null)).toBe('')
+    expect(tokensSuffix(undefined)).toBe('')
+    expect(tokensSuffix(0)).toBe('')
+    expect(tokensSuffix(Number.NaN)).toBe('')
+  })
+
+  it('names saved images', () => {
+    const at = new Date(2026, 9, 11, 14, 23, 5)
+    expect(imageFileName('image/png', at)).toBe('operant-image-20261011-142305.png')
+    expect(imageFileName('image/jpeg', at, 1)).toBe('operant-image-20261011-142305-2.jpg')
+    expect(imageFileName('image/svg+xml', at)).toBe('operant-image-20261011-142305.svg')
+    expect(imageFileName('', at)).toBe('operant-image-20261011-142305.png')
+  })
+
   it('formats durations', () => {
     expect(formatDuration(4600)).toBe('4.6s')
     expect(formatDuration(46_000)).toBe('46s')
@@ -188,5 +207,6 @@ describe('notice chips', () => {
     expect(noticeChipIcon('crash', 'warn')).toBe('alert')
     expect(noticeChipIcon('info', 'error')).toBe('alert')
     expect(noticeChipIcon('info', 'info')).toBe('info')
+    expect(noticeChipIcon('shot', 'info')).toBe('camera')
   })
 })

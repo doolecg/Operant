@@ -9,6 +9,7 @@ import {
   type ChatSendInput,
   type ChatState,
   type ContextUsage,
+  type NoticeItem,
   type SubagentItem,
 } from '../shared/claude-chat'
 import { LineBuffer } from './console'
@@ -234,6 +235,10 @@ export class ChatSession {
   get busy(): boolean {
     const t = this.mapper.state.turn
     return t.phase === 'working' || t.phase === 'waiting' || this.mapper.hasPending()
+  }
+
+  addNotice(n: Omit<NoticeItem, 'kind' | 'id' | 'parent' | 'at'>): void {
+    this.push(this.mapper.noteNotice(n))
   }
 
   private push(ops: ChatOp[]): void {
@@ -540,6 +545,15 @@ export class ChatSession {
     const content: unknown[] = [...images.map((i) => ({ type: 'image', source: { type: 'base64', media_type: i.mediaType, data: i.base64 } }))]
     if (text) content.push({ type: 'text', text })
     this.write({ type: 'user', message: { role: 'user', content }, parent_tool_use_id: null, session_id: this.deps.sessionId })
+  }
+
+  // A note into the running turn: written to stdin like any message (Claude Code takes it at its next step), shown as a steer bubble.
+  steer(text: string): void {
+    const t = (text ?? '').trim()
+    if (!t) return
+    if (!this.ensureRunning()) return
+    this.push(this.mapper.noteUserMessage(t, [], false, true))
+    this.write({ type: 'user', message: { role: 'user', content: [{ type: 'text', text: t }] }, parent_tool_use_id: null, session_id: this.deps.sessionId })
   }
 
   // Keep-warm's message, through the same process and session as the owner's messages (so the same cache is read).

@@ -120,6 +120,8 @@ function DiffLines({ v }: { v: string }) {
 
 // The chat style: code blocks are a filled box without border, the language muted at the top right and Copy only on hover.
 const ChatStyle = createContext(false)
+// When set, task checkboxes are clickable (the owner listens for the click); otherwise they are display only.
+const TaskInteractive = createContext(false)
 
 function CodeBlock({ lang, v, doc }: { lang: string; v: string; doc: boolean }) {
   const chat = useContext(ChatStyle)
@@ -157,6 +159,7 @@ const docHeadingClass = ['', 'mt-8 border-b pb-1.5 text-[22px] leading-tight', '
 
 function Blocks({ blocks, doc = false, flat = false }: { blocks: Block[]; doc?: boolean; flat?: boolean }) {
   const chat = useContext(ChatStyle)
+  const tasksOn = useContext(TaskInteractive)
   // The section a list belongs to: the nearest title above it.
   let section: string | null = null
   return (
@@ -203,7 +206,7 @@ function Blocks({ blocks, doc = false, flat = false }: { blocks: Block[]; doc?: 
                         type="checkbox"
                         checked={it.task}
                         readOnly
-                        disabled
+                        disabled={!tasksOn}
                         aria-label={it.task ? 'Done' : 'Not done'}
                         className="shrink-0"
                       />
@@ -319,9 +322,11 @@ interface Props {
   // "document" is the roomy reading style for outcomes and summaries: bigger type, spacious headings, tables and code,
   // and long sections fold away.
   variant?: 'compact' | 'document' | 'chat'
+  // Makes task checkboxes clickable in the compact variant; the caller handles the click.
+  interactiveTasks?: boolean
 }
 
-export const Markdown = memo(function Markdown({ source, className, variant = 'compact' }: Props) {
+export const Markdown = memo(function Markdown({ source, className, variant = 'compact', interactiveTasks = false }: Props) {
   const blocks = useMemo(() => parseMarkdown(source), [source])
   if (variant === 'document') {
     return (
@@ -340,8 +345,10 @@ export const Markdown = memo(function Markdown({ source, className, variant = 'c
     )
   }
   return (
-    <div data-markdown className={cn('min-w-0 space-y-2 text-sm [&_ol_ol]:mt-1 [&_ul_ul]:mt-1', className)}>
-      <Blocks blocks={blocks} />
-    </div>
+    <TaskInteractive.Provider value={interactiveTasks}>
+      <div data-markdown className={cn('min-w-0 space-y-2 text-sm [&_ol_ol]:mt-1 [&_ul_ul]:mt-1', className)}>
+        <Blocks blocks={blocks} />
+      </div>
+    </TaskInteractive.Provider>
   )
 })

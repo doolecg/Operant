@@ -657,7 +657,7 @@ export function Sidebar({ crews: allCrews, selected, onSelect, onNewCrew, action
             </Button>
           </div>
         )}
-        <div className="flex min-w-0 items-center gap-0.5" data-testid="sidebar-footer">
+        <div className="flex min-w-0 flex-wrap items-center gap-x-0.5 gap-y-1" data-testid="sidebar-footer">
           {footer}
         </div>
       </div>

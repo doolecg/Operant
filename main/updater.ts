@@ -179,7 +179,9 @@ export function createUpdater({
 
     if (r.kind === 'msi') {
       const exe = process.execPath
-      const worker = msiWorkerScript({ pid: process.pid, exe, installDir: dirname(exe), msi: r.file, log, relaunch })
+      // Old per-user install folder, removed by the worker once the new copy is in place (no-op if it is the same folder).
+      const oldDir = process.env.LOCALAPPDATA ? join(process.env.LOCALAPPDATA, 'Programs', 'Operant 3') : undefined
+      const worker = msiWorkerScript({ pid: process.pid, exe, installDir: dirname(exe), msi: r.file, log, relaunch, oldDir })
       const encoded = Buffer.from(worker, 'utf16le').toString('base64')
       // Node can't start a detached PowerShell that survives us, so a short-lived launcher starts it via Start-Process.
       const res = spawnSync(

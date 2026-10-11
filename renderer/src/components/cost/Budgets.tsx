@@ -1,12 +1,13 @@
 import { decodeIpcError } from '@shared/ipc'
 import type { BudgetConfig, BudgetProgress } from '@shared/types'
 import { NumberField } from '@/components/settings/parts'
-import { usd } from '@/lib/format'
+import { useMoney } from '@/lib/useMoney'
 import { useBudgets, useCrews, useSaveSettings, useSetBudgets, useSettings } from '@/lib/queries'
 
-const MAX_CAP = 100_000
+const MAX_CAP = 10_000_000
 
 function CapBar({ cap, warnPct, label }: { cap: BudgetProgress; warnPct: number; label: string }) {
+  const { money } = useMoney()
   const pct = Math.min(100, Math.round(cap.pct))
   const tone = cap.pct >= 100 ? 'bg-red-400' : cap.pct >= warnPct ? 'bg-amber-400' : 'bg-emerald-400'
   return (
@@ -17,14 +18,14 @@ function CapBar({ cap, warnPct, label }: { cap: BudgetProgress; warnPct: number;
         aria-valuemin={0}
         aria-valuemax={100}
         aria-valuenow={pct}
-        aria-valuetext={`${usd(cap.spentUsd)} of ${usd(cap.capUsd)}`}
+        aria-valuetext={`${money(cap.spentUsd)} of ${money(cap.capUsd)}`}
         className="bg-muted relative h-2 w-full rounded-full"
       >
         <div className={`h-full rounded-full ${tone}`} style={{ width: `${pct}%` }} />
         <div className="bg-foreground/60 absolute top-[-2px] h-3 w-px" style={{ left: `${Math.min(100, warnPct)}%` }} title={`Warns at ${warnPct}%`} aria-hidden />
       </div>
       <div className="text-muted-foreground text-[11px] tabular-nums">
-        {usd(cap.spentUsd)} of {usd(cap.capUsd)} ({Math.round(cap.pct)}%)
+        {money(cap.spentUsd)} of {money(cap.capUsd)} ({Math.round(cap.pct)}%)
       </div>
     </div>
   )
@@ -32,6 +33,7 @@ function CapBar({ cap, warnPct, label }: { cap: BudgetProgress; warnPct: number;
 
 // One cap: spend against it and an editable amount (0 = no cap).
 function CapRow({ name, value, progress, warnPct, busy, onCap }: { name: string; value: number; progress: BudgetProgress | null | undefined; warnPct: number; busy: boolean; onCap: (usd: number) => void }) {
+  const { symbol, code, toField, fromField } = useMoney()
   const id = `budget-${name.replace(/\W+/g, '-')}`
   return (
     <div className="space-y-1.5 py-2.5">
@@ -39,8 +41,8 @@ function CapRow({ name, value, progress, warnPct, busy, onCap }: { name: string;
         <label htmlFor={id} className="min-w-0 flex-1 truncate text-xs font-medium" title={name}>
           {name}
         </label>
-        <NumberField id={id} aria-label={`${name} cap in USD`} min={0} max={MAX_CAP} step="0.5" value={value} disabled={busy} className="h-7 w-20 text-xs" onCommit={onCap} />
-        <span className="text-muted-foreground text-[11px]">USD</span>
+        <NumberField id={id} aria-label={`${name} cap in ${code}`} min={0} max={MAX_CAP} step="0.5" value={toField(value)} disabled={busy} className="h-7 w-20 text-xs" onCommit={(v) => onCap(fromField(v))} />
+        <span className="text-muted-foreground text-[11px]">{symbol}</span>
       </div>
       {progress ? <CapBar cap={progress} warnPct={warnPct} label={`${name} spend against cap`} /> : <p className="text-muted-foreground text-[11px]">No cap applies</p>}
     </div>

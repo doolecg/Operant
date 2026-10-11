@@ -8,6 +8,7 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
 import { _electron as electron } from 'playwright-core'
+import { shot } from './lib/shot.mjs'
 import { claudeHome, e2eEnv } from './fixtures/real-claude.mjs'
 
 const outDir = resolve(process.argv[2] ?? 'docs/specs/screenshots')
@@ -31,7 +32,6 @@ try {
     for (const end = Date.now() + timeout; Date.now() < end; await page.waitForTimeout(250)) if (await fn().catch(() => false)) return
     throw new Error(`timed out waiting for ${label}`)
   }
-  const shot = async (name) => (await page.waitForTimeout(400), page.screenshot({ path: join(outDir, `${name}.png`) }))
 
   await page.getByText('Welcome to Operant 3').waitFor()
   await inv('crews:create', { name: 'mods', folder: project })
@@ -47,7 +47,7 @@ try {
   const panel = page.getByTestId('subagent-panel')
   await panel.waitFor()
   assert.match(await panel.innerText(), /Agents/)
-  await shot('mods-subagent-panel')
+  await shot(page, 'mods-subagent-panel')
 
   // One short real turn (Haiku), sent through the Chat view: the hooks take the sub-agent's row to Done.
   const crew = (await inv('crews:list')).find((c) => c.name === 'mods')
@@ -57,11 +57,11 @@ try {
   await inv('chat:send', tile.id, { text: 'Use the Task tool exactly once, in the foreground: a general-purpose sub-agent whose only job is to reply with the word ok. Then reply DONE.' })
   await until('the turn to start', async () => (await snap()).turn.phase !== 'idle', 30_000)
   await panel.getByRole('img', { name: /^(Running|Done)$/ }).first().waitFor({ timeout: 120_000 })
-  await shot('mods-subagent-running')
+  await shot(page, 'mods-subagent-running')
   await until('the turn to finish', async () => (await snap()).turn.phase === 'idle', 240_000)
   await panel.getByRole('img', { name: 'Done' }).waitFor({ timeout: 60_000 })
   assert.equal(await panel.getByRole('img', { name: 'Running' }).count(), 0, 'no agent runs any more')
-  await shot('mods-subagent-completed')
+  await shot(page, 'mods-subagent-completed')
 
   // The Terminal view (the same session resumed): the status line reports the model and the context into the info bar.
   await page.getByRole('group', { name: 'View' }).getByRole('button', { name: 'Terminal', exact: true }).click()
@@ -75,7 +75,7 @@ try {
   await card.waitFor()
   // The resumed session has not made a request yet, so the card shows real numbers or says none are reported (never invented).
   assert.match(await card.innerText(), /No context reported yet|Category breakdown/)
-  await shot('mods-context-popover')
+  await shot(page, 'mods-context-popover')
   await info.getByRole('button', { name: 'Context details' }).click() // closes the popover
 
   console.log('mods e2e ok')

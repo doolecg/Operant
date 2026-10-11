@@ -14,6 +14,88 @@ export const CUTE_NAMES = [
   'Lentil', 'Mango', 'Nibbles', 'Pancake', 'Quill', 'Rascal', 'Sprinkle', 'Turnip', 'Wiggles', 'Yo-yo',
 ]
 
+// Friendly characters from TV and film; `from` is the reference shown as a tooltip.
+export const SCREEN_NAMES: Array<{ name: string; from: string }> = [
+  { name: 'R2-D2', from: 'R2-D2: the plucky astromech droid, Star Wars' },
+  { name: 'C-3PO', from: 'C-3PO: the polite protocol droid, Star Wars' },
+  { name: 'BB-8', from: 'BB-8: the rolling orange droid, Star Wars' },
+  { name: 'Chewie', from: 'Chewie: the loyal Wookiee co-pilot, Star Wars' },
+  { name: 'Yoda', from: 'Yoda: the tiny wise Jedi master, Star Wars' },
+  { name: 'Grogu', from: 'Grogu: the curious little foundling, The Mandalorian' },
+  { name: 'Marvin', from: 'Marvin: the gloomy robot with a big brain, The Hitchhiker\'s Guide to the Galaxy' },
+  { name: 'HAL', from: 'HAL: the calm ship computer, 2001: A Space Odyssey' },
+  { name: 'Data', from: 'Data: the curious android officer, Star Trek: The Next Generation' },
+  { name: 'Spock', from: 'Spock: the logical science officer, Star Trek' },
+  { name: 'Scotty', from: 'Scotty: the miracle-working engineer, Star Trek' },
+  { name: 'WALL-E', from: 'WALL-E: the tidy little trash-compacting robot, WALL-E' },
+  { name: 'EVE', from: 'EVE: the sleek plant-hunting probe, WALL-E' },
+  { name: 'Baymax', from: 'Baymax: the gentle inflatable healthcare robot, Big Hero 6' },
+  { name: 'Johnny 5', from: 'Johnny 5: the curious robot who is alive, Short Circuit' },
+  { name: 'Bender', from: 'Bender: the bending robot with a big appetite, Futurama' },
+  { name: 'Fry', from: 'Fry: the delivery boy from the past, Futurama' },
+  { name: 'K-9', from: 'K-9: the faithful robot dog, Doctor Who' },
+  { name: 'TARS', from: 'TARS: the dry-witted blocky robot, Interstellar' },
+  { name: 'Gort', from: 'Gort: the silent, mighty robot, The Day the Earth Stood Still' },
+  { name: 'Robby', from: 'Robby: the helpful robot butler, Forbidden Planet' },
+  { name: 'Rosie', from: 'Rosie: the busy robot maid, The Jetsons' },
+  { name: 'Astro', from: 'Astro: the Jetsons\' talking dog, The Jetsons' },
+  { name: 'Optimus', from: 'Optimus: the noble robot leader, Transformers' },
+  { name: 'Bumblebee', from: 'Bumblebee: the small, brave yellow robot, Transformers' },
+  { name: 'Iron Giant', from: 'Iron Giant: the gentle giant robot, The Iron Giant' },
+  { name: 'Sonny', from: 'Sonny: the thoughtful robot, I, Robot' },
+  { name: 'Dot Matrix', from: 'Dot Matrix: the sassy robot sidekick, Spaceballs' },
+  { name: 'Twiki', from: 'Twiki: the beeping robot buddy, Buck Rogers in the 25th Century' },
+  { name: 'Gonzo', from: 'Gonzo: the daring blue stuntman, The Muppet Show' },
+  { name: 'Kermit', from: 'Kermit: the calm green frog host, The Muppet Show' },
+  { name: 'Elmo', from: 'Elmo: the cheerful red monster, Sesame Street' },
+  { name: 'Snoopy', from: 'Snoopy: the dreaming beagle, Peanuts' },
+  { name: 'Woodstock', from: 'Woodstock: the tiny yellow bird, Peanuts' },
+  { name: 'Scooby', from: 'Scooby: the scared but loyal Great Dane, Scooby-Doo' },
+  { name: 'Shaggy', from: 'Shaggy: the always-hungry mystery solver, Scooby-Doo' },
+  { name: 'Garfield', from: 'Garfield: the lasagna-loving orange cat, Garfield' },
+  { name: 'Pikachu', from: 'Pikachu: the electric yellow mouse, Pokemon' },
+  { name: 'Totoro', from: 'Totoro: the big gentle forest spirit, My Neighbor Totoro' },
+  { name: 'Ponyo', from: 'Ponyo: the little fish girl, Ponyo' },
+  { name: 'Jiji', from: 'Jiji: the witch\'s sarcastic black cat, Kiki\'s Delivery Service' },
+  { name: 'Mei', from: 'Mei: the adventurous little sister, My Neighbor Totoro' },
+  { name: 'Nemo', from: 'Nemo: the small clownfish with a lucky fin, Finding Nemo' },
+  { name: 'Dory', from: 'Dory: the forgetful, cheerful blue tang, Finding Nemo' },
+  { name: 'Woody', from: 'Woody: the loyal cowboy doll, Toy Story' },
+  { name: 'Buzz', from: 'Buzz: the space ranger toy, Toy Story' },
+  { name: 'Slinky', from: 'Slinky: the stretchy toy dog, Toy Story' },
+  { name: 'Remy', from: 'Remy: the rat who loves cooking, Ratatouille' },
+  { name: 'Sulley', from: 'Sulley: the big, kind blue monster, Monsters, Inc.' },
+  { name: 'Mike Wazowski', from: 'Mike Wazowski: the one-eyed green sidekick, Monsters, Inc.' },
+  { name: 'Boo', from: 'Boo: the giggling little girl, Monsters, Inc.' },
+  { name: 'Olaf', from: 'Olaf: the snowman who loves warm hugs, Frozen' },
+  { name: 'Simba', from: 'Simba: the young lion cub, The Lion King' },
+  { name: 'Timon', from: 'Timon: the wisecracking meerkat, The Lion King' },
+  { name: 'Pumbaa', from: 'Pumbaa: the cheerful warthog, The Lion King' },
+  { name: 'Baloo', from: 'Baloo: the laid-back dancing bear, The Jungle Book' },
+  { name: 'Dumbo', from: 'Dumbo: the flying big-eared elephant, Dumbo' },
+  { name: 'Thumper', from: 'Thumper: the chatty little rabbit, Bambi' },
+  { name: 'Genie', from: 'Genie: the wish-granting blue spirit, Aladdin' },
+  { name: 'Abu', from: 'Abu: the mischievous pet monkey, Aladdin' },
+  { name: 'Wallace', from: 'Wallace: the tinkering inventor, Wallace and Gromit' },
+  { name: 'Gromit', from: 'Gromit: the clever, silent beagle, Wallace and Gromit' },
+  { name: 'Shaun', from: 'Shaun: the mischievous little sheep, Shaun the Sheep' },
+  { name: 'Paddington', from: 'Paddington: the polite bear who loves marmalade, Paddington' },
+  { name: 'Po', from: 'Po: the kung fu panda, Kung Fu Panda' },
+  { name: 'Shrek', from: 'Shrek: the grumpy, kind-hearted ogre, Shrek' },
+  { name: 'Stitch', from: 'Stitch: the mischievous blue alien, Lilo and Stitch' },
+  { name: 'Hobbes', from: 'Hobbes: the tiger who loves pouncing, Calvin and Hobbes' },
+  { name: 'Luigi', from: 'Luigi: the shy, jumpy plumber, Super Mario' },
+  { name: 'Yoshi', from: 'Yoshi: the friendly egg-throwing dinosaur, Super Mario' },
+  { name: 'Finn', from: 'Finn: the brave young hero, Adventure Time' },
+  { name: 'Jake', from: 'Jake: the stretchy magical dog, Adventure Time' },
+  { name: 'BMO', from: 'BMO: the cheerful living game console, Adventure Time' },
+  { name: 'Bluey', from: 'Bluey: the playful blue heeler pup, Bluey' },
+  { name: 'Bingo', from: 'Bingo: the little red heeler sister, Bluey' },
+  { name: 'Peppa', from: 'Peppa: the cheerful little pig, Peppa Pig' },
+  { name: 'Gizmo', from: 'Gizmo: the cuddly, curious mogwai, Gremlins' },
+  { name: 'E.T.', from: 'E.T.: the gentle alien who wants to go home, E.T. the Extra-Terrestrial' },
+]
+
 // FNV-1a: a stable hash of the agent id, so a name and a look never change.
 export function hashId(id: string): number {
   let h = 2166136261
@@ -24,7 +106,18 @@ export function hashId(id: string): number {
   return h >>> 0
 }
 
-export const cuteName = (id: string): string => CUTE_NAMES[hashId(id) % CUTE_NAMES.length]!
+// About one agent in two gets a screen name (bit 7 of the hash), the rest a cute one; both are stable per id.
+export function agentName(id: string): { name: string; ref: string | null } {
+  const h = hashId(id)
+  if ((h >>> 7) % 2 === 0) {
+    const s = SCREEN_NAMES[h % SCREEN_NAMES.length]!
+    return { name: s.name, ref: s.from }
+  }
+  return { name: CUTE_NAMES[h % CUTE_NAMES.length]!, ref: null }
+}
+
+export const cuteName = (id: string): string => agentName(id).name
+export const nameRef = (id: string): string | null => agentName(id).ref
 
 export const HATS = ['cap', 'hardhat', 'beanie', 'chef', 'headphones', 'flag', 'bow', 'crown'] as const
 export type Hat = (typeof HATS)[number]
@@ -66,6 +159,7 @@ export function shortModel(model: string | null): string | null {
 
 export interface AgentView extends AgentRowModel {
   name: string
+  nameRef: string | null
   effort: string | null
   todos: { done: number; total: number } | null
   tokens: number | null
@@ -98,7 +192,8 @@ export function agentCost(a: Pick<SubagentItem, 'usage' | 'outputTokens' | 'mode
 export function viewFor(row: AgentRowModel, item: SubagentItem | null, items: ChatItem[]): AgentView {
   return {
     ...row,
-    name: cuteName(item?.id ?? row.id),
+    name: agentName(item?.id ?? row.id).name,
+    nameRef: agentName(item?.id ?? row.id).ref,
     effort: item?.effort ?? null,
     todos: item ? todoProgress(items, item.id) : null,
     tokens: item ? agentTokens(item) : null,

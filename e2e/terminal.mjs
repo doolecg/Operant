@@ -7,6 +7,7 @@ import { mkdirSync, mkdtempSync, writeFileSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
 import { _electron as electron } from 'playwright-core'
+import { shot } from './lib/shot.mjs'
 import { claudeHome, e2eEnv } from './fixtures/real-claude.mjs'
 
 const outDir = resolve(process.argv[2] ?? 'docs/specs/screenshots')
@@ -30,7 +31,6 @@ try {
     for (const end = Date.now() + timeout; Date.now() < end; await page.waitForTimeout(200)) if (await fn()) return
     throw new Error(`timed out waiting for ${label}`)
   }
-  const shot = async (name) => (await page.waitForTimeout(400), page.screenshot({ path: join(outDir, `${name}.png`) }))
   const tiles = () => page.locator('[data-tile]')
   const rectOf = (loc) => loc.evaluate((e) => ({ x: e.offsetLeft, y: e.offsetTop, w: e.offsetWidth, h: e.offsetHeight }))
 
@@ -44,7 +44,7 @@ try {
   // No terminals yet: an empty note, no tile surface.
   await page.getByText('No terminals open').waitFor()
   assert.equal(await tiles().count(), 0)
-  await shot('terminal-tiles-empty')
+  await shot(page, 'terminal-tiles-empty')
 
   // The project row's agent button opens the main CLI (Claude) as a tile, and that tile takes the focus.
   await inv('settings:set', { mainCli: 'claude' })
@@ -72,7 +72,7 @@ try {
   const ra = await rectOf(a)
   const rb = await rectOf(b)
   assert.ok(ra.x !== rb.x || ra.y !== rb.y, 'the shell tiles have their own rects')
-  await shot('terminal-tiles-shells')
+  await shot(page, 'terminal-tiles-shells')
 
   // Layout key: the master layout puts the first tile in a left pane of fixed share.
   await page.keyboard.press('Alt+Shift+L')
@@ -80,7 +80,7 @@ try {
   await page.waitForTimeout(400)
   const after = await rectOf(a)
   assert.ok(after.h !== ra.h || after.w !== ra.w, 'the layout key changes the tile rects')
-  await shot('terminal-tiles-master-layout')
+  await shot(page, 'terminal-tiles-master-layout')
 
   // Fullscreen key: the focused tile fills the surface, the others hide; pressing again restores.
   await a.click({ position: { x: 20, y: 12 } })
@@ -100,7 +100,7 @@ try {
   await page.keyboard.press('Alt+Shift+W')
   await poll('last tile closed', async () => (await tiles().count()) === 0)
   assert.equal(await shells.count(), 0)
-  await shot('terminal-tiles-closed')
+  await shot(page, 'terminal-tiles-closed')
   console.log('terminal e2e ok')
 } finally {
   await app.close()

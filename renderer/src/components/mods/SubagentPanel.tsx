@@ -48,7 +48,7 @@ function AgentRow({ row, now, onOpen, onClear }: { row: AgentView; now: number; 
             <span className="min-w-0 flex-1 truncate text-[13px] font-semibold">{row.description}</span>
             <StatusMark dot={row.dot} />
           </span>
-          <span className="text-muted-foreground/80 block truncate text-xs">{kind ? `${row.name} · ${kind}` : row.name}</span>
+          <span title={row.nameRef ?? undefined} className="text-muted-foreground/80 block truncate text-xs">{kind ? `${row.name} · ${kind}` : row.name}</span>
           {(eff || detail) && (
             <span className="block truncate text-xs">
               {eff && <span className={cn('font-medium', tone.text)}>{eff.word}</span>}

@@ -2,7 +2,8 @@ import { Fragment, useState } from 'react'
 import type { ChatCommand, ChatState, McpServerInfo } from '@shared/claude-chat'
 import { decodeIpcError } from '@shared/ipc'
 import { bridge } from '@/lib/bridge'
-import { compact, usd } from '@/lib/format'
+import { compact } from '@/lib/format'
+import { useMoney } from '@/lib/useMoney'
 import { cn } from '@/lib/utils'
 import { RUNS_IN_CHAT } from './chatHelpers'
 
@@ -15,7 +16,7 @@ interface Report {
 }
 
 // The chat's own state, as the /status command shows it.
-function statusRows(s: ChatState): Array<[string, string]> {
+function statusRows(s: ChatState, money: (usd: number) => string): Array<[string, string]> {
   const ctx = s.context
   return [
     ['Model', s.modelDisplayName ?? s.model ?? 'not reported yet'],
@@ -24,13 +25,14 @@ function statusRows(s: ChatState): Array<[string, string]> {
     ['Permissions', s.permissionMode],
     ['Effort', s.effort ?? 'default'],
     ['Context', ctx ? `${compact(ctx.usedTokens)}${ctx.windowTokens ? ` of ${compact(ctx.windowTokens)}` : ''}` : 'not reported yet'],
-    ['Cost', s.costUsd == null ? 'not reported yet' : usd(s.costUsd)],
+    ['Cost', s.costUsd == null ? 'not reported yet' : money(s.costUsd)],
   ]
 }
 
 // The Commands menu of a Claude tile: every slash command, filterable. /status, /mcp and /doctor show their result
 // here; a chat command goes into the message box; the rest only run on Claude Code's own screen, which is said.
 export function CommandMenu({ commands, state, initial, onInsert }: { commands: ChatCommand[]; state: ChatState; initial: string | null; onInsert: (name: string) => void }) {
+  const { money } = useMoney()
   const [query, setQuery] = useState('')
   const [picked, setPicked] = useState<string | null>(initial)
   const [report, setReport] = useState<Report>({ busy: false, text: null, error: null })
@@ -87,7 +89,7 @@ export function CommandMenu({ commands, state, initial, onInsert }: { commands: 
           </div>
           {cmd.name === 'status' && (
             <dl className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 text-[12px]">
-              {statusRows(state).map(([k, v]) => (
+              {statusRows(state, money).map(([k, v]) => (
                 <Fragment key={k}>
                   <dt className="text-muted-foreground">{k}</dt>
                   <dd className="min-w-0 truncate">{v}</dd>
