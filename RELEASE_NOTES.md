@@ -1,3 +1,26 @@
+# Operant 3.1.3
+
+**Install:** download the file for your system from the assets below. Operant keeps itself up to date from these releases.
+
+## New
+- **Learning uses your project's memory.** The learn step runs in the project folder, pulls what Hindsight already knows about the project so it doesn't repeat it, and can look things up in CodeGraph when it's on.
+- **Hindsight restarts itself.** If Operant's own Hindsight server stops answering, the next recall or save starts it again and retries once. A server hosted elsewhere is never touched.
+
+---
+
+## Changed
+- **Simpler Learning settings.** A "What learning did" card at the top, one "When to learn" choice, and the limits folded into a closed group.
+- **Simpler Memory settings.** Hindsight and CodeGraph sit together in one Tools card, recall options are folded away, and Export and Reset sit in a Danger zone at the bottom.
+- **Memory page.** The status panel opens with one plain line, and lessons are listed newest first.
+
+---
+
+## Fixed
+- **OpenCode free models as the learning AI.** Free models such as Big Pickle refused the learn call; they now work.
+- **Hindsight address shown twice** in the Memory settings.
+
+---
+
 # Operant 3.1.2
 
 **Install:** download the file for your system from the assets below. Operant keeps itself up to date from these releases.
