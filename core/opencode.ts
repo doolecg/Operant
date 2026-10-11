@@ -1,5 +1,5 @@
 import { spawnHidden } from './proc'
-import { randomUUID } from 'node:crypto'
+import { randomBytes } from 'node:crypto'
 import { readFileSync } from 'node:fs'
 import { homedir } from 'node:os'
 import { join } from 'node:path'
@@ -56,8 +56,15 @@ export interface OpenCodeDeps {
   readJson: (file: string) => unknown
   sleep: (ms: number) => Promise<void>
   newSessionId: () => string
-  // Off for one-shot calls (the learn step): `run --session <new id>` is refused on OpenCode's free models.
-  pinSession?: boolean
+}
+
+const BASE62 = '0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz'
+
+// A new session id in OpenCode's own shape: ses_ + 12 hex (newest sorts first) + 14 base62. Any other length is refused
+// on OpenCode's free models ("free tier can only be used from within OpenCode"); checked with opencode/big-pickle.
+export function openCodeSessionId(now = Date.now(), bytes: Uint8Array = randomBytes(14)): string {
+  const time = (~(BigInt(now) * 0x1000n) & 0xffffffffffffn).toString(16).padStart(12, '0')
+  return `ses_${time}${Array.from(bytes, (b) => BASE62[b % 62]).join('')}`
 }
 
 const defaults: OpenCodeDeps = {
@@ -78,7 +85,7 @@ const defaults: OpenCodeDeps = {
     }
   },
   sleep: (ms) => new Promise((r) => setTimeout(r, ms)),
-  newSessionId: () => `ses_${randomUUID().replace(/-/g, '')}`,
+  newSessionId: () => openCodeSessionId(),
 }
 
 const AUTO_APPROVE_MODES = ['acceptEdits', 'bypassPermissions']
@@ -251,8 +258,7 @@ export function createOpenCodeAdapter(deps: Partial<OpenCodeDeps> = {}): MasterA
   async function start(o: MasterStartOptions): Promise<MasterHandle> {
     // The session id is pinned up front so the event stream and interrupt can address it before it exists.
     const sessionId = d.newSessionId()
-    const pinned = d.pinSession !== false
-    const args = pinned ? ['run', '--session', sessionId] : ['run']
+    const args = ['run', '--session', sessionId]
     // `run` has no --variant flag: the effort rides on the model as provider/model#variant.
     if (o.model) {
       const variant = o.effort && /^[A-Za-z0-9][A-Za-z0-9_-]{0,31}$/.test(o.effort) ? `#${o.effort}` : ''
@@ -302,10 +308,8 @@ export function createOpenCodeAdapter(deps: Partial<OpenCodeDeps> = {}): MasterA
     await d.sleep(0)
     if (spawnError) throw spawnError
 
-    if (pinned) {
-      o.onEvent({ kind: 'session', text: sessionId })
-      void streamEvents(sessionId, o.onEvent, abort.signal, () => finished)
-    }
+    o.onEvent({ kind: 'session', text: sessionId })
+    void streamEvents(sessionId, o.onEvent, abort.signal, () => finished)
 
     return {
       async stop() {

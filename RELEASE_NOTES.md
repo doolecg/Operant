@@ -16,7 +16,7 @@
 ---
 
 ## Fixed
-- **OpenCode free models as the learning AI.** Free models such as Big Pickle refused the learn call; they now work.
+- **OpenCode free models.** Free models such as Big Pickle refused every run Operant started (tiles, jobs and learning), because Operant made session ids OpenCode didn't accept. They now work.
 - **Hindsight address shown twice** in the Memory settings.
 
 ---

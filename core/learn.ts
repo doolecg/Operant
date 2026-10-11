@@ -113,7 +113,6 @@ function opencodeLearnAdapter(): MasterAdapter {
     },
     fetch: () => Promise.reject(new Error('the learn step does not use the OpenCode service')),
     readJson: () => null,
-    pinSession: false,
   })
 }
 
