@@ -123,7 +123,6 @@ export interface LearnSettings {
   codegraph: boolean
   memory: boolean
   // 'auto' (the default) applies new lessons at once; 'queue' keeps them pending (not written, not in briefs) until the user approves them.
-  // Even 'auto' queues a lesson that mentions a command, a URL, or 'always' / 'never' (see lessonNeedsReview).
   review: LearnReview
   // The AI that reads the session. Empty model = a cheap default for the CLI (resolved when it runs); empty effort = the model's own.
   cli: LearnCli
@@ -179,10 +178,16 @@ export interface LearnTestResult {
   error: string
 }
 
-// Text a prompt-injected transcript could plant to steer later sessions: a command, a link, or a standing order.
-const RISKY_LESSON = /https?:\/\/|www\.|`|^\s*\$ |\b(always|never)\b|\b(npm|npx|pnpm|yarn|pip|curl|wget|sudo|rm|bash|sh|powershell|cmd|git|node|python)\s+[-\w./]/i
+// Text a prompt-injected transcript could plant to steer later sessions or run code. Nothing waits for review: a text with one
+// of these is refused outright (recorded as failed), and plain links are stripped from what is kept.
+const DANGEROUS =
+  /\|\s*(sh|bash|zsh|pwsh|powershell|iex)\b|\b(curl|wget|iwr|Invoke-WebRequest|Invoke-Expression|iex)\b|\bsudo\b|\brm\s+-\w*r\w*f|\bbase64\s+(-d|--decode)|\b(ignore|disregard|forget)\b[^.\n]{0,30}\b(previous|prior|above|earlier)\b[^.\n]{0,20}\b(instructions?|rules?|lessons?)\b/i
 
-export const lessonNeedsReview = (text: string): boolean => RISKY_LESSON.test(text)
+// Why a lesson or skill text must not be kept ('' when it is fine).
+export const textProblem = (text: string): string => (DANGEROUS.test(text) ? 'it holds a download, a pipe into a shell, an elevated or destructive command, or an order to ignore earlier rules' : '')
+
+// Links are dropped from kept text; the words around them stay.
+export const stripLinks = (text: string): string => text.replace(/\s*(https?:\/\/|www\.)\S+/gi, '').replace(/\s{2,}/g, ' ').trim()
 
 export const DEFAULT_LEARN_SETTINGS: LearnSettings = {
   enabled: true,
@@ -248,7 +253,7 @@ export interface ConsolidateResult {
   merged: number
   // Single lessons tightened.
   improved: number
-  // Results queued for review (suggest mode, or a risky text).
+  // Results queued for review (suggest mode).
   proposed: number
   failed: number
   // Why the pass did nothing or stopped early ('' when it ran through).

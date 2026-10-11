@@ -35,13 +35,12 @@ describe('clusterLessons', () => {
     expect(groups[0]!.map((l) => l.id)).toEqual([a.id, b.id])
   })
 
-  it('excludes other scope, kind, project, risky and non-active lessons', () => {
+  it('excludes other scope, kind, project and non-active lessons', () => {
     const a = mk(base)
     const others = [
       mk(near('zeta eta'), { scope: 'user' }),
       mk(near('zeta eta'), { kind: 'pitfall' }),
       mk(near('zeta eta'), { crewId: 2 }),
-      mk(near('zeta eta') + ' always', { }),
       mk(near('zeta eta'), { status: 'pending' }),
       mk(near('zeta eta'), { status: 'stale' }),
       mk(near('zeta eta'), { status: 'deleted' }),

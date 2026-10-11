@@ -121,11 +121,11 @@ describe('learn modes, budgets and records', () => {
     await expect(svc.rollback(c!.id)).rejects.toMatchObject({ code: 'CONFLICT' })
   })
 
-  it('controlled still queues a risky lesson', async () => {
+  it('controlled applies a lesson with a command or "always" in it too', async () => {
     const { svc, changes } = service()
     answers.push(one({ text: 'Always run npm publish before the cart tests' }))
-    expect(await svc.onConversationEnd(crewId, 's1')).toMatchObject({ queued: 1, written: 0 })
-    expect(changes.list()[0]!.status).toBe('proposed')
+    expect(await svc.onConversationEnd(crewId, 's1')).toMatchObject({ queued: 0, written: 1 })
+    expect(changes.list()[0]!.status).toBe('applied')
   })
 
   it('a duplicate that changes the text is recorded with the old text, and rollback puts it back', async () => {
@@ -158,7 +158,7 @@ describe('learn modes, budgets and records', () => {
     expect(changes.list()).toHaveLength(0)
   })
 
-  it('writes every lesson of a session to the project bank, whatever maxChangesPerReview says; a risky one waits', async () => {
+  it('writes every lesson of a session to the project bank, whatever maxChangesPerReview says', async () => {
     settings.maxChangesPerReview = 1
     const { svc, changes } = service()
     answers.push(
@@ -169,8 +169,8 @@ describe('learn modes, budgets and records', () => {
       ]),
     )
     const r = await svc.onConversationEnd(crewId, 's1')
-    expect(r).toMatchObject({ written: 2, queued: 1 })
-    expect(changes.list().map((c) => c.status).sort()).toEqual(['applied', 'applied', 'proposed'])
+    expect(r).toMatchObject({ written: 3, queued: 0 })
+    expect(changes.list().map((c) => c.status).sort()).toEqual(['applied', 'applied', 'applied'])
   })
 
   it('a user-scope lesson goes to the Soul Bank, a project lesson to its project bank', async () => {

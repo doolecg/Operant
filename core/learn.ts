@@ -3,9 +3,10 @@ import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
 import type { HindsightStatus } from '../shared/types'
 import {
+  textProblem,
+  stripLinks,
   LEARN_STORES,
   LESSON_KINDS,
-  lessonNeedsReview,
   type ConsolidateResult,
   type LearnChange,
   type LearnChangeKind,
@@ -190,7 +191,8 @@ export function skillProblem(d: Pick<SkillDraft, 'name' | 'body'>): string {
   if (!SKILL_NAME.test(d.name)) return 'the name is not lowercase words with dashes'
   if (!/^---\nname: /.test(d.body)) return 'the draft has no frontmatter'
   if (d.body.length < 40 || d.body.length > 8000) return 'the draft is too short or too long'
-  if (/https?:\/\//i.test(d.body)) return 'the draft links to a URL: review it'
+  const unsafe = textProblem(d.body)
+  if (unsafe) return unsafe
   return ''
 }
 
@@ -222,6 +224,7 @@ const SECRET_ONLY = /^(\W|\[secret\]|\[token\])*$/
 const DAY_MS = 24 * 60 * 60 * 1000
 const HINDSIGHT_DAILY_CAP = 20
 const TIGHTEN_OVER = 300
+const PURGE_AFTER_MS = 14 * DAY_MS
 const CONSOLIDATION = 'Consolidation'
 const RETAINS_SQL = 'CREATE TABLE IF NOT EXISTS learn_retains (crew_id INTEGER NOT NULL, day TEXT NOT NULL, n INTEGER NOT NULL DEFAULT 0, PRIMARY KEY (crew_id, day))'
 
@@ -340,6 +343,8 @@ export class LearnService {
   private chain: Promise<unknown> = Promise.resolve()
   private running = 0
   private readonly lastConsolidated = new Map<number, number>()
+  // Groups the model already left as they are (lesson ids and edit times), so a close does not ask about them again.
+  private readonly settledGroups = new Set<string>()
   private readonly retains = new Map<string, number>()
 
   constructor(private readonly d: LearnDeps) {
@@ -396,7 +401,8 @@ export class LearnService {
     if (!crew || !settings.enabled || settings.mode === 'off') return null
     const base = { crewId, runId: null, source: 'conversation' as const }
     const info = { ...base, extracted: 0, written: 0, merged: 0, staled: 0, queued: 0, skipped: [] as LearnSkip[], error: '', cli: settings.cli as string, model: settings.model }
-    const finish = (): LearnRunInfo => {
+    const finish = async (): Promise<LearnRunInfo> => {
+      await this.tidy(crewId, crew.folder, settings, info)
       const rec = db.addLearnRun(info)
       const skipped = rec.skipped.map((s) => `${s.store} skipped: ${s.reason}`)
       this.safe(() => this.d.log?.(
@@ -468,11 +474,17 @@ export class LearnService {
 
     // suggest queues everything for review; controlled and advanced apply what is low-risk, up to the change cap.
     const queue = settings.mode === 'suggest'
-    const cap = settings.maxChangesPerReview
     const run = (): RunCtx => ({ crewId, cli: info.cli, model: info.model, tokens: budget.tokens, validation, evidence })
     let changes = 0
     const jobs: number[] = []
-    for (const e of lessons) {
+    for (const raw of lessons) {
+      const unsafe = textProblem(raw.text)
+      if (unsafe) {
+        this.note({ ...run(), validation: unsafe }, { kind: 'lesson', targetId: 0, proposal: raw.text, previous: '', next: '', status: 'failed' })
+        continue
+      }
+      const e = { ...raw, text: stripLinks(raw.text) }
+      if (!e.text) continue
       const existing = db.listLessons({ crewId }).filter((l) => l.status === 'active' || l.status === 'pending')
       const dup = existing.find((l) => l.kind === e.kind && isDuplicate(l, e))
       let lesson: Lesson
@@ -491,8 +503,7 @@ export class LearnService {
         }
       } else {
         // The review setting decides whether a new lesson waits; any number per session reaches the project's bank.
-        // A lesson that looks risky always waits.
-        const pending = settings.review === 'queue' || lessonNeedsReview(e.text)
+        const pending = settings.review === 'queue'
         lesson = db.addLesson({ crewId, text: e.text, kind: e.kind, scope: e.scope, files: e.files, symbols: e.symbols, sourceJobs: jobs, status: pending ? 'pending' : 'active' })
         this.note(run(), { kind: 'lesson', targetId: lesson.id, proposal: e.text, previous: '', next: e.text, status: pending ? 'proposed' : 'applied', filesAffected: e.files })
         if (!pending) changes++
@@ -516,34 +527,46 @@ export class LearnService {
       else info.written += (await this.writeStores(lesson, crew.folder, info.skipped)) ? 1 : 0
     }
 
-    if (!queue) info.staled += this.staleCheck(crewId, crew.folder, run)
-    const made = this.draftSkills(crewId)
-    if (settings.mode === 'advanced') {
-      for (const d of made) {
-        if (changes >= cap) break
-        const problem = skillProblem(d)
-        if (problem) {
-          this.note({ ...run(), validation: problem }, { kind: 'skill', targetId: d.id, proposal: `Skill ${d.name}`, previous: '', next: '', status: 'failed' })
-          continue
-        }
-        try {
-          this.approveDraft(d.id)
-          const installed = this.d.db.getDraft(d.id)?.installedPath ?? ''
-          this.note(run(), { kind: 'skill', targetId: d.id, proposal: `Skill ${d.name}`, previous: '', next: d.body, status: 'applied', filesAffected: [installed] })
-          changes++
-        } catch (err) {
-          this.note(run(), { kind: 'skill', targetId: d.id, proposal: `Skill ${d.name}`, previous: '', next: '', status: 'failed' })
-          this.safe(() => this.d.log?.(`Skill ${d.name} not applied: ${clean(errText(err))}`, crewId))
-        }
-      }
-    }
+    this.draftSkills(crewId)
+    if (settings.mode === 'advanced') this.applyPendingDrafts(crewId, run)
+    if (!queue && settings.review !== 'queue') await this.applyPendingLessons(crewId, crew.folder, info.skipped)
+    return finish()
+  }
+
+  // Runs at the end of every learn step (a closed terminal, an idle one, run now), whatever it found: retire lessons whose code
+  // is gone, delete old stale ones, then merge and tighten what is left. Nothing here waits for the owner. A run that failed on
+  // its model call skips the merge; the rest needs no model.
+  private async tidy(crewId: number, folder: string, s: LearnSettings, info: { cli: string; model: string; staled: number; error: string }): Promise<void> {
+    if (s.mode === 'suggest') return
+    const run = (): RunCtx => ({ crewId, cli: info.cli, model: info.model, tokens: 0, validation: 'valid', evidence: 'tidy after a learn step' })
     try {
-      if (this.consolidationDue(crewId, settings)) await this.consolidate(crewId)
+      info.staled += this.staleCheck(crewId, folder, run)
+      this.purgeOld(crewId, run)
+      if (!info.error || info.error.startsWith('Skipped:')) await this.consolidate(crewId, { always: true })
     } catch (err) {
-      this.safe(() => this.d.log?.(`Consolidation failed: ${clean(errText(err))}`, crewId))
+      this.safe(() => this.d.log?.(`Tidy failed: ${clean(errText(err))}`, crewId))
     }
     this.safe(() => this.rebuildLinks(crewId))
-    return finish()
+  }
+
+  // Stale and deleted lessons, and rejected drafts, are removed for good once they are PURGE_AFTER_MS old.
+  private purgeOld(crewId: number, run: () => RunCtx): void {
+    const { db } = this.d
+    const cutoff = Date.now() - PURGE_AFTER_MS
+    let n = 0
+    for (const l of db.listLessons({ crewId })) {
+      if ((l.status === 'stale' || l.status === 'deleted') && l.updatedAt < cutoff) {
+        db.deleteLesson(l.id)
+        n++
+      }
+    }
+    for (const d of db.listDrafts(crewId, 'rejected')) {
+      if (d.updatedAt < cutoff) {
+        db.deleteDraft(d.id)
+        n++
+      }
+    }
+    if (n) this.note(run(), { kind: 'lesson', targetId: 0, proposal: `Removed ${n} old stale or rejected ${n === 1 ? 'entry' : 'entries'}`, previous: '', next: '', status: 'applied' })
   }
 
   // Consolidation
@@ -566,14 +589,14 @@ export class LearnService {
   }
 
   // Folds related active lessons into one each (one model call per group) and tightens long ones. suggest mode only proposes.
-  async consolidate(crewId: number, opts: { manual?: boolean } = {}): Promise<ConsolidateResult> {
+  async consolidate(crewId: number, opts: { manual?: boolean; always?: boolean } = {}): Promise<ConsolidateResult> {
     const out: ConsolidateResult = { merged: 0, improved: 0, proposed: 0, failed: 0, skipped: '' }
     const { db } = this.d
     const settings = this.d.settings()
     const crew = this.d.store.getCrew(crewId)
     if (!crew) return { ...out, skipped: 'project not found' }
     if (!settings.enabled || settings.mode === 'off') return { ...out, skipped: 'learning is off' }
-    if (!opts.manual && !this.consolidationDue(crewId, settings)) return { ...out, skipped: 'not due' }
+    if (!opts.manual && !opts.always && !this.consolidationDue(crewId, settings)) return { ...out, skipped: 'not due' }
     this.lastConsolidated.set(crewId, Date.now())
 
     const active = db.listLessons({ crewId, status: 'active' })
@@ -581,7 +604,7 @@ export class LearnService {
     const inGroup = new Set(grouped.flat().map((l) => l.id))
     const hasTargets = active.some((l) => l.files.length || l.symbols.length)
     const singles = active
-      .filter((l) => !inGroup.has(l.id) && l.consolidatedInto == null && !lessonNeedsReview(l.text) && (l.text.length > TIGHTEN_OVER || (hasTargets && !l.files.length && !l.symbols.length)))
+      .filter((l) => !inGroup.has(l.id) && l.consolidatedInto == null && (l.text.length > TIGHTEN_OVER || (hasTargets && !l.files.length && !l.symbols.length)))
       .map((l) => [l])
     const groups = [...grouped, ...singles]
     if (!groups.length) {
@@ -600,6 +623,8 @@ export class LearnService {
     let made = 0
     for (const g of groups) {
       if (made >= settings.maxChangesPerReview) break
+      const key = g.map((l) => `${l.id}:${l.updatedAt}`).join(',')
+      if (this.settledGroups.has(key)) continue
       let raw: string
       try {
         raw = await ask(this.consolidationPrompt(g))
@@ -610,7 +635,10 @@ export class LearnService {
         break
       }
       const answer = parseConsolidation(raw)
-      if (answer.kind === 'none') continue
+      if (answer.kind === 'none') {
+        this.settledGroups.add(key)
+        continue
+      }
       if (answer.kind === 'bad') {
         fail(g, answer.reason)
         continue
@@ -623,10 +651,13 @@ export class LearnService {
       const { text, set, files, symbols } = checked
       const keep = set[0]!
       const others = set.slice(1)
-      if (!others.length && text === keep.text) continue
+      if (!others.length && text === keep.text) {
+        this.settledGroups.add(key)
+        continue
+      }
       const ids = set.map((l) => `#${l.id}`).join(', ')
       const oldTargetsJson = JSON.stringify({ files: keep.files, symbols: keep.symbols })
-      if (queue || lessonNeedsReview(text)) {
+      if (queue) {
         this.note(run(JSON.stringify({ replaces: set.map((l) => l.id), files, symbols })), { kind: 'lesson', targetId: keep.id, proposal: `${CONSOLIDATION}: proposed ${others.length ? `merge of ${ids}` : `tightening of ${ids}`}: ${text}`, previous: keep.text, next: text, status: 'proposed', filesAffected: files })
         out.proposed++
         made++
@@ -908,6 +939,35 @@ export class LearnService {
       made.push(db.addDraft(crewId, name, body, jobs, '', p.id))
     }
     return made
+  }
+
+  // Advanced mode: every pending draft (new skills and fixes to installed ones, from this run or an earlier one) that passes
+  // validation installs itself and is recorded, so rollback can undo it. One that fails validation is rejected, never left waiting.
+  private applyPendingDrafts(crewId: number, run: () => RunCtx): void {
+    for (const d of this.d.db.listDrafts(crewId).filter((x) => x.status === 'pending')) {
+      const problem = skillProblem(d)
+      if (problem) {
+        this.d.db.updateDraft(d.id, { status: 'rejected' })
+        this.note({ ...run(), validation: problem }, { kind: 'skill', targetId: d.id, proposal: `Skill ${d.name}`, previous: '', next: '', status: 'failed' })
+        continue
+      }
+      try {
+        this.approveDraft(d.id)
+        const done = this.d.db.getDraft(d.id)
+        this.note(run(), { kind: 'skill', targetId: d.id, proposal: d.targetPath ? `Fix ${d.name}` : `Skill ${d.name}`, previous: done?.previousBody ?? '', next: d.body, status: 'applied', filesAffected: [done?.installedPath ?? ''] })
+      } catch (err) {
+        this.note(run(), { kind: 'skill', targetId: d.id, proposal: `Skill ${d.name}`, previous: '', next: '', status: 'failed' })
+        this.safe(() => this.d.log?.(`Skill ${d.name} not applied: ${clean(errText(err))}`, crewId))
+      }
+    }
+  }
+
+  // Lessons left pending by an earlier review setting or run apply themselves once reviewing is off.
+  private async applyPendingLessons(crewId: number, folder: string, skipped: LearnSkip[]): Promise<void> {
+    for (const l of this.d.db.listLessons({ crewId, status: 'pending' })) {
+      const next = this.d.db.updateLesson(l.id, { status: 'active' })
+      await this.writeStores(next, folder, skipped)
+    }
   }
 
   drafts(crewId?: number): SkillDraft[] {

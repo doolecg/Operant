@@ -194,7 +194,7 @@ describe('Operant: Chat view tiles', () => {
     expect(() => op.handlers['chat:setEffort'](t.id, 'galaxy')).toThrow()
   })
 
-  it('closing the tile asks before learning, and learns only when the owner says yes', async () => {
+  it('closing the tile learns from it at once, without asking, and only once', async () => {
     const t = makeTile()
     op.startScratch(t.id)
     const sessionId = store.getScratch(t.id)!.sessionId
@@ -203,29 +203,18 @@ describe('Operant: Chat view tiles', () => {
     op.stopScratch(t.id)
     await op.chat.stop(t.id)
     expect(op.scratchStatus(t.id).running).toBe(false)
-    expect(learned).toEqual([])
-    expect(asks).toEqual([{ scratchId: t.id, title: store.getScratch(t.id)!.title, crewId: store.getScratch(t.id)!.crewId, sessionId }])
-    op.handlers['learn:answerClose'](t.id, true)
-    op.handlers['learn:answerClose'](t.id, true)
+    expect(asks).toEqual([])
     expect(learned).toEqual([[store.getScratch(t.id)!.crewId, sessionId]])
   })
 
-  it('skipping the close prompt learns nothing, and a tile learned from already is not asked', async () => {
-    const t = makeTile()
-    op.startScratch(t.id)
-    const asks: unknown[] = []
-    op.on('learn:askOnClose', (e) => void asks.push(e))
-    op.stopScratch(t.id)
-    await op.chat.stop(t.id)
-    op.handlers['learn:answerClose'](t.id, false)
-    expect(learned).toEqual([])
-
+  it('a tile learned from already is not learned from again when it closes', async () => {
     const u = makeTile()
     op.startScratch(u.id)
     await op.handlers['learn:runNow'](u.id)
+    const before = learned.length
     op.stopScratch(u.id)
     await op.chat.stop(u.id)
-    expect(asks).toHaveLength(1)
+    expect(learned).toHaveLength(before)
   })
 
   it('learn:consolidate runs the consolidation pass for the project and returns its result', async () => {

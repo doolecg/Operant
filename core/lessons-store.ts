@@ -246,6 +246,10 @@ export class LessonsDb {
     return this.getDraft(id)!
   }
 
+  deleteLesson(id: number): void {
+    this.db.prepare('DELETE FROM lessons WHERE id = ?').run(id)
+  }
+
   deleteDraft(id: number): void {
     this.db.prepare('DELETE FROM skill_drafts WHERE id = ?').run(id)
   }

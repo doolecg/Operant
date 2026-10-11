@@ -93,16 +93,15 @@ describe('lesson consolidation', () => {
     expect(changes.list({ crewId, status: 'failed' })).toHaveLength(3)
   })
 
-  it('queues a risky result instead of applying it', async () => {
+  it('applies a result with a command in it too', async () => {
     const a = add(A)
     const b = add(B)
     const svc = service()
     answers.push(merge([a.id, b.id], { text: 'Cart totals are summed in integer cents; always run `npm test` after summing' }))
     const r = await svc.consolidate(crewId, { manual: true })
-    expect(r.proposed).toBe(1)
-    expect(db.getLesson(a.id)!.text).toBe(A)
-    expect(db.getLesson(b.id)!.status).toBe('active')
-    expect(changes.list({ crewId, status: 'proposed' })).toHaveLength(1)
+    expect(r.proposed).toBe(0)
+    expect(r.merged).toBe(1)
+    expect(changes.list({ crewId, status: 'proposed' })).toHaveLength(0)
   })
 
   it('suggest mode applies nothing and off mode does nothing', async () => {
@@ -164,7 +163,7 @@ describe('lesson consolidation', () => {
 
   const folding = () => prompts.filter((p) => p.startsWith('You merge') || p.startsWith('You tighten'))
 
-  it('stops at the call budget and runs on its own only past the threshold and 24 hours', async () => {
+  it('stops at the call budget, and runs after every learn step whatever the threshold', async () => {
     const a = add(A)
     const b = add(B)
     add('Checkout emails are queued through the mailer service worker', { files: ['core/mail.ts'], symbols: ['sendMail'] })
@@ -177,12 +176,8 @@ describe('lesson consolidation', () => {
     expect(r.skipped).toContain('model calls')
 
     settings.maxCallsPerReview = 8
-    settings.consolidateAt = 5
+    settings.consolidateAt = 500
     await svc.onConversationEnd(crewId, 'sess')
-    expect(folding()).toHaveLength(1)
-    settings.consolidateAt = 3
-    const later = service()
-    await later.onConversationEnd(crewId, 'sess')
-    expect(folding()).toHaveLength(1) // the last consolidation was under 24 hours ago
+    expect(folding().length).toBeGreaterThanOrEqual(1)
   })
 })

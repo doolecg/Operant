@@ -1305,11 +1305,11 @@ export class Operant extends EventEmitter<PushEvents> {
     return this.learn.learnNow(tile.crewId, tile.sessionId, confirm)
   }
 
-  // A closed Claude tile not learned from yet: ask the owner first (the tile's process is gone, so the answer is kept here).
+  // A closed Claude tile not learned from yet is learned from at once, then the project is tidied and merged; nobody is asked.
   private askLearnOnClose(scratch: ScratchTerminal): void {
-    if (!scratch.sessionId || this.settings.learn.mode === 'off' || this.learnedTiles.has(scratch.id)) return
-    this.learnAsks.set(scratch.id, { crewId: scratch.crewId, sessionId: scratch.sessionId })
-    this.emit('learn:askOnClose', { scratchId: scratch.id, title: scratch.title, crewId: scratch.crewId, sessionId: scratch.sessionId })
+    if (!scratch.sessionId || !this.settings.learn.enabled || this.settings.learn.mode === 'off' || this.learnedTiles.has(scratch.id)) return
+    this.learnedTiles.add(scratch.id)
+    void this.learnFrom(scratch)
   }
 
   // Notices

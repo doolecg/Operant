@@ -1,4 +1,4 @@
-import { lessonNeedsReview, type Lesson } from '../shared/learn'
+import type { Lesson } from '../shared/learn'
 
 // Pure helpers over lesson text: comparing, matching and rendering for a brief.
 
@@ -53,11 +53,11 @@ export const LINK_FLOOR = 0.3
 const eligible = (l: Lesson): boolean => l.status === 'active' && l.consolidatedInto == null
 
 // Groups of 2 to 6 related, not-yet-duplicate active lessons (same project, scope and kind, same code) for the model to fold into one.
-// Lessons that need review are left out. Greedy from the oldest lesson; largest groups first.
+// Greedy from the oldest lesson; largest groups first.
 export function clusterLessons(lessons: Lesson[], opts: { min?: number; max?: number } = {}): Lesson[][] {
   const min = opts.min ?? 2
   const max = opts.max ?? 6
-  const pool = lessons.filter((l) => eligible(l) && !lessonNeedsReview(l.text)).sort((a, b) => a.id - b.id)
+  const pool = lessons.filter((l) => eligible(l)).sort((a, b) => a.id - b.id)
   const used = new Set<number>()
   const groups: Lesson[][] = []
   for (const seed of pool) {
