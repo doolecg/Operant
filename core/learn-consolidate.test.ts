@@ -104,14 +104,16 @@ describe('lesson consolidation', () => {
     expect(changes.list({ crewId, status: 'proposed' })).toHaveLength(0)
   })
 
-  it('suggest mode applies nothing and off mode does nothing', async () => {
+  it('suggest mode proposes nothing (it applies) and off mode does nothing', async () => {
     const a = add(A)
     const b = add(B)
     settings.mode = 'suggest'
     const svc = service()
     answers.push(merge([a.id, b.id]))
-    expect((await svc.consolidate(crewId, { manual: true })).proposed).toBe(1)
-    expect(db.getLesson(b.id)!.status).toBe('active')
+    const r = await svc.consolidate(crewId, { manual: true })
+    expect(r.proposed).toBe(0)
+    expect(r.merged).toBe(1)
+    expect(db.getLesson(b.id)!.status).not.toBe('active')
     settings.mode = 'off'
     expect((await svc.consolidate(crewId, { manual: true })).skipped).toBe('learning is off')
     expect(prompts).toHaveLength(1)

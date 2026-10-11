@@ -9,6 +9,7 @@ import { Switch } from '@/components/ui/switch'
 import type { ModId } from '@shared/claude-mods'
 import { CLAUDE_MODS } from '@/components/mods/registry'
 import { useAppInfo, useCapabilities, useInstallRun, useInstallStatus, useSaveSettings, useSettings } from '@/lib/queries'
+import { formatAccel } from '@/lib/keys'
 import { NumberField, Row } from '../parts'
 
 export function ModsSection() {
@@ -95,8 +96,11 @@ export function ModsSection() {
           <Row label="Enable dictation" hint="Off hides the microphone button and the dictation shortcut does nothing." htmlFor="dictation-enabled">
             <Switch id="dictation-enabled" checked={s.dictation.enabled} onCheckedChange={(v) => save.mutate({ dictation: { enabled: v } })} />
           </Row>
-          <Row label="Shortcut" hint="Change it in Shortcuts.">
-            <kbd className="bg-muted rounded px-2 py-0.5 font-mono text-xs">{s.keybinds.dictate || 'unbound'}</kbd>
+          <Row label="Hold to talk" hint="On: record only while the shortcut is held down, and transcribe when you let go. Off: press once to start and again to stop." htmlFor="dictation-hold">
+            <Switch id="dictation-hold" checked={s.dictation.mode === 'hold'} onCheckedChange={(v) => save.mutate({ dictation: { mode: v ? 'hold' : 'toggle' } })} />
+          </Row>
+          <Row label="Shortcut" hint="Change it in Shortcuts. A key combination or the middle, back or forward mouse button.">
+            <kbd className="bg-muted rounded px-2 py-0.5 font-mono text-xs">{formatAccel(s.keybinds.dictate)}</kbd>
           </Row>
           <Row label="Speech model" hint={installError ?? installItem('dictation').enables}>
             <div className="flex items-center gap-2">

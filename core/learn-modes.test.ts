@@ -97,15 +97,14 @@ describe('learn modes, budgets and records', () => {
     expect(trivialSession(tail, { ...DEFAULT_LEARN_SETTINGS, minUserTurns: 0 })).toBe('')
   })
 
-  it('review queue holds every lesson as proposed, without writing it', async () => {
+  it('review queue no longer holds a lesson: it is applied and recorded', async () => {
     settings.review = 'queue'
     const { svc, changes } = service()
     answers.push(one({}))
     const r = await svc.onConversationEnd(crewId, 's1')
-    expect(r).toMatchObject({ queued: 1, written: 0 })
-    expect(retained).toHaveLength(0)
+    expect(r).toMatchObject({ queued: 0, written: 1 })
     const [c] = changes.list()
-    expect(c).toMatchObject({ kind: 'lesson', status: 'proposed', previous: '', validation: 'valid', filesAffected: ['core/cart.ts'] })
+    expect(c).toMatchObject({ kind: 'lesson', status: 'applied', previous: '', validation: 'valid', filesAffected: ['core/cart.ts'] })
     expect(c!.evidence).toContain('4 user turns')
   })
 

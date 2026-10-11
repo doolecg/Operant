@@ -44,6 +44,7 @@ async function launch() {
   page.setDefaultTimeout(60_000)
   await page.setViewportSize({ width: 1440, height: 900 })
   await page.waitForFunction(() => !!window.operant)
+  await page.evaluate(() => window.operant.invoke('settings:set', { setupDone: true }))
 }
 const inv = (channel, ...args) => page.evaluate(([c, a]) => window.operant.invoke(c, ...a), [channel, args])
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
@@ -127,7 +128,7 @@ try {
     const sw = (name) => page.getByRole('switch', { name })
     await sw('Learn from finished sessions').waitFor()
     // The default holds lessons for review; the rest of this run needs them written straight away.
-    assert.equal((await inv('settings:get')).learn.review, 'queue')
+    assert.equal((await inv('settings:get')).learn.review, 'auto')
     await inv('settings:set', { learn: { review: 'auto' } })
     await sw('Write to CodeGraph notes').click()
     await until('codegraph off', async () => (await inv('settings:get')).learn.codegraph === false)

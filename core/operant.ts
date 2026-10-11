@@ -417,6 +417,8 @@ export class Operant extends EventEmitter<PushEvents> {
         changes: this.changes,
         onRunEnd: (crewId) => void this.refreshRecall(crewId),
       })
+    // Lessons and skill drafts left pending by an older version or setting apply themselves now.
+    if (typeof this.learn.settleAllPending === 'function') void this.learn.settleAllPending()
     this.ops = new Ops({
       store,
       learn: this.learn,

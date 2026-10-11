@@ -27,6 +27,7 @@ try {
   await page.setViewportSize({ width: 1920, height: 1080 })
   await page.waitForFunction(() => !!window.operant)
   const inv = (channel, ...args) => page.evaluate(([c, a]) => window.operant.invoke(c, ...a), [channel, args])
+  await inv('settings:set', { setupDone: true })
   const poll = async (label, fn, timeout = 15_000) => {
     for (const end = Date.now() + timeout; Date.now() < end; await page.waitForTimeout(200)) if (await fn()) return
     throw new Error(`timed out waiting for ${label}`)

@@ -51,7 +51,7 @@ export function ShortcutsSection() {
         <CardHeader>
           <CardTitle className="text-base">Keyboard shortcuts</CardTitle>
           <CardDescription>
-            Click a shortcut, then press the new keys. Backspace unbinds, Esc cancels. A key can belong to one action only.
+            Click a shortcut, then press the new keys or the middle, back or forward mouse button. Backspace unbinds, Esc cancels. A key can belong to one action only.
           </CardDescription>
           <CardAction>
             <Button

@@ -2,7 +2,7 @@ import { useEffect, useLayoutEffect, useMemo, useRef, useState, type ClipboardEv
 import { KeepWarmLine } from './KeepWarmLine'
 import { DictationButton } from './DictationButton'
 import { useDictation } from './useDictation'
-import { matches } from '@/lib/keys'
+import { keyReleases, matches, matchesMouseEvent, mouseButtonOfAccel } from '@/lib/keys'
 import { useQueryClient } from '@tanstack/react-query'
 import { ArrowUp, Check, ChevronDown, Command, CornerDownLeft, Loader2, Plus, Sparkles, Square, StickyNote, Undo2, X } from 'lucide-react'
 import type { ChatState } from '@shared/claude-chat'
@@ -302,17 +302,43 @@ export function Composer({ scratchId, state, launchEffort, tileModel, disabled, 
   const dictateKey = useSettings().data?.keybinds.dictate ?? ''
   const dictationOn = useSettings().data?.dictation.enabled ?? true
   const speechReady = useInstallStatus().data?.find((s) => s.id === 'dictation')?.state === 'installed' && dictationOn
+  const holdMode = useSettings().data?.dictation.mode === 'hold'
   const toggleDictation = dictation.toggle
+  const { holdStart, holdEnd } = dictation
   useEffect(() => {
     if (!dictateKey || !speechReady) return
+    const mouseButton = mouseButtonOfAccel(dictateKey)
     const onKey = (e: globalThis.KeyboardEvent) => {
       if (document.activeElement !== area.current || !matches(e, dictateKey)) return
       e.preventDefault()
-      toggleDictation()
+      if (!holdMode) return toggleDictation()
+      if (!e.repeat) void holdStart()
+    }
+    const onKeyUp = (e: globalThis.KeyboardEvent) => {
+      if (holdMode && keyReleases(e, dictateKey)) holdEnd()
+    }
+    const onMouseDown = (e: globalThis.MouseEvent) => {
+      if (document.activeElement !== area.current || !matchesMouseEvent(e, dictateKey)) return
+      e.preventDefault()
+      if (holdMode) void holdStart()
+      else toggleDictation()
+    }
+    const onMouseUp = (e: globalThis.MouseEvent) => {
+      if (holdMode && e.button === mouseButton) holdEnd()
     }
     window.addEventListener('keydown', onKey)
-    return () => window.removeEventListener('keydown', onKey)
-  }, [dictateKey, speechReady, toggleDictation])
+    window.addEventListener('keyup', onKeyUp)
+    window.addEventListener('mousedown', onMouseDown)
+    window.addEventListener('mouseup', onMouseUp)
+    window.addEventListener('blur', holdEnd)
+    return () => {
+      window.removeEventListener('keydown', onKey)
+      window.removeEventListener('keyup', onKeyUp)
+      window.removeEventListener('mousedown', onMouseDown)
+      window.removeEventListener('mouseup', onMouseUp)
+      window.removeEventListener('blur', holdEnd)
+    }
+  }, [dictateKey, speechReady, toggleDictation, holdMode, holdStart, holdEnd])
 
   const blocked = state.process === 'blocked'
   const placeholder = state.process === 'starting' ? 'Starting Claude Code…' : 'Type / for commands'

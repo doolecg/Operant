@@ -3,7 +3,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogBody, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
-import { eventToAccel, formatAccel } from '@/lib/keys'
+import { eventToAccel, formatAccel, mouseEventToAccel } from '@/lib/keys'
 import { cn } from '@/lib/utils'
 
 // Shared building blocks for the settings sections.
@@ -157,9 +157,27 @@ export function KeyRecorder({ value, label, onChange }: { value: string; label?:
       onChange(accel)
       setRecording(false)
     }
+    // Middle, back and forward buttons can be bound too; left and right click are left alone.
+    const onMouse = (e: MouseEvent) => {
+      const accel = mouseEventToAccel(e)
+      if (!accel) return
+      e.preventDefault()
+      e.stopPropagation()
+      if (e.type !== 'mousedown') return
+      onChange(accel)
+      setRecording(false)
+    }
     // Capture phase, so the app's own shortcuts don't fire while recording.
     window.addEventListener('keydown', onKey, true)
-    return () => window.removeEventListener('keydown', onKey, true)
+    window.addEventListener('mousedown', onMouse, true)
+    window.addEventListener('mouseup', onMouse, true)
+    window.addEventListener('auxclick', onMouse, true)
+    return () => {
+      window.removeEventListener('keydown', onKey, true)
+      window.removeEventListener('mousedown', onMouse, true)
+      window.removeEventListener('mouseup', onMouse, true)
+      window.removeEventListener('auxclick', onMouse, true)
+    }
   }, [recording, onChange])
 
   return (
@@ -171,7 +189,7 @@ export function KeyRecorder({ value, label, onChange }: { value: string; label?:
       onBlur={() => setRecording(false)}
     >
       {label && <span className="sr-only">{label}: </span>}
-      {recording ? 'Press keys…' : formatAccel(value)}
+      {recording ? 'Press keys or a mouse button…' : formatAccel(value)}
     </Button>
   )
 }

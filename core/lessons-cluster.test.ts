@@ -107,3 +107,12 @@ describe('buildLinks', () => {
     expect(links.get(all[0]!.id)).toEqual([all[1]!.id, all[2]!.id, all[3]!.id])
   })
 })
+
+describe('link building on many lessons', () => {
+  it('finishes quickly for a large project', () => {
+    const many = Array.from({ length: 800 }, (_, i) => ({ id: i + 1, crewId: 1, scope: 'project', kind: 'pitfall', status: 'active', consolidatedInto: null, files: [], symbols: [], text: `lesson number ${i} about topic${i % 40} and thing${i % 7} in the build` }) as unknown as Lesson)
+    const t = Date.now()
+    buildLinks(many)
+    expect(Date.now() - t).toBeLessThan(5000)
+  })
+})

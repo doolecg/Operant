@@ -107,7 +107,7 @@ describe('Operant: Chat view tiles', () => {
       },
     })
     op.on('chat:ops', (e) => pushed.push(e))
-    op.handlers['settings:set']({ learn: { mode: 'suggest' } })
+    op.handlers['settings:set']({ learn: { mode: 'advanced' } })
   })
   afterEach(() => {
     store.close()

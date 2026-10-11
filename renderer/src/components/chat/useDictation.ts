@@ -114,5 +114,22 @@ export function useDictation(onText: (text: string) => void) {
     else if (state === 'idle') void start()
   }, [state, start, stop])
 
-  return { state, error, toggle }
+  // Hold-to-talk: holdStart begins recording, holdEnd (key or button released, window blurred) stops and transcribes.
+  // A release that lands while the microphone is still opening stops the recording as soon as it is ready.
+  const held = useRef(false)
+  const stateRef = useRef(state)
+  stateRef.current = state
+  const holdStart = useCallback(async () => {
+    held.current = true
+    if (stateRef.current !== 'idle' || rec.current) return
+    await start()
+    if (!held.current && rec.current) void stop()
+  }, [start, stop])
+  const holdEnd = useCallback(() => {
+    if (!held.current) return
+    held.current = false
+    if (rec.current) void stop()
+  }, [stop])
+
+  return { state, error, toggle, holdStart, holdEnd }
 }

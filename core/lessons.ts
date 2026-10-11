@@ -24,6 +24,11 @@ export function jaccard(a: Set<string>, b: Set<string>): number {
 
 export const similarity = (a: string, b: string): number => (normalize(a) === normalize(b) ? 1 : jaccard(words(a), words(b)))
 
+// The same score from text prepared once, for loops that compare every pair.
+interface Prepared { norm: string; words: Set<string> }
+const prepare = (text: string): Prepared => ({ norm: normalize(text), words: new Set(normalize(text).split(' ').filter((w) => w.length >= 3 && !STOP.has(w))) })
+const similarityOf = (a: Prepared, b: Prepared): number => (a.norm === b.norm ? 1 : jaccard(a.words, b.words))
+
 const lower = (xs: string[]) => xs.map((x) => x.toLowerCase())
 
 type Targets = Pick<Lesson, 'files' | 'symbols'>
@@ -59,6 +64,7 @@ export function clusterLessons(lessons: Lesson[], opts: { min?: number; max?: nu
   const max = opts.max ?? 6
   const pool = lessons.filter((l) => eligible(l)).sort((a, b) => a.id - b.id)
   const used = new Set<number>()
+  const prep = new Map(pool.map((l) => [l.id, prepare(l.text)]))
   const groups: Lesson[][] = []
   for (const seed of pool) {
     if (used.has(seed.id)) continue
@@ -68,7 +74,7 @@ export function clusterLessons(lessons: Lesson[], opts: { min?: number; max?: nu
       if (c.id === seed.id || used.has(c.id)) continue
       if (c.crewId !== seed.crewId || c.scope !== seed.scope || c.kind !== seed.kind) continue
       if (!sameTargets(seed, c)) continue
-      const s = similarity(seed.text, c.text)
+      const s = similarityOf(prep.get(seed.id)!, prep.get(c.id)!)
       if (s >= CLUSTER_FLOOR && s < DUPLICATE_AT) group.push(c)
     }
     if (group.length < min) continue
@@ -83,14 +89,16 @@ export function clusterLessons(lessons: Lesson[], opts: { min?: number; max?: nu
 export function buildLinks(lessons: Lesson[], cap = 5): Map<number, number[]> {
   const pool = lessons.filter(eligible).sort((a, b) => a.id - b.id)
   const pairs: Array<{ a: number; b: number; score: number }> = []
+  const prep = new Map(pool.map((l) => [l.id, prepare(l.text)]))
+  const low = new Map(pool.map((l) => [l.id, { f: lower(l.files), s: lower(l.symbols) }]))
   for (let i = 0; i < pool.length; i++) {
     for (let j = i + 1; j < pool.length; j++) {
       const x = pool[i]!
       const y = pool[j]!
       if (x.id === y.id || x.crewId !== y.crewId || x.scope !== y.scope) continue
-      const [xf, yf, xs, ys] = [lower(x.files), lower(y.files), lower(x.symbols), lower(y.symbols)]
-      const shared = xf.filter((f) => yf.includes(f)).length + xs.filter((s) => ys.includes(s)).length
-      const sim = similarity(x.text, y.text)
+      const [lx, ly] = [low.get(x.id)!, low.get(y.id)!]
+      const shared = lx.f.filter((f) => ly.f.includes(f)).length + lx.s.filter((s) => ly.s.includes(s)).length
+      const sim = similarityOf(prep.get(x.id)!, prep.get(y.id)!)
       if (!shared && sim < LINK_FLOOR) continue
       pairs.push({ a: x.id, b: y.id, score: sim + (shared ? 1 + shared / 100 : 0) })
     }

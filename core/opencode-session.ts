@@ -41,7 +41,7 @@ export function readOpenCodeSessionText(dbFile: string, folder: string, cap = TR
         // an unreadable row
       }
     }
-    return scrubLogLine(lines.join('\n')).slice(-cap)
+    return scrubLogLine(lines.join('\n').slice(-cap))
   } catch {
     return ''
   } finally {

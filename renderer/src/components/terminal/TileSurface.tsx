@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react'
 import { insertTile, removeTile, tileIds, tileRects, toggleSplit, type Rect, type TileNode } from '@shared/tiling'
-import { matches } from '@/lib/keys'
+import { matches, matchesMouseEvent } from '@/lib/keys'
 import { useSaveSettings, useSettings } from '@/lib/queries'
 import { TileFrame } from './TileFrame'
 import type { TileInfo } from './useProjectTiles'
@@ -125,8 +125,18 @@ export function TileSurface({ crewId, tiles, onClose, body, info, chrome, onFocu
       e.preventDefault()
       actRef.current(hit[1])
     }
+    const onMouse = (e: MouseEvent) => {
+      const hit = map.find(([accel]) => matchesMouseEvent(e, accel))
+      if (!hit) return
+      e.preventDefault()
+      actRef.current(hit[1])
+    }
     window.addEventListener('keydown', onKey)
-    return () => window.removeEventListener('keydown', onKey)
+    window.addEventListener('mousedown', onMouse)
+    return () => {
+      window.removeEventListener('keydown', onKey)
+      window.removeEventListener('mousedown', onMouse)
+    }
   }, [binds])
 
   const rects = tileRects(tree, area, layout, MASTER_FACTOR, gap)

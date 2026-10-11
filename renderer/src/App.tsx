@@ -29,7 +29,7 @@ import { ActivityMenu } from '@/components/topbar/ActivityMenu'
 import { UsageDialog } from '@/components/cost/UsageDialog'
 import { useBarTier } from '@/components/topbar/useBarTier'
 import { mediaCommand } from '@/components/topbar/useMedia'
-import { matches } from '@/lib/keys'
+import { matches, matchesMouseEvent, swallowBoundMouse } from '@/lib/keys'
 import { effectiveScale, stepScale, useUiScale } from '@/lib/uiScale'
 import { useAction, useCrews, useIndexStatus, useLiveUpdates, useMoveToGroup, useSaveSettings, useSettings } from '@/lib/queries'
 import { bridge } from '@/lib/bridge'
@@ -186,10 +186,8 @@ export function App() {
     const binds = settings.data?.keybinds
     const uiScale = settings.data?.uiScale ?? 0
     if (!binds) return
-    const onKey = (e: KeyboardEvent) => {
-      if (e.defaultPrevented) return
-      const dash = () => setPage('dashboard')
-      const actions: Array<[string, () => void]> = [
+    const dash = () => setPage('dashboard')
+    const actions: Array<[string, () => void]> = [
         [binds.newCrew, () => (dash(), setNewCrew(true))],
         [binds.indexCrew, () => crewId != null && runIndex.mutate([crewId])],
         [binds.openSettings, () => setPage((v) => (v === 'settings' ? 'dashboard' : 'settings'))],
@@ -207,14 +205,28 @@ export function App() {
         [binds.zoomIn, () => saveSettings.mutate({ uiScale: stepScale(effectiveScale(uiScale), 1) })],
         [binds.zoomOut, () => saveSettings.mutate({ uiScale: stepScale(effectiveScale(uiScale), -1) })],
         [binds.zoomReset, () => saveSettings.mutate({ uiScale: 0 })],
-      ]
+    ]
+    const onKey = (e: KeyboardEvent) => {
+      if (e.defaultPrevented) return
       const hit = actions.find(([accel]) => matches(e, accel))
       if (!hit) return
       e.preventDefault()
       hit[1]()
     }
+    const onMouse = (e: MouseEvent) => {
+      const hit = actions.find(([accel]) => matchesMouseEvent(e, accel))
+      if (!hit) return
+      e.preventDefault()
+      hit[1]()
+    }
+    const unswallow = swallowBoundMouse(Object.values(binds))
     window.addEventListener('keydown', onKey)
-    return () => window.removeEventListener('keydown', onKey)
+    window.addEventListener('mousedown', onMouse)
+    return () => {
+      window.removeEventListener('keydown', onKey)
+      window.removeEventListener('mousedown', onMouse)
+      unswallow()
+    }
   }, [settings.data?.keybinds, settings.data?.uiScale, saveSettings, crewId, runIndex, crew, terminals.openTab, crews.data, sidebarHidden, notesOpen, mode])
 
   return (

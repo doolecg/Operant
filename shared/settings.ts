@@ -1,4 +1,4 @@
-import { DEFAULT_LEARN_SETTINGS, LEARN_MODES, type LearnSettings } from './learn'
+import { DEFAULT_LEARN_SETTINGS, type LearnSettings } from './learn'
 import { DEFAULT_AUX_MODELS, DEFAULT_AUX_SETTINGS, DEFAULT_MEMORY_SETTINGS, sanitizeAux, sanitizeAuxModels, sanitizeMemory, type AuxModels, type AuxSettings, type MemorySettings } from './aux-settings'
 import { IDE_IDS, type IdeId } from './projects'
 import type { CacheTtl } from './types'
@@ -10,7 +10,10 @@ import { MOD_DEFAULT_ENABLED, MOD_IDS, type ModId } from './claude-mods'
 import { CLAUDE_EFFORTS } from './models'
 import { DEFAULT_CURRENCY, sanitizeCurrency, type CurrencySetting } from './currency'
 
+import { sanitizeAccel } from './keybinds'
+
 export type HindsightMode = 'local' | 'lan' | 'remote'
+export type DictationMode = 'toggle' | 'hold'
 
 export type KeyAction =
   | 'newCrew'
@@ -117,7 +120,8 @@ export interface Settings {
   // Windows notifications for a Claude turn that finished and for Claude waiting on the owner.
   notify: { finished: boolean; needs: boolean }
   // Dictation in the Chat view: off hides the microphone button and ignores the dictation shortcut.
-  dictation: { enabled: boolean }
+  // mode: 'toggle' starts and stops with the shortcut; 'hold' records only while the shortcut is held down.
+  dictation: { enabled: boolean; mode: DictationMode }
   // True once the first-start setup (optional installs) was shown and answered; "Show setup again" in Settings reopens it.
   setupDone: boolean
   tokens: {
@@ -217,7 +221,7 @@ export const DEFAULT_SETTINGS: Settings = {
   browser: { ...DEFAULT_BROWSER_SETTINGS },
   confirm: { closeTile: true, closeApp: true },
   notify: { finished: true, needs: true },
-  dictation: { enabled: true },
+  dictation: { enabled: true, mode: 'toggle' },
   topBar: {
     mediaControls: typeof process !== 'undefined' && process.platform === 'win32',
     mediaSize: 'full',
@@ -314,13 +318,15 @@ export function sanitizeSettings(raw: unknown): Settings {
       hindsight: flag(learn.hindsight, d.learn.hindsight),
       codegraph: flag(learn.codegraph, d.learn.codegraph),
       memory: flag(learn.memory, d.learn.memory),
-      review: learn.review === 'auto' || learn.review === 'queue' ? learn.review : d.learn.review,
+      // Nothing waits for review any more: a saved 'queue' is read as 'auto'.
+      review: 'auto',
       cli: learn.cli === 'claude' || learn.cli === 'opencode' || learn.cli === 'local' ? learn.cli : d.learn.cli,
       model: MODEL_ID.test(str(learn.model, '', 200)) ? str(learn.model, '', 200) : '',
       effort: EFFORT_ID.test(str(learn.effort, '', 40)) ? str(learn.effort, '', 40) : '',
       localUrl: HTTP_URL.test(str(learn.localUrl, '', 300)) ? str(learn.localUrl, '', 300) : d.learn.localUrl,
       localInsecureOk: flag(learn.localInsecureOk, d.learn.localInsecureOk),
-      mode: (LEARN_MODES as string[]).includes(learn.mode) ? (learn.mode as LearnSettings['mode']) : d.learn.mode,
+      // 'suggest' and 'controlled' (old saved values) held changes for review; they now behave as 'advanced'.
+      mode: learn.mode === 'off' ? 'off' : d.learn.mode,
       maxCallsPerReview: Math.round(num(learn.maxCallsPerReview, d.learn.maxCallsPerReview, 0, 50)),
       maxTokensPerReview: Math.round(num(learn.maxTokensPerReview, d.learn.maxTokensPerReview, 0, 10_000_000)),
       maxChangesPerReview: Math.round(num(learn.maxChangesPerReview, d.learn.maxChangesPerReview, 0, 100)),
@@ -358,7 +364,7 @@ export function sanitizeSettings(raw: unknown): Settings {
       installOnQuit: typeof updates.installOnQuit === 'boolean' ? updates.installOnQuit : d.updates.installOnQuit,
     },
     keybinds: Object.fromEntries(
-      KEY_ACTIONS.map(({ id }) => [id, str(keys[id], d.keybinds[id], 40)]),
+      KEY_ACTIONS.map(({ id }) => [id, sanitizeAccel(keys[id], d.keybinds[id], 40)]),
     ) as Record<KeyAction, string>,
     appearance: sanitizeAppearance(r.appearance),
     uiScale: r.uiScale === 0 ? 0 : num(r.uiScale, d.uiScale, 0.8, 2),
@@ -403,7 +409,10 @@ export function sanitizeSettings(raw: unknown): Settings {
       finished: flag(notify.finished, d.notify.finished),
       needs: flag(notify.needs, d.notify.needs),
     },
-    dictation: { enabled: flag(dictation.enabled, d.dictation.enabled) },
+    dictation: {
+      enabled: flag(dictation.enabled, d.dictation.enabled),
+      mode: dictation.mode === 'hold' || dictation.mode === 'toggle' ? dictation.mode : d.dictation.mode,
+    },
     tokens: {
       capWarnPct: num(tokens.capWarnPct, d.tokens.capWarnPct, 1, 100),
       coldThresholdPct: num(tokens.coldThresholdPct, d.tokens.coldThresholdPct, 1, 100),
