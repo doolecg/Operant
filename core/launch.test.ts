@@ -132,6 +132,15 @@ describe('tile launches', () => {
     expect(commandLine({ file: 'claude', args: ['--model', 'a b'] }, 'powershell')).toBe("claude --model 'a b'")
   })
 
+  it('adds the MCP config, strict flag and the one allowed tool to a run only when claude supports them', () => {
+    const run = { cwd: '/code/shop', mcpConfig: '/tmp/cg.json', allowedTools: 'mcp__codegraph__codegraph_explore' }
+    expect(buildClaudeRunLaunch(run).args).toEqual(expect.arrayContaining(['--mcp-config', '"/tmp/cg.json"', '--strict-mcp-config', '--allowedTools', 'mcp__codegraph__codegraph_explore']))
+    expect(buildClaudeRunLaunch({ cwd: '/code/shop' }).args).not.toContain('--mcp-config')
+    expect(buildClaudeRunLaunch(run, { supported: new Set(['--mcp-config']) }).args).toEqual(expect.arrayContaining(['--mcp-config']))
+    expect(buildClaudeRunLaunch(run, { supported: new Set(['--mcp-config']) }).args).not.toContain('--allowedTools')
+    expect(buildClaudeRunLaunch(run, { supported: new Set() }).args).not.toContain('--mcp-config')
+  })
+
   it('forces Haiku for Claude only in an e2e run', () => {
     expect(e2eClaudeModel('claude-sonnet-5-5', {})).toBe('claude-sonnet-5-5')
     expect(e2eClaudeModel('claude-sonnet-5-5', { OPERANT_E2E: '1' })).toBe('claude-haiku-5-5')

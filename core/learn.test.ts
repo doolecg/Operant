@@ -1,4 +1,4 @@
-import { mkdtempSync, readFileSync, existsSync, rmSync, readdirSync } from 'node:fs'
+import { mkdirSync, mkdtempSync, readFileSync, existsSync, rmSync, readdirSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
@@ -229,6 +229,52 @@ describe('learning loop', () => {
     expect(first!.error).toMatch(/timed out/)
     expect(stopped).toEqual([1])
     expect(await svc.onConversationEnd(crewId, finishedRun())).toMatchObject({ extracted: 1, error: '' })
+  })
+
+  it('puts Hindsight recall into the prompt before the model call, and skips it when recall fails or is off', async () => {
+    const recalls: string[] = []
+    let mode: 'ok' | 'fail' | 'hang' = 'ok'
+    const hs = {
+      retain: async () => ({ ok: true as const }),
+      status: async () => ({ url: 'u', managed: true, state: 'running' as const, detail: '' }),
+      recall: async (bank: string, q: string, limit?: number) => {
+        recalls.push(`${bank}|${limit}|${q.length > 0}`)
+        if (mode === 'fail') throw new Error('down')
+        return { ok: true as const, items: ['Totals are integer cents'] }
+      },
+    }
+    await service({ hindsight: hs }).onConversationEnd(crewId, finishedRun())
+    expect(recalls).toHaveLength(1)
+    expect(recalls[0]).toMatch(/\|5\|true$/)
+    expect(prompts.at(-1)).toContain('Already known in this project (do not repeat):\n- Totals are integer cents')
+    mode = 'fail'
+    await service({ hindsight: hs }).onConversationEnd(crewId, finishedRun())
+    expect(prompts.at(-1)).not.toContain('Already known')
+    expect(prompts.at(-1)).toContain('Transcript tail')
+    settings.hindsight = false
+    mode = 'ok'
+    recalls.length = 0
+    await service({ hindsight: hs }).onConversationEnd(crewId, finishedRun())
+    expect(recalls).toHaveLength(0)
+    expect(prompts.at(-1)).not.toContain('Already known')
+  })
+
+  it('runs the learn call in the project and adds read-only CodeGraph only when asked and indexed', async () => {
+    const proj = mkdtempSync(join(tmpdir(), 'operant-learn-proj-'))
+    const started: Array<{ cwd: string; mcpConfig?: string; allowedTools?: string }> = []
+    const adapter = { start: async (o: { cwd: string; mcpConfig?: string; allowedTools?: string }) => (started.push(o), { done: Promise.resolve({ ok: true, text: '[]' }), stop: async () => undefined }) }
+    const model = claudeLearnModel(undefined, { adapter })
+    await model('p')
+    await model('p', undefined, { folder: proj, codegraph: true })
+    mkdirSync(join(proj, '.codegraph'))
+    await model('p', undefined, { folder: proj, codegraph: false })
+    await model('p', undefined, { folder: proj, codegraph: true })
+    await model('p', undefined, { folder: join(proj, 'missing'), codegraph: true })
+    rmSync(proj, { recursive: true, force: true })
+    expect(started.map((o) => o.cwd === proj)).toEqual([false, true, true, true, false])
+    expect(started.map((o) => !!o.mcpConfig)).toEqual([false, false, false, true, false])
+    expect(started[3]!.allowedTools).toBe('mcp__codegraph__codegraph_explore')
+    expect(JSON.parse(readFileSync(started[3]!.mcpConfig!, 'utf8'))).toEqual({ mcpServers: { codegraph: { command: 'codegraph', args: ['serve', '--mcp'] } } })
   })
 
   it('respects per-store toggles and the master switch', async () => {

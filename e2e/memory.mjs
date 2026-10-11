@@ -126,7 +126,7 @@ try {
     await page.getByRole('heading', { name: 'Settings' }).waitFor()
     await page.getByRole('button', { name: 'Learning', exact: true }).click()
     const sw = (name) => page.getByRole('switch', { name })
-    await sw('Learn from finished sessions').waitFor()
+    await page.getByRole('combobox', { name: 'When to learn' }).waitFor()
     // The default holds lessons for review; the rest of this run needs them written straight away.
     assert.equal((await inv('settings:get')).learn.review, 'auto')
     await inv('settings:set', { learn: { review: 'auto' } })
@@ -134,10 +134,10 @@ try {
     await until('codegraph off', async () => (await inv('settings:get')).learn.codegraph === false)
     await sw('Write to CodeGraph notes').click()
     await until('codegraph on', async () => (await inv('settings:get')).learn.codegraph === true)
-    await sw('Learn from finished sessions').click()
+    await pick('When to learn', 'Off')
     await until('master off', async () => (await inv('settings:get')).learn.enabled === false)
     assert.ok(await sw('Write to Hindsight').isDisabled(), 'store switches wait for the master switch')
-    await sw('Learn from finished sessions').click()
+    await pick('When to learn', 'When a session finishes')
     await until('master on', async () => (await inv('settings:get')).learn.enabled === true)
   })
 

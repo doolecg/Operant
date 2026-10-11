@@ -15,6 +15,7 @@ describe('settings page registry', () => {
 
   it('opens the page that holds an old section and names the section to scroll to', () => {
     expect(resolveSettingsTarget('hindsight')).toMatchObject({ page: { id: 'memory' }, section: { id: 'hindsight' } })
+    expect(resolveSettingsTarget('codegraph')).toMatchObject({ page: { id: 'memory' }, section: { id: 'codegraph' } })
     expect(resolveSettingsTarget('aux')).toMatchObject({ page: { id: 'learning' }, section: { id: 'aux' } })
     expect(resolveSettingsTarget('teams')).toMatchObject({ page: { id: 'presets' }, section: { id: 'teams' } })
     expect(resolveSettingsTarget('import')).toMatchObject({ page: { id: 'data' }, section: { id: 'import' } })
@@ -35,7 +36,8 @@ describe('settings page registry', () => {
     expect(new Set(SETTINGS_PAGES.map((p) => p.label)).size).toBe(SETTINGS_PAGES.length)
     const sectionIds = SETTINGS_PAGES.flatMap((p) => p.subsections.map((s) => s.id))
     expect(new Set(sectionIds).size).toBe(sectionIds.length)
-    expect(sectionIds.sort()).toEqual([...SETTINGS_SECTION_IDS].sort())
+    // hindsight and codegraph live inside the Memory page's Tools block and resolve to it as anchors.
+    expect(sectionIds.sort()).toEqual(SETTINGS_SECTION_IDS.filter((id) => id !== 'hindsight' && id !== 'codegraph').sort())
     for (const p of SETTINGS_PAGES) expect(p.subsections.length, p.id).toBeGreaterThan(0)
   })
 

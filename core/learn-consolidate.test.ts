@@ -153,14 +153,12 @@ describe('lesson consolidation', () => {
     expect(item.tags).toContain(`supersedes:${b.id}`)
   })
 
-  it('holds the Hindsight cap at 20 per project per day', async () => {
+  it('has no daily Hindsight cap', async () => {
     const svc = service()
     const lessons = Array.from({ length: 23 }, (_, i) => add(`Distinct lesson number ${i} about topic${i}`, { files: [`f${i}.ts`], symbols: [] }))
     for (const l of lessons) await svc.setLessonStatus(l.id, 'active')
-    expect(retained).toHaveLength(20)
-    const skipped = lessons.filter((l) => !db.getLesson(l.id)!.stores.includes('hindsight'))
-    expect(skipped).toHaveLength(3)
-    expect(db.getLesson(skipped[0]!.id)!.stores).toContain('memory')
+    expect(retained).toHaveLength(23)
+    expect(lessons.filter((l) => !db.getLesson(l.id)!.stores.includes('hindsight'))).toHaveLength(0)
   })
 
   const folding = () => prompts.filter((p) => p.startsWith('You merge') || p.startsWith('You tighten'))

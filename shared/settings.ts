@@ -327,9 +327,10 @@ export function sanitizeSettings(raw: unknown): Settings {
       localInsecureOk: flag(learn.localInsecureOk, d.learn.localInsecureOk),
       // 'suggest' and 'controlled' (old saved values) held changes for review; they now behave as 'advanced'.
       mode: learn.mode === 'off' ? 'off' : d.learn.mode,
-      maxCallsPerReview: Math.round(num(learn.maxCallsPerReview, d.learn.maxCallsPerReview, 0, 50)),
-      maxTokensPerReview: Math.round(num(learn.maxTokensPerReview, d.learn.maxTokensPerReview, 0, 10_000_000)),
-      maxChangesPerReview: Math.round(num(learn.maxChangesPerReview, d.learn.maxChangesPerReview, 0, 100)),
+      // 3, 60000 and 5 were the old defaults: saved settings that still hold them become "no limit".
+      maxCallsPerReview: learn.maxCallsPerReview === 3 ? 0 : Math.round(num(learn.maxCallsPerReview, d.learn.maxCallsPerReview, 0, 50)),
+      maxTokensPerReview: learn.maxTokensPerReview === 60_000 ? 0 : Math.round(num(learn.maxTokensPerReview, d.learn.maxTokensPerReview, 0, 10_000_000)),
+      maxChangesPerReview: learn.maxChangesPerReview === 5 ? 0 : Math.round(num(learn.maxChangesPerReview, d.learn.maxChangesPerReview, 0, 100)),
       validationRetries: Math.round(num(learn.validationRetries, d.learn.validationRetries, 0, 3)),
       dailyUsdBudget: num(learn.dailyUsdBudget, d.learn.dailyUsdBudget, 0, 100_000),
       onLimit: learn.onLimit === 'confirm' ? 'confirm' : 'stop',

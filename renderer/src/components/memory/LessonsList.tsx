@@ -282,7 +282,7 @@ export function LessonsList({ filter, crews, crewId }: { filter: LessonFilter; c
   const [merging, setMerging] = useState(false)
   const consolidate = useConsolidate()
   const [result, setResult] = useState<ConsolidateResult | null>(null)
-  const list = useMemo(() => (lessons.data ?? []).filter((l) => filter.status || l.status !== 'deleted'), [lessons.data, filter.status])
+  const list = useMemo(() => (lessons.data ?? []).filter((l) => filter.status || l.status !== 'deleted').sort((a, b) => b.createdAt - a.createdAt), [lessons.data, filter.status])
   const picked = list.filter((l) => selected.includes(l.id))
   const sameCrew = new Set(picked.map((l) => l.crewId)).size <= 1
   const mergedCount = (lessons.data ?? []).filter((l) => l.status === 'deleted' && l.consolidatedInto != null).length

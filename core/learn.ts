@@ -90,7 +90,17 @@ export async function diffInfo(git: Git, folder: string): Promise<DiffInfo> {
 
 // One prompt to the learn AI; its text comes back. `onUsed` is told the CLI and model that were actually asked.
 // `confirm` is set when the owner allowed a call past a limit that asks first.
-export type LearnModel = (prompt: string, onUsed?: (used: { cli: string; model: string }) => void, opts?: { confirm?: boolean }) => Promise<string>
+const RECALL_LIMIT = 5
+const RECALL_MS = 4000
+const RECALL_QUERY_CAP = 1500
+
+// `folder` runs the call in the project itself; `codegraph` adds read-only CodeGraph when that folder is indexed.
+export interface LearnCallOpts {
+  confirm?: boolean
+  folder?: string
+  codegraph?: boolean
+}
+export type LearnModel = (prompt: string, onUsed?: (used: { cli: string; model: string }) => void, opts?: LearnCallOpts) => Promise<string>
 
 export { LEARN_MODEL }
 
@@ -120,7 +130,7 @@ export interface LearnModelOptions {
 export function claudeLearnModel(supported?: ReadonlySet<string>, o: LearnModelOptions = {}): LearnModel {
   const claude = o.adapter ?? new ClaudeAdapter({ supported, permissionMode: 'default' })
   let opencode: MasterAdapter | undefined = o.opencode
-  return async (prompt, onUsed) => {
+  return async (prompt, onUsed, opts) => {
     const ai = await resolveLearnAi(o.settings?.() ?? { cli: 'claude', model: '', effort: '' }, o.models ?? learnModelList(() => ({ localUrl: o.settings?.().localUrl ?? '', localInsecureOk: !!o.settings?.().localInsecureOk }), o.local))
     if (ai.error || !ai.model) throw new Error(ai.error ?? 'No learn model is chosen')
     onUsed?.({ cli: ai.cli, model: ai.model })
@@ -131,9 +141,15 @@ export function claudeLearnModel(supported?: ReadonlySet<string>, o: LearnModelO
       return localChat(url.url, ai.model, [{ role: 'user', content: prompt }], {}, o.local)
     }
     const adapter = ai.cli === 'opencode' ? (opencode ??= opencodeLearnAdapter()) : claude
-    const cwd = join(tmpdir(), 'operant-learn')
-    mkdirSync(cwd, { recursive: true })
-    const run = await adapter.start({ cwd, prompt, model: ai.model, effort: ai.effort || undefined, onEvent: () => undefined })
+    const scratch = join(tmpdir(), 'operant-learn')
+    mkdirSync(scratch, { recursive: true })
+    const cwd = opts?.folder && existsSync(opts.folder) ? opts.folder : scratch
+    let mcpConfig: string | undefined
+    if (ai.cli === 'claude' && opts?.codegraph && cwd !== scratch && existsSync(join(cwd, '.codegraph'))) {
+      mcpConfig = join(scratch, 'codegraph-mcp.json')
+      writeFileSync(mcpConfig, JSON.stringify({ mcpServers: { codegraph: { command: 'codegraph', args: ['serve', '--mcp'] } } }))
+    }
+    const run = await adapter.start({ cwd, prompt, model: ai.model, effort: ai.effort || undefined, onEvent: () => undefined, ...(mcpConfig ? { mcpConfig, allowedTools: 'mcp__codegraph__codegraph_explore' } : {}) })
     const result = await resultWithin(run, o.timeoutMs ?? MODEL_TIMEOUT_MS, 'The learn model')
     if (!result.ok) throw new Error(result.text || 'The learn model failed')
     return result.text
@@ -223,11 +239,9 @@ const TEXT_MAX = 400
 const SKILL_NAME = /^[a-z0-9][a-z0-9-]{0,60}$/
 const SECRET_ONLY = /^(\W|\[secret\]|\[token\])*$/
 const DAY_MS = 24 * 60 * 60 * 1000
-const HINDSIGHT_DAILY_CAP = 20
 const TIGHTEN_OVER = 300
 const PURGE_AFTER_MS = 14 * DAY_MS
 const CONSOLIDATION = 'Consolidation'
-const RETAINS_SQL = 'CREATE TABLE IF NOT EXISTS learn_retains (crew_id INTEGER NOT NULL, day TEXT NOT NULL, n INTEGER NOT NULL DEFAULT 0, PRIMARY KEY (crew_id, day))'
 
 type ConsolidationAnswer = { kind: 'none' } | { kind: 'bad'; reason: string } | { kind: 'ok'; text: string; replaces: number[]; files: string[]; symbols: string[] }
 
@@ -346,7 +360,6 @@ export class LearnService {
   private readonly lastConsolidated = new Map<number, number>()
   // Groups the model already left as they are (lesson ids and edit times), so a close does not ask about them again.
   private readonly settledGroups = new Set<string>()
-  private readonly retains = new Map<string, number>()
 
   constructor(private readonly d: LearnDeps) {
     this.memory = d.memory ?? new PersonalMemory()
@@ -434,8 +447,8 @@ export class LearnService {
     const budget = { calls: 0, tokens: 0 }
     const ask = async (prompt: string): Promise<string> => {
       const est = estimateTokens(prompt)
-      if (!bypass && budget.calls >= settings.maxCallsPerReview) throw new ReviewStop(`this review used its ${settings.maxCallsPerReview} model calls`)
-      if (!bypass && budget.tokens + est > settings.maxTokensPerReview) throw new ReviewStop(`this review would pass its ${settings.maxTokensPerReview}-token budget`)
+      if (!bypass && settings.maxCallsPerReview > 0 && budget.calls >= settings.maxCallsPerReview) throw new ReviewStop(`this review used its ${settings.maxCallsPerReview} model calls`)
+      if (!bypass && settings.maxTokensPerReview > 0 && budget.tokens + est > settings.maxTokensPerReview) throw new ReviewStop(`this review would pass its ${settings.maxTokensPerReview}-token budget`)
       budget.calls++
       budget.tokens += est
       const out = await this.d.model(
@@ -444,7 +457,7 @@ export class LearnService {
           info.cli = u.cli
           info.model = u.model
         },
-        { confirm: bypass },
+        { confirm: bypass, folder: crew.folder, codegraph: settings.codegraph },
       )
       budget.tokens += estimateTokens(out)
       return out
@@ -458,7 +471,8 @@ export class LearnService {
     try {
       const diff = await diffInfo(this.d.git, crew.folder)
       const known = db.listLessons({ crewId, status: 'active' }).slice(0, 40)
-      const prompt = this.prompt(tail, diff, known, installed)
+      const recalled = await this.recalled(crew.folder, tail)
+      const prompt = this.prompt(tail, diff, known, installed, recalled)
       let raw = await ask(prompt)
       lessons = parseLessons(raw)
       for (let r = 0; lessons.length === 0 && r < settings.validationRetries && isUnparsed(raw); r++) {
@@ -614,7 +628,7 @@ export class LearnService {
     }
     let made = 0
     for (const g of groups) {
-      if (made >= settings.maxChangesPerReview) break
+      if (settings.maxChangesPerReview > 0 && made >= settings.maxChangesPerReview) break
       const key = g.map((l) => `${l.id}:${l.updatedAt}`).join(',')
       if (this.settledGroups.has(key)) continue
       let raw: string
@@ -709,8 +723,8 @@ export class LearnService {
     const budget = { calls: 0, tokens: 0 }
     const ask = async (prompt: string): Promise<string> => {
       const est = estimateTokens(prompt)
-      if (!bypass && budget.calls >= s.maxCallsPerReview) throw new ReviewStop(`this review used its ${s.maxCallsPerReview} model calls`)
-      if (!bypass && budget.tokens + est > s.maxTokensPerReview) throw new ReviewStop(`this review would pass its ${s.maxTokensPerReview}-token budget`)
+      if (!bypass && s.maxCallsPerReview > 0 && budget.calls >= s.maxCallsPerReview) throw new ReviewStop(`this review used its ${s.maxCallsPerReview} model calls`)
+      if (!bypass && s.maxTokensPerReview > 0 && budget.tokens + est > s.maxTokensPerReview) throw new ReviewStop(`this review would pass its ${s.maxTokensPerReview}-token budget`)
       budget.calls++
       budget.tokens += est
       const out = await model(
@@ -758,7 +772,7 @@ export class LearnService {
     }
   }
 
-  private prompt(tail: string, diff: DiffInfo, known: Lesson[], skills: InstalledSkillFile[]): string {
+  private prompt(tail: string, diff: DiffInfo, known: Lesson[], skills: InstalledSkillFile[], recalled: string[] = []): string {
     return [
       'You review a finished coding session and extract durable lessons for the next session on this project.',
       'Answer with ONE JSON array and nothing else. Each item: {"kind": "convention"|"pitfall"|"correction"|"procedure", "text": string (one or two plain sentences), "files": string[], "symbols": string[], "scope": "project"|"user", "supersedes": number[], "skill": string (optional)}.',
@@ -770,11 +784,31 @@ export class LearnService {
       diff.files.length ? `Files changed: ${diff.files.join(', ')}` : 'No files changed.',
       diff.symbols.length ? `Symbols touched: ${diff.symbols.join(', ')}` : '',
       known.length ? `Known lessons:\n${known.map((l) => `#${l.id} [${l.kind}] ${l.text}`).join('\n')}` : '',
+      recalled.length ? `Already known in this project (do not repeat):\n${recalled.map((t) => `- ${t}`).join('\n')}` : '',
       skills.length ? `Installed skills:\n${skills.slice(0, 60).map((s) => `- ${s.name}: ${s.description}`).join('\n')}` : '',
       `Transcript tail:\n${scrubLogLine(tail).slice(-TRANSCRIPT_CAP)}`,
     ]
       .filter(Boolean)
       .join('\n\n')
+  }
+
+  // Hindsight memories close to the session, fetched before the model call; any failure or a slow answer gives none.
+  private async recalled(folder: string, tail: string): Promise<string[]> {
+    if (!this.enabled('hindsight')) return []
+    let timer: ReturnType<typeof setTimeout> | undefined
+    try {
+      const query = scrubLogLine(tail).slice(-RECALL_QUERY_CAP).trim()
+      if (!query) return []
+      const late = new Promise<never>((_, reject) => {
+        timer = setTimeout(() => reject(new Error('recall timed out')), RECALL_MS)
+      })
+      const r = await Promise.race([this.d.hindsight.recall(bankFor(folder), query, RECALL_LIMIT), late])
+      return r.ok ? r.items.map((t) => clean(t).slice(0, 300)).filter(Boolean).slice(0, RECALL_LIMIT) : []
+    } catch {
+      return []
+    } finally {
+      clearTimeout(timer)
+    }
   }
 
   private safe(fn: () => void): void {
@@ -798,7 +832,6 @@ export class LearnService {
       this.memory.write(folder, l)
       return
     }
-    if (this.retainsToday(l.crewId) >= HINDSIGHT_DAILY_CAP) throw new Error('daily Hindsight cap')
     const folded = this.d.db.listLessons({ crewId: l.crewId }).filter((o) => o.consolidatedInto === l.id).map((o) => o.id)
     // Facts about the user go to the Soul Bank (one global bank); project lessons go to the project's own bank.
     const r = await this.d.hindsight.retain(l.scope === 'user' ? SOUL_BANK : bankFor(folder), this.hindsightText(l), [
@@ -812,34 +845,6 @@ export class LearnService {
       ...l.symbols.map((s) => `symbol:${s}`),
     ], 'Operant lesson')
     if (!r.ok) throw new Error(r.error)
-    this.countRetain(l.crewId)
-  }
-
-  private dayKey(): string {
-    const d = new Date()
-    return `${d.getFullYear()}-${d.getMonth() + 1}-${d.getDate()}`
-  }
-
-  // Hindsight retains for a project today (local day): kept in a small table of the app's database so a restart keeps the count.
-  private retainsToday(crewId: number): number {
-    const day = this.dayKey()
-    let saved = 0
-    try {
-      this.d.store.db.exec(RETAINS_SQL)
-      const row = this.d.store.db.prepare('SELECT n FROM learn_retains WHERE crew_id = ? AND day = ?').get(crewId, day) as { n: number } | undefined
-      saved = row ? Number(row.n) : 0
-    } catch {
-      // no table: the in-memory count stands
-    }
-    return Math.max(saved, this.retains.get(`${crewId}:${day}`) ?? 0)
-  }
-
-  private countRetain(crewId: number): void {
-    const day = this.dayKey()
-    this.retains.set(`${crewId}:${day}`, this.retainsToday(crewId) + 1)
-    this.safe(() => {
-      this.d.store.db.prepare('INSERT INTO learn_retains (crew_id, day, n) VALUES (?, ?, 1) ON CONFLICT(crew_id, day) DO UPDATE SET n = n + 1').run(crewId, day)
-    })
   }
 
   private hindsightText(l: Lesson): string {

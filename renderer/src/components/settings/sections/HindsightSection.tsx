@@ -4,7 +4,6 @@ import type { HindsightAdapter, HindsightStatus, HindsightTestResult } from '@sh
 import type { HindsightMode } from '@shared/settings'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { errorText } from '@/components/memory/ui'
@@ -15,6 +14,7 @@ import {
   useHindsightKeys,
   useHindsightStatus,
   useHindsightTest,
+  useMemoryDiagnostics,
   useSaveSettings,
   useSettings,
 } from '@/lib/queries'
@@ -154,6 +154,7 @@ export function HindsightSection() {
   const keys = useHindsightKeys()
   const test = useHindsightTest()
   const act = useHindsightAct()
+  const diag = useMemoryDiagnostics()
   const [urlError, setUrlError] = useState('')
   const [confirmOpen, setConfirmOpen] = useState(false)
   const s = settings.data
@@ -161,6 +162,7 @@ export function HindsightSection() {
   const h = s.hindsight
   const list = adapters.data ?? []
   const st = status.data
+  const banks = diag.data?.banks ?? []
   const set = (patch: Partial<typeof h>) => save.mutate({ hindsight: patch })
 
   const commitUrl = (v: string) => {
@@ -179,20 +181,20 @@ export function HindsightSection() {
 
   return (
     <>
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base">Hindsight</CardTitle>
-          <CardDescription>
+      <div className="space-y-4">
+        <div>
+          <h4 className="text-sm font-semibold">Hindsight</h4>
+          <p className="text-muted-foreground text-xs">
             Where the Hindsight memory server runs. Jobs read and write project memory there, and the Memory page lists it. Changing the mode never moves the memories already
             written.
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
+          </p>
+        </div>
           <div role="group" aria-label="Hindsight status" className="flex flex-wrap items-center gap-2 text-sm">
             <Badge variant="secondary">{modeBadge}</Badge>
             <Badge variant="outline" className={cn(st?.state === 'running' ? 'text-emerald-400' : 'text-destructive')}>
               {st ? STATE_LABEL[st.state] : 'Checking'}
             </Badge>
+            {st?.url && !st.detail?.includes(st.url) && <span className="font-mono text-xs">{st.url}</span>}
             <span className="text-muted-foreground text-xs">{st?.detail}</span>
             {st?.managed && (
               <Button variant="outline" size="sm" disabled={act.isPending} onClick={() => act.mutate(st.state === 'running' ? 'restart' : 'start')}>
@@ -325,8 +327,22 @@ export function HindsightSection() {
               {errorText(save.error)}
             </p>
           )}
-        </CardContent>
-      </Card>
+
+          {banks.length > 0 && (
+            <div role="group" aria-label="Memory banks" className="divide-y">
+              <Row label="Banks">
+                <span className="font-mono text-xs">{diag.data?.hindsight.banks || 'none'}</span>
+              </Row>
+              {banks.map((b) => (
+                <Row key={b.bank} label={b.name} hint={b.hindsightError || undefined}>
+                  <span className="text-muted-foreground text-xs tabular-nums">
+                    {b.lessons} lessons · {b.hindsightEntries == null ? 'Hindsight unavailable' : `${b.hindsightEntries} Hindsight entries`}
+                  </span>
+                </Row>
+              ))}
+            </div>
+          )}
+        </div>
       <ConfirmDialog
         open={confirmOpen}
         title="Share Hindsight without an API key?"

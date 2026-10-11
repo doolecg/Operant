@@ -1,7 +1,7 @@
 // Memory recall policy, the model each learn/memory task uses, and the daily budget every such call goes through.
 
-export type RecallMode = 'off' | 'on-demand' | 'session-start'
-export const RECALL_MODES: RecallMode[] = ['off', 'on-demand', 'session-start']
+export type RecallMode = 'off' | 'session-start'
+export const RECALL_MODES: RecallMode[] = ['off', 'session-start']
 
 export interface MemorySettings {
   recallMode: RecallMode
@@ -42,7 +42,7 @@ export interface AuxSettings {
   onLimit: 'stop' | 'confirm'
 }
 
-export const DEFAULT_AUX_SETTINGS: AuxSettings = { maxCallsPerDay: 200, maxUsdPerDay: 0, retryLimit: 2, backoffMs: 1000, onLimit: 'stop' }
+export const DEFAULT_AUX_SETTINGS: AuxSettings = { maxCallsPerDay: 0, maxUsdPerDay: 0, retryLimit: 2, backoffMs: 1000, onLimit: 'stop' }
 
 const MODEL_ID = /^[A-Za-z0-9][A-Za-z0-9._:+@/[\]-]*$/
 const EFFORT_ID = /^[A-Za-z0-9][A-Za-z0-9_-]*$/
@@ -56,6 +56,7 @@ export function sanitizeMemory(raw: unknown): MemorySettings {
   const r = obj(raw)
   const d = DEFAULT_MEMORY_SETTINGS
   return {
+    // 'on-demand' (an old saved value) recalled nothing by itself: it now means session start.
     recallMode: (RECALL_MODES as string[]).includes(r.recallMode) ? (r.recallMode as RecallMode) : d.recallMode,
     topK: int(r.topK, d.topK, 1, 50),
     maxTokens: int(r.maxTokens, d.maxTokens, 100, 20_000),
@@ -83,7 +84,8 @@ export function sanitizeAux(raw: unknown): AuxSettings {
   const r = obj(raw)
   const d = DEFAULT_AUX_SETTINGS
   return {
-    maxCallsPerDay: int(r.maxCallsPerDay, d.maxCallsPerDay, 0, 100_000),
+    // 200 was the old default: saved settings that still hold it become "no limit".
+    maxCallsPerDay: r.maxCallsPerDay === 200 ? 0 : int(r.maxCallsPerDay, d.maxCallsPerDay, 0, 100_000),
     maxUsdPerDay: typeof r.maxUsdPerDay === 'number' && Number.isFinite(r.maxUsdPerDay) ? Math.min(100_000, Math.max(0, r.maxUsdPerDay)) : d.maxUsdPerDay,
     retryLimit: int(r.retryLimit, d.retryLimit, 0, 5),
     backoffMs: int(r.backoffMs, d.backoffMs, 0, 60_000),

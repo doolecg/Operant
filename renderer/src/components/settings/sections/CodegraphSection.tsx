@@ -3,9 +3,8 @@ import { RefreshCw } from 'lucide-react'
 import { decodeIpcError } from '@shared/ipc'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { useCodegraphRebuild, useCodegraphStatus, useCrews } from '@/lib/queries'
+import { useCodegraphRebuild, useCodegraphStatus, useCrews, useOptionalMcp } from '@/lib/queries'
 import { toast } from '@/lib/toast'
 import { ConfirmDialog, Row } from '../parts'
 
@@ -16,6 +15,7 @@ export function CodegraphSection() {
   const crew = projects.find((c) => c.id === crewId) ?? projects[0]
   const status = useCodegraphStatus(crew?.folder)
   const rebuild = useCodegraphRebuild()
+  const optional = useOptionalMcp(null)
   const [confirm, setConfirm] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const s = status.data
@@ -32,13 +32,28 @@ export function CodegraphSection() {
     }
   }
 
+  const installed = optional.data?.find((e) => e.id === 'codegraph')?.runtime.ok
+  const indexLabel = !s ? (status.isError ? 'Unknown' : 'Checking') : s.indexing ? 'Indexing' : s.initialized ? 'Ready' : 'Not built'
+
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle className="text-base">CodeGraph</CardTitle>
-        <CardDescription>The code index of a project. Rebuilding discards the index and builds it again from the files.</CardDescription>
-      </CardHeader>
-      <CardContent className="divide-y">
+    <div className="space-y-3">
+      <div>
+        <h4 className="text-sm font-semibold">CodeGraph</h4>
+        <p className="text-muted-foreground text-xs">The code index of a project. Rebuilding discards the index and builds it again from the files.</p>
+      </div>
+      <div role="group" aria-label="CodeGraph status" className="flex flex-wrap items-center gap-2 text-sm">
+        <Badge variant="outline" className={installed === false ? 'text-destructive' : 'text-emerald-400'}>
+          {installed === undefined ? 'Checking' : installed ? 'Installed' : 'Not installed'}
+        </Badge>
+        <Badge variant={s?.indexing || s?.initialized ? 'secondary' : 'outline'}>Index: {indexLabel}</Badge>
+        {s?.initialized && (
+          <span className="text-xs tabular-nums">
+            {s.files.toLocaleString()} files · {s.symbols.toLocaleString()} symbols · {s.edges.toLocaleString()} edges
+          </span>
+        )}
+        {s?.error && <span className="text-destructive text-xs">{s.error}</span>}
+      </div>
+      <div className="divide-y">
         {projects.length === 0 ? (
           <p className="text-muted-foreground py-3 text-sm">No projects yet.</p>
         ) : (
@@ -62,29 +77,6 @@ export function CodegraphSection() {
                 {crew?.folder}
               </span>
             </Row>
-            {!s ? (
-              <p className="text-muted-foreground py-3 text-sm">{status.isError ? decodeIpcError(status.error).message : 'Checking…'}</p>
-            ) : (
-              <>
-                <Row label="Index">
-                  <Badge variant={s.indexing || s.initialized ? 'secondary' : 'outline'}>
-                    {s.indexing ? 'Indexing' : s.initialized ? 'Ready' : 'Not built'}
-                  </Badge>
-                </Row>
-                {s.initialized && (
-                  <Row label="Contents">
-                    <span className="text-xs tabular-nums">
-                      {s.files.toLocaleString()} files · {s.symbols.toLocaleString()} symbols · {s.edges.toLocaleString()} edges
-                    </span>
-                  </Row>
-                )}
-                {s.error && (
-                  <Row label="Error">
-                    <span className="text-destructive max-w-96 text-xs">{s.error}</span>
-                  </Row>
-                )}
-              </>
-            )}
             <Row label="Rebuild index" hint="Deletes the index, then indexes the project again.">
               <Button variant="outline" size="sm" disabled={!crew || s?.indexing || rebuild.isPending} onClick={() => setConfirm(true)}>
                 <RefreshCw /> Rebuild
@@ -92,7 +84,7 @@ export function CodegraphSection() {
             </Row>
           </>
         )}
-      </CardContent>
+      </div>
       <ConfirmDialog
         open={confirm}
         title={`Rebuild the index for ${crew?.name ?? ''}?`}
@@ -107,6 +99,6 @@ export function CodegraphSection() {
       >
         <p>The current index is discarded first. Large projects can take a while to index.</p>
       </ConfirmDialog>
-    </Card>
+    </div>
   )
 }

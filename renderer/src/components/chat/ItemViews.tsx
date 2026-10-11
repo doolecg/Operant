@@ -96,8 +96,8 @@ export const UserBubble = memo(function UserBubble({ item, small }: { item: User
   const [shown, setShown] = useState<number | null>(null)
   const many = item.images.length > 1
   return (
-    <div className="group/user flex flex-col items-end gap-1" style={{ maxWidth: small ? '92%' : '76%' }}>
-      <div className={cn('bg-bubble rounded-[18px] px-[15px] py-[9px] leading-[1.55] break-words whitespace-pre-wrap', small ? 'text-[13px]' : 'text-[15px]')}>
+    <div className="group/user flex min-w-0 flex-col items-end gap-1" style={{ maxWidth: small ? '92%' : '76%' }}>
+      <div className={cn('bg-bubble rounded-[18px] px-[15px] py-[9px] leading-[1.55] [overflow-wrap:anywhere] whitespace-pre-wrap', small ? 'text-[13px]' : 'text-[15px]')}>
         {item.images.length > 0 && (
           <div className="mb-2 flex flex-wrap gap-1.5">
             {item.images.map((im, i) => (

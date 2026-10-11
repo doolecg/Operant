@@ -39,6 +39,7 @@ export const CLAUDE_FLAGS = [
   '--effort',
   '--permission-mode',
   '--tools',
+  '--allowedTools',
   '--settings',
   '--append-system-prompt-file',
   '--strict-mcp-config',
@@ -407,7 +408,7 @@ export interface RunLaunch {
 }
 
 export function buildClaudeRunLaunch(
-  run: { cwd: string; model?: string; effort?: string; permissionMode?: string; settingsFile?: string },
+  run: { cwd: string; model?: string; effort?: string; permissionMode?: string; settingsFile?: string; mcpConfig?: string; allowedTools?: string },
   ctx: Pick<LaunchContext, 'supported'> = {},
 ): RunLaunch {
   const args: string[] = ['-p', '--output-format', 'stream-json', '--verbose']
@@ -420,6 +421,12 @@ export function buildClaudeRunLaunch(
   if (run.permissionMode && run.permissionMode !== 'default') add('--permission-mode', checkMode(run.permissionMode))
   // A settings file that turns every hook off (the user's and plugins'); quoted because the spawn goes through a shell.
   if (run.settingsFile) add('--settings', `"${checkPath('settingsFile', run.settingsFile)}"`)
+  // Read-only tools from one MCP server (the learn step's CodeGraph); only that server loads.
+  if (run.mcpConfig && (!ctx.supported || ctx.supported.has('--mcp-config'))) {
+    add('--mcp-config', `"${checkPath('mcpConfig', run.mcpConfig)}"`)
+    if (!ctx.supported || ctx.supported.has('--strict-mcp-config')) args.push('--strict-mcp-config')
+    if (run.allowedTools && /^[\w*-]+$/.test(run.allowedTools)) add('--allowedTools', run.allowedTools)
+  }
   return { file: 'claude', args, cwd: checkPath('cwd', run.cwd) }
 }
 

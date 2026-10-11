@@ -134,7 +134,7 @@ export interface LearnSettings {
   // off: nothing runs. suggest (default): every lesson and draft waits for review. controlled: low-risk lessons apply
   // themselves, reversibly. advanced: also skill drafts that pass validation apply themselves.
   mode: LearnMode
-  // Budgets per learn run (one session end). Calls include validation retries.
+  // Budgets per learn run (one session end). Calls include validation retries. 0 means no limit.
   maxCallsPerReview: number
   maxTokensPerReview: number
   maxChangesPerReview: number
@@ -202,9 +202,9 @@ export const DEFAULT_LEARN_SETTINGS: LearnSettings = {
   localUrl: 'http://127.0.0.1:1234',
   localInsecureOk: false,
   mode: 'advanced',
-  maxCallsPerReview: 3,
-  maxTokensPerReview: 60_000,
-  maxChangesPerReview: 5,
+  maxCallsPerReview: 0,
+  maxTokensPerReview: 0,
+  maxChangesPerReview: 0,
   validationRetries: 1,
   dailyUsdBudget: 0,
   onLimit: 'stop',

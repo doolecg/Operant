@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useActiveClaudeTile } from '@/components/terminal/activeClaudeTile'
-import { LEARN_MODES, LEARN_STORES, type LearnChange, type LearnCli, type LearnMode, type LearnOnLimit, type LearnReview, type LearnStore } from '@shared/learn'
+import { LEARN_STORES, type LearnChange, type LearnCli, type LearnOnLimit, type LearnStore } from '@shared/learn'
+import type { RecallMode } from '@shared/aux-settings'
 import { decodeIpcError } from '@shared/ipc'
 import { Badge } from '@/components/ui/badge'
 import { toast } from '@/lib/toast'
@@ -11,7 +12,7 @@ import { Switch } from '@/components/ui/switch'
 import { STORE_LABEL, errorText } from '@/components/memory/ui'
 import { Button } from '@/components/ui/button'
 import { ModelEffortSelect } from '@/components/settings/ModelEffortSelect'
-import { useClearRecords, useLearnAi, useLearnRecords, useLocalKey, useLocalModels, useMutate, useRollbackChange, useSaveSettings, useSetLocalKey, useSettings, useTestLearnAi } from '@/lib/queries'
+import { useClearRecords, useCrews, useLearnAi, useLearnRecords, useLessons, useLocalKey, useLocalModels, useMemoryDiagnostics, useMutate, useRollbackChange, useSaveSettings, useSetLocalKey, useSettings, useTestLearnAi } from '@/lib/queries'
 import { useMoney } from '@/lib/useMoney'
 import { CommitInput, ConfirmDialog, NumberField, Row } from '../parts'
 import { MemoryToolsWarning } from '../MemoryToolsWarning'
@@ -22,12 +23,12 @@ const STORE_HINT: Record<LearnStore, string> = {
   memory: "Writes each lesson as a file in the project's personal memory folder.",
 }
 
-const MODE_LABEL: Record<LearnMode, string> = { off: 'Off', suggest: 'Suggest', controlled: 'Controlled', advanced: 'Advanced' }
-const MODE_HINT: Record<LearnMode, string> = {
-  off: 'Nothing runs.',
-  suggest: 'Edits and drafts wait for your review. New lessons follow the Review setting.',
-  controlled: 'Low-risk lessons apply themselves, and can be rolled back.',
-  advanced: 'Also applies skill drafts that pass validation.',
+const RECALL_LABEL: Record<RecallMode, string> = { off: 'Off', 'session-start': 'Session start' }
+
+type WhenToLearn = 'off' | 'finished'
+const WHEN_HINT: Record<WhenToLearn, string> = {
+  off: 'Nothing is learned, and lessons stay out of briefs.',
+  finished: 'A cheap review step reads each Claude Code session when it ends and keeps the lessons worth keeping.',
 }
 
 const fail = (e: unknown) => toast(decodeIpcError(e).message, true)
@@ -112,6 +113,63 @@ function RecordsCard() {
   )
 }
 
+function StatusCard() {
+  const settings = useSettings()
+  const diag = useMemoryDiagnostics()
+  const crews = useCrews()
+  const lessons = useLessons({})
+  const { money } = useMoney()
+  const d = diag.data
+  const on = settings.data?.learn.enabled ?? false
+  const start = new Date().setHours(0, 0, 0, 0)
+  const today = (lessons.data ?? []).filter((x) => x.status !== 'deleted' && x.createdAt >= start).length
+  const run = d?.lastRun ?? null
+  const project = run ? ((crews.data ?? []).find((c) => c.id === run.crewId)?.name ?? `project ${run.crewId}`) : ''
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="text-base">What learning did</CardTitle>
+        <CardDescription>Whether learning is on, what the last run kept and what it cost today.</CardDescription>
+      </CardHeader>
+      <CardContent className="divide-y">
+        <Row label="Learning">
+          <span className="text-xs">{on ? 'On' : 'Off'}</span>
+        </Row>
+        {d && (
+          <>
+            <Row label="Last learn run" hint={run?.error || undefined}>
+              <span className="text-muted-foreground text-xs">
+                {run
+                  ? `${new Date(run.at).toLocaleString()} · ${project} · ${run.extracted} extracted, ${run.written} written, ${run.merged} merged, ${run.queued} queued${run.cli ? ` · ${run.cli}${run.model ? ` ${run.model}` : ''}` : ''}`
+                  : 'None yet'}
+              </span>
+            </Row>
+            <Row label="Lessons added today">
+              <span className="text-xs tabular-nums">{today}</span>
+            </Row>
+            <Row label="Spend today" hint={d.spend.blocked ?? undefined}>
+              <span className="text-xs tabular-nums">
+                {d.spend.total.calls} calls · {d.spend.total.tokens.toLocaleString()} tokens · {money(d.spend.total.usd, true)}
+                {d.spend.label ? ` · ${d.spend.label}` : ''}
+              </span>
+            </Row>
+            <Row label="Recall in force">
+              <span className="text-xs">
+                {RECALL_LABEL[d.recall.recallMode]} · top {d.recall.topK} · {d.recall.maxTokens} tokens · Soul {d.recall.includeSoul ? 'included' : 'excluded'}
+              </span>
+            </Row>
+            {d.spend.lastError && (
+              <p role="alert" className="text-destructive py-3 text-xs">
+                Last error: {d.spend.lastError}
+              </p>
+            )}
+          </>
+        )}
+      </CardContent>
+    </Card>
+  )
+}
+
 export function LearningSection() {
   const settings = useSettings()
   const { symbol, toField, fromField } = useMoney()
@@ -131,40 +189,28 @@ export function LearningSection() {
   const result = test.data
   const picked = ai.data
   // Run now needs learning on and a Claude Code tile to learn from; the reason is shown where the button is.
-  const runReason = !l.enabled || l.mode === 'off' ? 'Turn learning on and pick a mode first.' : activeTile == null ? 'Open a Claude Code terminal: the learn step reads its session.' : null
+  const runReason = !l.enabled ? 'Turn learning on first.' : activeTile == null ? 'Open a Claude Code terminal: the learn step reads its session.' : null
+  const when: WhenToLearn = l.enabled ? 'finished' : 'off'
 
   return (
     <>
       <MemoryToolsWarning />
+      <StatusCard />
+      <RecordsCard />
       <Card>
         <CardHeader>
           <CardTitle className="text-base">Learning</CardTitle>
-          <CardDescription>
-            When a Claude Code session ends, a cheap review step reads it and keeps the lessons worth keeping. See the Memory page to read, edit and
-            delete them.
-          </CardDescription>
+          <CardDescription>When and where lessons are kept. See the Memory page to read, edit and delete them.</CardDescription>
         </CardHeader>
         <CardContent className="divide-y">
-          <Row label="Learn from finished sessions" hint="Off stops the learn step and keeps lessons out of briefs." htmlFor="learn-enabled">
-            <Switch id="learn-enabled" checked={l.enabled} onCheckedChange={(v) => save.mutate({ learn: { enabled: v } })} />
-          </Row>
-          {LEARN_STORES.map((id) => (
-            <Row key={id} label={`Write to ${STORE_LABEL[id]}`} hint={STORE_HINT[id]} htmlFor={`learn-${id}`}>
-              <Switch id={`learn-${id}`} disabled={!l.enabled} checked={l[id]} onCheckedChange={(v) => save.mutate({ learn: { [id]: v } })} />
-            </Row>
-          ))}
-          <Row
-            label="Review mode"
-            hint="Queue (the default) holds each new lesson until you activate it on the Memory page; held lessons are not written to Hindsight, CodeGraph notes or personal memory, and not in briefs. Automatic writes lessons straight away, except any lesson that mentions a command, a link, or always / never: those are still held for review."
-            htmlFor="learn-review"
-          >
-            <Select value={l.review} onValueChange={(v) => save.mutate({ learn: { review: v as LearnReview } })}>
-              <SelectTrigger id="learn-review" className="w-44">
+          <Row label="When to learn" hint={WHEN_HINT[when]} htmlFor="learn-enabled">
+            <Select value={when} onValueChange={(v) => save.mutate({ learn: { enabled: v === 'finished' } })}>
+              <SelectTrigger id="learn-enabled" className="w-52">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="auto">Automatic</SelectItem>
-                <SelectItem value="queue">Queue for review</SelectItem>
+                <SelectItem value="off">Off</SelectItem>
+                <SelectItem value="finished">When a session finishes</SelectItem>
               </SelectContent>
             </Select>
           </Row>
@@ -183,71 +229,58 @@ export function LearningSection() {
               Run now
             </Button>
           </Row>
+          {LEARN_STORES.map((id) => (
+            <Row key={id} label={`Write to ${STORE_LABEL[id]}`} hint={STORE_HINT[id]} htmlFor={`learn-${id}`}>
+              <Switch id={`learn-${id}`} disabled={!l.enabled} checked={l[id]} onCheckedChange={(v) => save.mutate({ learn: { [id]: v } })} />
+            </Row>
+          ))}
           {save.error != null && (
             <p role="alert" className="text-destructive py-3 text-xs">
               {errorText(save.error)}
             </p>
           )}
+          <details className="group py-3">
+            <summary className="cursor-pointer text-sm font-medium select-none">Limits</summary>
+            <div className="divide-y pt-1">
+              <Row label="Calls per review" hint="Includes validation retries. 0 means no limit." htmlFor="learn-calls">
+                <NumberField id="learn-calls" value={l.maxCallsPerReview} min={0} max={50} onCommit={(n) => save.mutate({ learn: { maxCallsPerReview: n } })} />
+              </Row>
+              <Row label="Tokens per review" hint="0 means no limit." htmlFor="learn-tokens">
+                <NumberField id="learn-tokens" value={l.maxTokensPerReview} min={0} max={2000000} onCommit={(n) => save.mutate({ learn: { maxTokensPerReview: n } })} />
+              </Row>
+              <Row label="Changes per review" hint="0 means no limit." htmlFor="learn-changes">
+                <NumberField id="learn-changes" value={l.maxChangesPerReview} min={0} max={100} onCommit={(n) => save.mutate({ learn: { maxChangesPerReview: n } })} />
+              </Row>
+              <Row label="Validation retries" htmlFor="learn-retries">
+                <NumberField id="learn-retries" value={l.validationRetries} min={0} max={5} onCommit={(n) => save.mutate({ learn: { validationRetries: n } })} />
+              </Row>
+              <Row label={`Daily budget (${symbol})`} hint="0 means no cap." htmlFor="learn-usd">
+                <NumberField id="learn-usd" value={toField(l.dailyUsdBudget)} min={0} max={10000000} step="0.01" onCommit={(n) => save.mutate({ learn: { dailyUsdBudget: fromField(n) } })} />
+              </Row>
+              <Row label="When a limit is hit" hint="Stop ends the run. Confirm stops it and waits for you." htmlFor="learn-onlimit">
+                <Select value={l.onLimit} onValueChange={(v) => save.mutate({ learn: { onLimit: v as LearnOnLimit } })}>
+                  <SelectTrigger id="learn-onlimit" className="w-44">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="stop">Stop</SelectItem>
+                    <SelectItem value="confirm">Stop and confirm</SelectItem>
+                  </SelectContent>
+                </Select>
+              </Row>
+              <Row label="Minimum user turns" hint="Shorter sessions are skipped without a model call." htmlFor="learn-turns">
+                <NumberField id="learn-turns" value={l.minUserTurns} min={0} max={100} onCommit={(n) => save.mutate({ learn: { minUserTurns: n } })} />
+              </Row>
+              <Row label="Minimum tokens" hint="Smaller sessions are skipped without a model call." htmlFor="learn-mintokens">
+                <NumberField id="learn-mintokens" value={l.minTokens} min={0} max={10000000} onCommit={(n) => save.mutate({ learn: { minTokens: n } })} />
+              </Row>
+              <Row label="Learn when idle (minutes)" hint="Learns from a Claude session on its own after it has been quiet this long, or right after a turn finishes. 0 turns it off; closing a tile still learns." htmlFor="learn-idle">
+                <NumberField id="learn-idle" value={l.idleMinutes} min={0} max={1440} onCommit={(n) => save.mutate({ learn: { idleMinutes: n } })} />
+              </Row>
+            </div>
+          </details>
         </CardContent>
       </Card>
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base">Learning mode and budgets</CardTitle>
-          <CardDescription>How much a learn run may change by itself, and the limits on one run.</CardDescription>
-        </CardHeader>
-        <CardContent className="divide-y">
-          <Row label="Mode" hint={MODE_HINT[l.mode]} htmlFor="learn-mode">
-            <Select value={l.mode} onValueChange={(v) => save.mutate({ learn: { mode: v as LearnMode } })}>
-              <SelectTrigger id="learn-mode" className="w-44">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {LEARN_MODES.map((m) => (
-                  <SelectItem key={m} value={m}>
-                    {MODE_LABEL[m]}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </Row>
-          <Row label="Calls per review" hint="Includes validation retries." htmlFor="learn-calls">
-            <NumberField id="learn-calls" value={l.maxCallsPerReview} min={1} max={50} onCommit={(n) => save.mutate({ learn: { maxCallsPerReview: n } })} />
-          </Row>
-          <Row label="Tokens per review" htmlFor="learn-tokens">
-            <NumberField id="learn-tokens" value={l.maxTokensPerReview} min={1000} max={2000000} onCommit={(n) => save.mutate({ learn: { maxTokensPerReview: n } })} />
-          </Row>
-          <Row label="Changes per review" htmlFor="learn-changes">
-            <NumberField id="learn-changes" value={l.maxChangesPerReview} min={1} max={100} onCommit={(n) => save.mutate({ learn: { maxChangesPerReview: n } })} />
-          </Row>
-          <Row label="Validation retries" htmlFor="learn-retries">
-            <NumberField id="learn-retries" value={l.validationRetries} min={0} max={5} onCommit={(n) => save.mutate({ learn: { validationRetries: n } })} />
-          </Row>
-          <Row label={`Daily budget (${symbol})`} hint="0 means no cap." htmlFor="learn-usd">
-            <NumberField id="learn-usd" value={toField(l.dailyUsdBudget)} min={0} max={10000000} step="0.01" onCommit={(n) => save.mutate({ learn: { dailyUsdBudget: fromField(n) } })} />
-          </Row>
-          <Row label="When a limit is hit" hint="Stop ends the run. Confirm stops it and waits for you." htmlFor="learn-onlimit">
-            <Select value={l.onLimit} onValueChange={(v) => save.mutate({ learn: { onLimit: v as LearnOnLimit } })}>
-              <SelectTrigger id="learn-onlimit" className="w-44">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="stop">Stop</SelectItem>
-                <SelectItem value="confirm">Stop and confirm</SelectItem>
-              </SelectContent>
-            </Select>
-          </Row>
-          <Row label="Minimum user turns" hint="Shorter sessions are skipped without a model call." htmlFor="learn-turns">
-            <NumberField id="learn-turns" value={l.minUserTurns} min={0} max={100} onCommit={(n) => save.mutate({ learn: { minUserTurns: n } })} />
-          </Row>
-          <Row label="Minimum tokens" hint="Smaller sessions are skipped without a model call." htmlFor="learn-mintokens">
-            <NumberField id="learn-mintokens" value={l.minTokens} min={0} max={10000000} onCommit={(n) => save.mutate({ learn: { minTokens: n } })} />
-          </Row>
-          <Row label="Learn when idle (minutes)" hint="Learns from a Claude session on its own after it has been quiet this long, or right after a turn finishes. 0 turns it off; closing a tile still learns." htmlFor="learn-idle">
-            <NumberField id="learn-idle" value={l.idleMinutes} min={0} max={1440} onCommit={(n) => save.mutate({ learn: { idleMinutes: n } })} />
-          </Row>
-        </CardContent>
-      </Card>
-      <RecordsCard />
       <Card>
         <CardHeader>
           <CardTitle className="text-base">Learning AI</CardTitle>
@@ -319,7 +352,7 @@ export function LearningSection() {
                 <Switch id="learn-local-insecure" checked={l.localInsecureOk} onCheckedChange={(v) => save.mutate({ learn: { localInsecureOk: v } })} />
               </Row>
               <p className="text-muted-foreground py-3 text-xs">
-                Small local models may extract poor lessons. Keep the review mode on Queue so you check each one before it is kept.
+                Small local models may extract poor lessons. Check what it writes on the Memory page.
               </p>
             </>
           )}

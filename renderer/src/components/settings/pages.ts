@@ -105,13 +105,9 @@ export const SETTINGS_CATEGORIES: SettingsCategory[] = [
       {
         id: 'memory',
         label: 'Memory',
-        description: 'The memory server, what recall returns, lessons, and the code index of each project.',
-        keywords: 'hindsight codegraph lessons recall bank soul export reset diagnostics',
-        subsections: [
-          { id: 'memory', label: 'Memory provider and recall' },
-          { id: 'hindsight', label: 'Hindsight' },
-          { id: 'codegraph', label: 'CodeGraph' },
-        ],
+        description: 'The Hindsight server and the CodeGraph index, lessons, advanced recall, and export and reset.',
+        keywords: 'hindsight codegraph server local shared remote index lessons recall bank soul export reset danger',
+        subsections: [{ id: 'memory', label: 'Tools and recall' }],
       },
       {
         id: 'learning',
@@ -172,6 +168,8 @@ export const SETTINGS_CATEGORIES: SettingsCategory[] = [
 
 export const SETTINGS_PAGES: SettingsPage[] = SETTINGS_CATEGORIES.flatMap((c) => c.pages)
 
+const FOLDED_SECTIONS: Record<string, string> = { hindsight: 'Hindsight', codegraph: 'CodeGraph' }
+
 // The page and (when the id names a section inside a shared page) the section to scroll to.
 // Page ids win over section ids, so 'general' opens the General page itself.
 export function resolveSettingsTarget(id?: string): { page: SettingsPage; section?: SettingsSubsection } | undefined {
@@ -181,6 +179,12 @@ export function resolveSettingsTarget(id?: string): { page: SettingsPage; sectio
   for (const p of SETTINGS_PAGES) {
     const section = p.subsections.find((s) => s.id === id)
     if (section) return { page: p, section }
+  }
+  // Sections folded into another section's block: the anchor sits inside the Memory page's Tools block.
+  const folded = FOLDED_SECTIONS[id]
+  if (folded) {
+    const memory = SETTINGS_PAGES.find((p) => p.id === 'memory')
+    if (memory) return { page: memory, section: { id: id as SettingsSectionId, label: folded } }
   }
   return undefined
 }

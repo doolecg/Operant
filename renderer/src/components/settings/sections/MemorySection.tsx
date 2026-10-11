@@ -11,15 +11,15 @@ import { Badge } from '@/components/ui/badge'
 import { Textarea } from '@/components/ui/textarea'
 import { KIND_LABEL } from '@/components/memory/ui'
 import { toast } from '@/lib/toast'
-import { useCrews, useLessons, useMemoryDelete, useMemoryDiagnostics, useMemoryEdit, useMemoryExport, useMemoryReset, useSaveSettings, useSettings } from '@/lib/queries'
-import { useMoney } from '@/lib/useMoney'
+import { useCrews, useLessons, useMemoryDelete, useMemoryEdit, useMemoryExport, useMemoryReset, useSaveSettings, useSettings } from '@/lib/queries'
 import { ConfirmDialog, NumberField, Row } from '../parts'
+import { CodegraphSection } from './CodegraphSection'
+import { HindsightSection } from './HindsightSection'
 import { MemoryToolsWarning } from '../MemoryToolsWarning'
 
-const RECALL_LABEL: Record<RecallMode, string> = { off: 'Off', 'on-demand': 'On demand', 'session-start': 'Session start' }
+const RECALL_LABEL: Record<RecallMode, string> = { off: 'Off', 'session-start': 'Session start' }
 const RECALL_HINT: Record<RecallMode, string> = {
   off: 'Nothing is recalled.',
-  'on-demand': 'Memory is searched when an agent asks for it.',
   'session-start': 'Relevant memory is added when a session starts.',
 }
 
@@ -87,9 +87,7 @@ function LessonRow({ lesson, crewName }: { lesson: Lesson; crewName: string }) {
 
 export function MemorySection() {
   const settings = useSettings()
-  const { money } = useMoney()
   const save = useSaveSettings()
-  const diag = useMemoryDiagnostics()
   const crews = useCrews()
   const lessons = useLessons({})
   const exp = useMemoryExport()
@@ -100,7 +98,6 @@ export function MemorySection() {
   const s = settings.data
   if (!s) return null
   const m = s.memory
-  const d = diag.data
   const crewList = crews.data ?? []
   const crewName = (id: number) => crewList.find((c) => c.id === id)?.name ?? `project ${id}`
   const list = (lessons.data ?? []).filter((l) => l.status !== 'deleted')
@@ -140,51 +137,42 @@ export function MemorySection() {
           <CardTitle className="text-base">Tools</CardTitle>
           <CardDescription>Both are off until you switch them on. When on and installed, every Claude session Operant starts uses them.</CardDescription>
         </CardHeader>
-        <CardContent className="divide-y">
-          <Row label="Use Hindsight" hint="Lessons are kept in Hindsight and recalled when a session starts. Starts the local server with the app." htmlFor="mem-use-hindsight">
-            <Switch id="mem-use-hindsight" checked={s.learn.hindsight} onCheckedChange={(v) => save.mutate({ learn: { hindsight: v } }, { onError: fail })} />
-          </Row>
-          <Row label="Use CodeGraph" hint="Adds the CodeGraph MCP server to each session." htmlFor="mem-use-codegraph">
-            <Switch id="mem-use-codegraph" checked={s.learn.codegraph} onCheckedChange={(v) => save.mutate({ learn: { codegraph: v } }, { onError: fail })} />
-          </Row>
+        <CardContent className="space-y-6">
+          <div id="settings-hindsight" className="scroll-mt-6 space-y-3">
+            <Row label="Use Hindsight" hint="Lessons are kept in Hindsight and recalled when a session starts. Starts the local server with the app." htmlFor="mem-use-hindsight">
+              <Switch id="mem-use-hindsight" checked={s.learn.hindsight} onCheckedChange={(v) => save.mutate({ learn: { hindsight: v } }, { onError: fail })} />
+            </Row>
+            <HindsightSection />
+          </div>
+          <div id="settings-codegraph" className="scroll-mt-6 space-y-3 border-t pt-6">
+            <Row label="Use CodeGraph" hint="Adds the CodeGraph MCP server to each session." htmlFor="mem-use-codegraph">
+              <Switch id="mem-use-codegraph" checked={s.learn.codegraph} onCheckedChange={(v) => save.mutate({ learn: { codegraph: v } }, { onError: fail })} />
+            </Row>
+            <CodegraphSection />
+          </div>
         </CardContent>
       </Card>
       <Card>
         <CardHeader>
-          <CardTitle className="text-base">Memory provider</CardTitle>
-          <CardDescription>The memory server and how much of it each bank holds.</CardDescription>
+          <CardTitle className="text-base">Lessons</CardTitle>
+          <CardDescription>Edit or delete what was learned. {list.length} {list.length === 1 ? 'lesson' : 'lessons'}.</CardDescription>
         </CardHeader>
-        <CardContent className="divide-y">
-          {d ? (
-            <>
-              <Row label="Hindsight" hint={d.hindsight.detail || undefined}>
-                <Badge variant={d.hindsight.state === 'running' ? 'secondary' : 'outline'}>{d.hindsight.state}</Badge>
-              </Row>
-              <Row label="Banks">
-                <span className="font-mono text-xs">{d.hindsight.banks || 'none'}</span>
-              </Row>
-              <Row label="Learn mode">
-                <span className="text-sm">{d.learnMode}</span>
-              </Row>
-              {d.banks.map((b) => (
-                <Row key={b.bank} label={b.name} hint={b.hindsightError || undefined}>
-                  <span className="text-muted-foreground text-xs tabular-nums">
-                    {b.lessons} lessons · {b.hindsightEntries == null ? 'Hindsight unavailable' : `${b.hindsightEntries} Hindsight entries`}
-                  </span>
-                </Row>
-              ))}
-            </>
+        <CardContent>
+          {list.length === 0 ? (
+            <p className="text-muted-foreground py-3 text-xs">{lessons.isPending ? 'Loading…' : 'No lessons yet.'}</p>
           ) : (
-            <p className="text-muted-foreground py-3 text-xs">{diag.error ? decodeIpcError(diag.error).message : 'Loading…'}</p>
+            <ul className="divide-y max-h-96 overflow-auto" aria-label="Lessons">
+              {list.map((l) => (
+                <LessonRow key={l.id} lesson={l} crewName={crewName(l.crewId)} />
+              ))}
+            </ul>
           )}
         </CardContent>
       </Card>
       <Card>
-        <CardHeader>
-          <CardTitle className="text-base">Recall</CardTitle>
-          <CardDescription>What memory agents get back and how much of it.</CardDescription>
-        </CardHeader>
-        <CardContent className="divide-y">
+        <details className="group">
+          <summary className="cursor-pointer px-6 text-base font-semibold select-none">Advanced recall</summary>
+          <CardContent className="divide-y pt-4">
           <Row label="Recall mode" hint={RECALL_HINT[m.recallMode]} htmlFor="mem-recall">
             <Select value={m.recallMode} onValueChange={(v) => setMem({ recallMode: v as RecallMode })}>
               <SelectTrigger id="mem-recall" className="w-44">
@@ -208,28 +196,12 @@ export function MemorySection() {
           <Row label="Include the Soul Bank" hint="Facts about you, shared across projects." htmlFor="mem-soul">
             <Switch id="mem-soul" checked={m.includeSoul} onCheckedChange={(v) => setMem({ includeSoul: v })} />
           </Row>
-        </CardContent>
+          </CardContent>
+        </details>
       </Card>
-      <Card>
+      <Card className="border-destructive/40">
         <CardHeader>
-          <CardTitle className="text-base">Lessons</CardTitle>
-          <CardDescription>Edit or delete what was learned. {list.length} {list.length === 1 ? 'lesson' : 'lessons'}.</CardDescription>
-        </CardHeader>
-        <CardContent>
-          {list.length === 0 ? (
-            <p className="text-muted-foreground py-3 text-xs">{lessons.isPending ? 'Loading…' : 'No lessons yet.'}</p>
-          ) : (
-            <ul className="divide-y max-h-96 overflow-auto" aria-label="Lessons">
-              {list.map((l) => (
-                <LessonRow key={l.id} lesson={l} crewName={crewName(l.crewId)} />
-              ))}
-            </ul>
-          )}
-        </CardContent>
-      </Card>
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base">Export and reset</CardTitle>
+          <CardTitle className="text-base">Danger zone</CardTitle>
           <CardDescription>Keep a copy of the memory, or wipe it.</CardDescription>
         </CardHeader>
         <CardContent className="divide-y">
@@ -273,41 +245,6 @@ export function MemorySection() {
       <ConfirmDialog open={confirm} title="Reset memory?" confirmLabel="Reset" busy={reset.isPending} onClose={() => setConfirm(false)} onConfirm={doReset}>
         <p>This permanently deletes {scopeLabel}: its lessons and its Hindsight entries.</p>
       </ConfirmDialog>
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base">Diagnostics</CardTitle>
-          <CardDescription>The recall settings in force, the last learn run and today's spend.</CardDescription>
-        </CardHeader>
-        <CardContent className="divide-y">
-          {d && (
-            <>
-              <Row label="Recall in force">
-                <span className="text-xs">
-                  {RECALL_LABEL[d.recall.recallMode]} · top {d.recall.topK} · {d.recall.maxTokens} tokens · Soul {d.recall.includeSoul ? 'included' : 'excluded'}
-                </span>
-              </Row>
-              <Row label="Last learn run" hint={d.lastRun?.error || undefined}>
-                <span className="text-muted-foreground text-xs">
-                  {d.lastRun
-                    ? `${new Date(d.lastRun.at).toLocaleString()} · ${d.lastRun.extracted} extracted, ${d.lastRun.written} written, ${d.lastRun.merged} merged, ${d.lastRun.queued} queued${d.lastRun.cli ? ` · ${d.lastRun.cli}${d.lastRun.model ? ` ${d.lastRun.model}` : ''}` : ''}`
-                    : 'None yet'}
-                </span>
-              </Row>
-              <Row label="Spend today" hint={d.spend.blocked ?? undefined}>
-                <span className="text-xs tabular-nums">
-                  {d.spend.total.calls} calls · {d.spend.total.tokens.toLocaleString()} tokens · {money(d.spend.total.usd, true)}
-                  {d.spend.label ? ` · ${d.spend.label}` : ''}
-                </span>
-              </Row>
-              {d.spend.lastError && (
-                <p role="alert" className="text-destructive py-3 text-xs">
-                  Last error: {d.spend.lastError}
-                </p>
-              )}
-            </>
-          )}
-        </CardContent>
-      </Card>
     </>
   )
 }

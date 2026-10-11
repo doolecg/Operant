@@ -26,18 +26,36 @@ export function LearningStatusPanel({ crewId, onShowDrafts }: { crewId: number |
     <Card aria-label="Learning status" role="region">
       <CardHeader>
         <CardTitle className="text-base">Learning status</CardTitle>
-        <CardDescription>What the learn step did, and how each place it writes to is doing.</CardDescription>
+        <CardDescription>Whether learning is on, what the last run did, and how each place it writes to is doing.</CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
         <ErrorLine error={status.error ?? save.error} />
         {s && learn && (
           <>
             <div className="flex items-center justify-between gap-4 rounded-md border p-3">
-              <div>
-                <div className="text-sm font-medium">Learning from finished sessions</div>
-                <div className="text-muted-foreground text-xs">
-                  {s.enabled ? 'On' : 'Off'} · new lessons are {s.review === 'queue' ? 'held for your review' : 'written straight away (unless it mentions a command, link, always or never)'}
+              <div aria-label="Last learn run" role="group">
+                <div className="text-sm font-medium">
+                  Learning is {s.enabled ? 'on' : 'off'}
+                  <span className="text-muted-foreground font-normal">
+                    {' · '}
+                    {!last ? 'no learn run yet' : last.error ? `last run ${timeAgo(last.at)} did nothing` : `last run ${timeAgo(last.at)}: ${last.extracted} found, ${last.written} written, ${last.merged} merged${last.staled ? `, ${last.staled} marked stale` : ''}${last.queued ? `, ${last.queued} queued for review` : ''}`}
+                  </span>
                 </div>
+                {last?.error && <p className="text-destructive text-xs">Did nothing: {last.error}</p>}
+                {last?.model && (
+                  <p className="text-muted-foreground text-xs">
+                    AI: {last.cli === 'opencode' ? 'OpenCode' : 'Claude Code'} · <span className="font-mono">{last.model}</span>
+                  </p>
+                )}
+                {last && last.skipped.length > 0 && (
+                  <ul className="text-muted-foreground list-disc pl-5 text-xs">
+                    {last.skipped.map((k) => (
+                      <li key={`${k.store}:${k.reason}`}>
+                        {STORE_LABEL[k.store]} skipped: {k.reason}
+                      </li>
+                    ))}
+                  </ul>
+                )}
               </div>
               <Switch aria-label="Learning on or off" checked={learn.enabled} onCheckedChange={(v) => toggle({ enabled: v })} />
             </div>
@@ -69,37 +87,6 @@ export function LearningStatusPanel({ crewId, onShowDrafts }: { crewId: number |
                 )
               })}
             </ul>
-
-            <div className="space-y-1 rounded-md border p-3 text-sm" aria-label="Last learn run" role="group">
-              <div className="font-medium">Last learn run</div>
-              {!last ? (
-                <p className="text-muted-foreground text-xs">No learn run yet.</p>
-              ) : (
-                <>
-                  <p className="text-xs">
-                    {timeAgo(last.at)}
-                    {last.error
-                      ? ''
-                      : ` · ${last.extracted} found, ${last.written} written, ${last.merged} merged, ${last.staled} marked stale${last.queued ? `, ${last.queued} queued for review` : ''}`}
-                  </p>
-                  {last.model && (
-                    <p className="text-muted-foreground text-xs">
-                      AI: {last.cli === 'opencode' ? 'OpenCode' : 'Claude Code'} · <span className="font-mono">{last.model}</span>
-                    </p>
-                  )}
-                  {last.error && <p className="text-destructive text-xs">Did nothing: {last.error}</p>}
-                  {last.skipped.length > 0 && (
-                    <ul className="text-muted-foreground list-disc pl-5 text-xs">
-                      {last.skipped.map((k) => (
-                        <li key={`${k.store}:${k.reason}`}>
-                          {STORE_LABEL[k.store]} skipped: {k.reason}
-                        </li>
-                      ))}
-                    </ul>
-                  )}
-                </>
-              )}
-            </div>
 
             <div className="flex flex-wrap items-center gap-x-6 gap-y-1 text-xs" aria-label="Learning totals" role="group">
               <span>{total?.active ?? 0} active</span>
