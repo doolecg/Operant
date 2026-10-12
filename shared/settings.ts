@@ -337,6 +337,7 @@ export function sanitizeSettings(raw: unknown): Settings {
       minUserTurns: Math.round(num(learn.minUserTurns, d.learn.minUserTurns, 0, 100)),
       minTokens: Math.round(num(learn.minTokens, d.learn.minTokens, 0, 10_000_000)),
       idleMinutes: Math.round(num(learn.idleMinutes, d.learn.idleMinutes, 0, 1440)),
+      everyTurns: Math.round(num(learn.everyTurns, d.learn.everyTurns, 0, 1000)),
       consolidateAt: Math.round(num(learn.consolidateAt, d.learn.consolidateAt, 5, 500)),
     },
     memory: sanitizeMemory(r.memory),

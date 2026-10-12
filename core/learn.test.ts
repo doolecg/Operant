@@ -100,6 +100,26 @@ describe('learning loop', () => {
     expect((await svc.status()).stores.find((s) => s.store === 'hindsight')).toMatchObject({ up: false, enabled: true })
   })
 
+  it('reads only the turns after the last learn, and records the token use the CLI reports', async () => {
+    let text = 'user: one\nassistant: a\nuser: two\nassistant: b'
+    const svc = service({ transcript: () => text, model: async (p, _u, o) => (prompts.push(p), o?.onUsage?.({ tokens: 900, usd: 0.003 }), '[]') })
+    const sid = finishedRun()
+    expect(svc.newTurns(crewId, sid)).toBe(2)
+    expect(await svc.learnNow(crewId, sid)).toMatchObject({ error: '', tokens: 900, usd: 0.003, tokensEstimated: false })
+    expect(svc.newTurns(crewId, sid)).toBe(0)
+    text += '\nuser: three\nassistant: c'
+    expect(svc.newTurns(crewId, sid)).toBe(1)
+    await svc.learnNow(crewId, sid)
+    expect(prompts.at(-1)).toContain('user: three')
+    expect(prompts.at(-1)).not.toContain('user: one')
+  })
+
+  it('estimates the tokens when the CLI reports none', async () => {
+    const r = await service().onConversationEnd(crewId, finishedRun())
+    expect(r!.tokensEstimated).toBe(true)
+    expect(r!.tokens).toBeGreaterThan(0)
+  })
+
   it('degraded mode: a failing model or memory folder never throws and is reported', async () => {
     const bad = service({ model: async () => Promise.reject(new Error('no claude')) })
     const r = await bad.onConversationEnd(crewId, finishedRun())

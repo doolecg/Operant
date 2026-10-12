@@ -3,7 +3,7 @@ import { dirname } from 'node:path'
 import { DatabaseSync } from 'node:sqlite'
 import type { AgentKind, CacheTtl, Crew, LaunchSettings, McpMode, OperantEvent, Preset, ScratchSpend, ScratchTerminal, ScratchView, Team, TeamInput, TeamPatch, Usage } from '../shared/types'
 import type { SeatFields } from '../shared/types'
-import { LEARN_AI_MIGRATION, LESSON_LINKS_MIGRATION, LESSONS_MIGRATION, SKILL_FIX_MIGRATION } from './lessons-store'
+import { LEARN_AI_MIGRATION, LEARN_USAGE_MIGRATION, LESSON_LINKS_MIGRATION, LESSONS_MIGRATION, SKILL_FIX_MIGRATION } from './lessons-store'
 import { BUILTIN_TEAMS, RETIRED_TEAMS, TEAM_RENAMES } from './team-presets'
 import { presetTextFor } from './preset-text'
 import { buildBackup, writeBackup } from './backup'
@@ -481,6 +481,8 @@ export const MIGRATIONS: string[] = [
    CREATE INDEX notes_crew ON notes (crew_id, sort_order);`,
   // Lessons link to related lessons and can be folded into one by consolidation.
   LESSON_LINKS_MIGRATION,
+  // Learn runs keep their token use and the session turns they read.
+  LEARN_USAGE_MIGRATION,
 ]
 
 export const PLAYGROUND_KEPT = 'The Playground cannot be deleted; you can rename it or change its folder'

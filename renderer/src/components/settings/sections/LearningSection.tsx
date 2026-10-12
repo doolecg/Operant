@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useActiveClaudeTile } from '@/components/terminal/activeClaudeTile'
-import { LEARN_STORES, type LearnChange, type LearnCli, type LearnOnLimit, type LearnStore } from '@shared/learn'
+import { LEARN_STORES, learnOutcomeText, type LearnChange, type LearnCli, type LearnOnLimit, type LearnStore } from '@shared/learn'
 import type { RecallMode } from '@shared/aux-settings'
 import { decodeIpcError } from '@shared/ipc'
 import { Badge } from '@/components/ui/badge'
@@ -220,6 +220,9 @@ export function LearningSection() {
               </SelectContent>
             </Select>
           </Row>
+          <Row label="Learn every N messages" info="A session is only learned from on its own after you have sent this many new messages since its last learn, so learning runs less often and costs fewer tokens. 0 learns after every finished turn. Closing a tile and Learn now always learn. The default is 10." hint="Waits for this many new messages before learning on its own. 0 means after every turn." htmlFor="learn-every">
+            <NumberField id="learn-every" value={l.everyTurns} min={0} max={1000} onCommit={(n) => save.mutate({ learn: { everyTurns: n } })} />
+          </Row>
           <Row label="Learn from the active session" hint={runReason ?? 'Runs now on the Claude Code session in the focused terminal tile.'}>
             <Button
               variant="outline"
@@ -227,7 +230,7 @@ export function LearningSection() {
               disabled={runReason != null || runNow.isPending}
               onClick={() =>
                 runNow.mutate([activeTile!, false], {
-                  onSuccess: (r) => toast(r?.error || (r ? `${r.extracted} lessons found, ${r.written} written` : 'The learn step did not run'), !!r?.error),
+                  onSuccess: (r) => toast(r ? learnOutcomeText(r) : 'The learn step did not run', !!r?.error && !r.error.startsWith('Skipped')),
                   onError: fail,
                 })
               }

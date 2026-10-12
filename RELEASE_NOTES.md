@@ -1,3 +1,26 @@
+# Operant 3.2.1
+
+**Install:** download the file for your system from the assets below. Operant keeps itself up to date from these releases.
+
+## New
+- **See what learning costs.** The Learn row in the chat ends with the tokens it used, and the cost when Claude reports it, for example "24.1k tokens ($0.0031)". OpenCode and local models show an estimate marked "about".
+- **Learn every N messages.** A new setting in Settings, Learning. Operant learns from a session on its own only after you send this many new messages since its last learn. The default is 10. Set it to 0 to learn after every turn. Closing a tile and Learn now still learn straight away.
+
+---
+
+## Changed
+- **Learning reads only what's new.** Each learn reads a session from where the last one stopped, so long sessions aren't sent again and again.
+- **Tidy-up runs less often.** Merging and tightening lessons runs when a project has 40 or more lessons, at most once a day, instead of after every learn. Consolidate now still runs it any time.
+- **Learn usage counts toward the daily limits.** Learning's tokens and cost now add to the daily totals, so the daily call and spend limits apply to it.
+
+---
+
+## Fixed
+- **Long sessions are learned from again.** Message counts on long sessions stopped growing, so automatic learning could stop for them.
+- **Learning remembers where it stopped after a restart.**
+
+---
+
 # Operant 3.2.0
 
 **Install:** download the file for your system from the assets below. Operant keeps itself up to date from these releases.

@@ -39,7 +39,7 @@ import type { LessonLookup } from './memory-recall'
 import { buildLinks, clusterLessons, isDuplicate, jaccard, similarity, slug, words } from './lessons'
 import { LEARN_MODEL, learnModelList, resolveLearnAi } from './learn-ai'
 import { localChat, normalizeLocalUrl, type LocalLlmDeps } from './localllm'
-import { ClaudeAdapter, MODEL_TIMEOUT_MS, assertFakeClaude, resultWithin, type MasterAdapter } from './model-run'
+import { ClaudeAdapter, MODEL_TIMEOUT_MS, assertFakeClaude, resultWithin, type MasterAdapter, type RunUsage } from './model-run'
 import type { ModelList } from './models'
 import { createOpenCodeAdapter, type ChildLike } from './opencode'
 import { spawnHidden } from './proc'
@@ -99,6 +99,8 @@ export interface LearnCallOpts {
   confirm?: boolean
   folder?: string
   codegraph?: boolean
+  // The tokens and cost the call used, when the CLI reports them (Claude does; OpenCode and local servers do not here).
+  onUsage?: (u: RunUsage) => void
 }
 export type LearnModel = (prompt: string, onUsed?: (used: { cli: string; model: string }) => void, opts?: LearnCallOpts) => Promise<string>
 
@@ -151,6 +153,7 @@ export function claudeLearnModel(supported?: ReadonlySet<string>, o: LearnModelO
     }
     const run = await adapter.start({ cwd, prompt, model: ai.model, effort: ai.effort || undefined, onEvent: () => undefined, ...(mcpConfig ? { mcpConfig, allowedTools: 'mcp__codegraph__codegraph_explore' } : {}) })
     const result = await resultWithin(run, o.timeoutMs ?? MODEL_TIMEOUT_MS, 'The learn model')
+    if (result.usage) opts?.onUsage?.(result.usage)
     if (!result.ok) throw new Error(result.text || 'The learn model failed')
     return result.text
   }
@@ -335,7 +338,15 @@ function readTranscript(folder: string, sessionId: string | null, read: (p: stri
       // a half-written line
     }
   }
-  return lines.join('\n').slice(-TRANSCRIPT_CAP)
+  return lines.join('\n')
+}
+
+// The part of a transcript after its first `turns` user turns: what a session said since it was last learned from.
+// '' when it has no newer turn.
+export function sinceTurn(text: string, turns: number): string {
+  if (turns <= 0) return text
+  const starts = [...text.matchAll(/^user:/gim)].map((m) => m.index)
+  return turns < starts.length ? text.slice(starts[turns]) : ''
 }
 
 const safeRead = (p: string): string | null => {
@@ -363,6 +374,32 @@ export class LearnService {
   private readonly lastConsolidated = new Map<number, number>()
   // Groups the model already left as they are (lesson ids and edit times), so a close does not ask about them again.
   private readonly settledGroups = new Set<string>()
+  // The token use of the learn run in progress (its extraction and any consolidation it starts); null between runs.
+  private usage: { tokens: number; usd: number; estimated: boolean } | null = null
+
+  // New user turns in a session since its last learn (kept in learn_runs, so a restart remembers); null when its
+  // transcript cannot be read.
+  newTurns(crewId: number, sessionId: string | null): number | null {
+    const crew = this.d.store.getCrew(crewId)
+    if (!crew || !sessionId) return null
+    try {
+      return userTurns(this.fullTranscript(crew.folder, sessionId)) - this.d.db.learnedTurns(sessionId)
+    } catch {
+      return null
+    }
+  }
+
+  private fullTranscript(folder: string, sessionId: string | null): string {
+    return this.d.transcript ? this.d.transcript(folder, sessionId) : readTranscript(folder, sessionId, this.read)
+  }
+
+  // Adds one model call's use to the run in progress: the CLI's own count, else an estimate from the text.
+  private addUsage(prompt: string, out: string, real: RunUsage | null): void {
+    if (!this.usage) return
+    this.usage.tokens += real ? real.tokens : estimateTokens(prompt) + estimateTokens(out)
+    this.usage.usd += real?.usd ?? 0
+    if (!real) this.usage.estimated = true
+  }
 
   constructor(private readonly d: LearnDeps) {
     this.memory = d.memory ?? new PersonalMemory()
@@ -421,11 +458,15 @@ export class LearnService {
     if (!crew || !settings.enabled || settings.mode === 'off') return null
     const base = { crewId, runId: null, source: 'conversation' as const }
     const info = { ...base, extracted: 0, written: 0, merged: 0, staled: 0, queued: 0, skipped: [] as LearnSkip[], error: '', cli: settings.cli as string, model: settings.model }
+    let turnsSeen = 0
+    this.usage = { tokens: 0, usd: 0, estimated: false }
     const finish = async (): Promise<LearnRunInfo> => {
       // Whatever happened above (a failed model call, a skipped session), nothing is left waiting for the owner.
       await this.settlePending(crewId, crew.folder, info, () => ({ crewId, cli: info.cli, model: info.model, tokens: 0, validation: 'valid', evidence: 'pending items applied after a learn step' }))
       await this.tidy(crewId, crew.folder, info)
-      const rec = db.addLearnRun(info)
+      const used = this.usage ?? { tokens: 0, usd: 0, estimated: false }
+      this.usage = null
+      const rec = db.addLearnRun({ ...info, tokens: used.tokens, usd: used.usd, tokensEstimated: used.estimated && used.tokens > 0, sessionId, turns: turnsSeen })
       const skipped = rec.skipped.map((s) => `${s.store} skipped: ${s.reason}`)
       this.safe(() => this.d.log?.(
         `Session learn: ${rec.error || `${rec.extracted} lessons, ${rec.written} written, ${rec.merged} merged, ${rec.staled} stale${rec.queued ? `, ${rec.queued} queued for review` : ''}`}${skipped.length ? `; ${skipped.join('; ')}` : ''}`,
@@ -436,9 +477,15 @@ export class LearnService {
     }
 
     // The trivial-session gate and the per-review budgets: checked here, before and between model calls.
+    // A Claude session is read from where its last learn stopped, so a long session is not sent again each time.
     let tail: string
     try {
-      tail = transcript ?? (this.d.transcript ? this.d.transcript(crew.folder, sessionId) : readTranscript(crew.folder, sessionId, this.read))
+      if (transcript !== undefined) tail = transcript
+      else {
+        const full = this.fullTranscript(crew.folder, sessionId)
+        turnsSeen = userTurns(full)
+        tail = sessionId ? sinceTurn(full, db.learnedTurns(sessionId)) : full
+      }
     } catch (err) {
       info.error = `Could not read the session: ${clean(errText(err))}`
       return finish()
@@ -457,15 +504,17 @@ export class LearnService {
       if (!bypass && settings.maxTokensPerReview > 0 && budget.tokens + est > settings.maxTokensPerReview) throw new ReviewStop(`this review would pass its ${settings.maxTokensPerReview}-token budget`)
       budget.calls++
       budget.tokens += est
+      let real: RunUsage | null = null
       const out = await this.d.model(
         prompt,
         (u) => {
           info.cli = u.cli
           info.model = u.model
         },
-        { confirm: bypass, folder: crew.folder, codegraph: settings.codegraph },
+        { confirm: bypass, folder: crew.folder, codegraph: settings.codegraph, onUsage: (u) => (real = u) },
       )
       budget.tokens += estimateTokens(out)
+      this.addUsage(prompt, out, real)
       return out
     }
 
@@ -555,7 +604,7 @@ export class LearnService {
     try {
       info.staled += this.staleCheck(crewId, folder, run)
       this.purgeOld(crewId, run)
-      if (!info.error || info.error.startsWith('Skipped:')) await this.consolidate(crewId, { always: true })
+      if (!info.error || info.error.startsWith('Skipped:')) await this.consolidate(crewId)
     } catch (err) {
       this.safe(() => this.d.log?.(`Tidy failed: ${clean(errText(err))}`, crewId))
     }
@@ -733,15 +782,17 @@ export class LearnService {
       if (!bypass && s.maxTokensPerReview > 0 && budget.tokens + est > s.maxTokensPerReview) throw new ReviewStop(`this review would pass its ${s.maxTokensPerReview}-token budget`)
       budget.calls++
       budget.tokens += est
+      let real: RunUsage | null = null
       const out = await model(
         prompt,
         (u) => {
           used.cli = u.cli
           used.model = u.model
         },
-        { confirm: bypass },
+        { confirm: bypass, onUsage: (u) => (real = u) },
       )
       budget.tokens += estimateTokens(out)
+      this.addUsage(prompt, out, real)
       return out
     }
     return { ask, budget }

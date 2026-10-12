@@ -93,6 +93,11 @@ export interface LearnRunInfo {
   // The CLI and model the step asked ('' for a run recorded before this was kept).
   cli: string
   model: string
+  // Tokens the step's model calls used, and their cost when the CLI reports it. Estimated (about four characters a
+  // token) when the CLI gives no counts.
+  tokens?: number
+  usd?: number
+  tokensEstimated?: boolean
 }
 
 export interface LearnStoreStatus {
@@ -149,6 +154,9 @@ export interface LearnSettings {
   // Minutes a Claude session must sit quiet before the app learns from it on its own (the app's timer, no model call to
   // decide); 0 turns it off. A tile whose turn has finished (the finished flag) is learned from after a few seconds of quiet. Closing a tile still learns.
   idleMinutes: number
+  // New user messages a session needs since its last learn before the app learns from it on its own (idle or after a turn);
+  // 0 learns after every finished turn. Closing a tile and Learn now ignore it.
+  everyTurns: number
   // Active lessons in a project before consolidation runs (5 to 500).
   consolidateAt: number
 }
@@ -211,6 +219,7 @@ export const DEFAULT_LEARN_SETTINGS: LearnSettings = {
   minUserTurns: 3,
   minTokens: 500,
   idleMinutes: 5,
+  everyTurns: 10,
   consolidateAt: 40,
 }
 
@@ -261,9 +270,21 @@ export interface ConsolidateResult {
 }
 
 // The one-line result of a learn run: "Learned 3 lessons: 2 saved, 1 to review", or why it did nothing (null: it did nothing).
-export function learnOutcomeText(r: Pick<LearnRunInfo, 'error' | 'extracted' | 'written' | 'queued'> | null): string {
+type RunUsage = Pick<LearnRunInfo, 'tokens' | 'usd' | 'tokensEstimated'>
+
+// " · 3.1k tokens ($0.004)", with "about" when estimated; '' when the run used none.
+export function tokenText(r: RunUsage | null | undefined): string {
+  const tokens = r?.tokens ?? 0
+  if (tokens <= 0) return ''
+  const n = tokens >= 1000 ? `${(tokens / 1000).toFixed(1)}k` : String(tokens)
+  const usd = r?.usd ?? 0
+  const cost = usd > 0 ? ` ($${usd < 0.01 ? usd.toFixed(4) : usd.toFixed(2)})` : ''
+  return ` · ${r?.tokensEstimated ? 'about ' : ''}${n} tokens${cost}`
+}
+
+export function learnOutcomeText(r: (Pick<LearnRunInfo, 'error' | 'extracted' | 'written' | 'queued'> & RunUsage) | null): string {
   if (!r) return 'Skipped: nothing to learn from'
-  if (r.error) return r.error
+  if (r.error) return r.error + tokenText(r)
   const queued = r.queued > 0 ? `, ${r.queued} to review` : ''
-  return `Learned ${r.extracted} ${r.extracted === 1 ? 'lesson' : 'lessons'}: ${r.written} saved${queued}`
+  return `Learned ${r.extracted} ${r.extracted === 1 ? 'lesson' : 'lessons'}: ${r.written} saved${queued}${tokenText(r)}`
 }

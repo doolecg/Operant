@@ -59,6 +59,13 @@ export const SKILL_FIX_MIGRATION = `ALTER TABLE skill_drafts ADD COLUMN target_p
 export const LESSON_LINKS_MIGRATION = `ALTER TABLE lessons ADD COLUMN related TEXT NOT NULL DEFAULT '[]';
    ALTER TABLE lessons ADD COLUMN consolidated_into INTEGER;`
 
+// What each learn run cost and which session (and how many of its user turns) it read (additive).
+export const LEARN_USAGE_MIGRATION = `ALTER TABLE learn_runs ADD COLUMN session_id TEXT NOT NULL DEFAULT '';
+   ALTER TABLE learn_runs ADD COLUMN turns INTEGER NOT NULL DEFAULT 0;
+   ALTER TABLE learn_runs ADD COLUMN tokens INTEGER NOT NULL DEFAULT 0;
+   ALTER TABLE learn_runs ADD COLUMN usd REAL NOT NULL DEFAULT 0;
+   ALTER TABLE learn_runs ADD COLUMN tokens_estimated INTEGER NOT NULL DEFAULT 0;`
+
 type Row = Record<string, unknown>
 
 const list = (v: unknown): string[] => {
@@ -117,6 +124,9 @@ const toRun = (r: Row): LearnRunInfo => ({
   error: String(r.error),
   cli: String(r.cli ?? ''),
   model: String(r.model ?? ''),
+  tokens: Number(r.tokens ?? 0),
+  usd: Number(r.usd ?? 0),
+  tokensEstimated: Number(r.tokens_estimated ?? 0) === 1,
 })
 
 export interface NewLesson {
@@ -254,12 +264,22 @@ export class LessonsDb {
     this.db.prepare('DELETE FROM skill_drafts WHERE id = ?').run(id)
   }
 
-  addLearnRun(r: Omit<LearnRunInfo, 'id' | 'at'>): LearnRunInfo {
+  // `sessionId` and `turns`: the session the run read and its user turns then, so the next run reads only newer ones.
+  addLearnRun(r: Omit<LearnRunInfo, 'id' | 'at'> & { sessionId?: string | null; turns?: number }): LearnRunInfo {
     const at = this.now()
+    const { sessionId, turns, ...info } = r
     const res = this.db
-      .prepare('INSERT INTO learn_runs (crew_id, run_id, source, at, extracted, written, merged, staled, queued, skipped, error, cli, model) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)')
-      .run(r.crewId, r.runId, r.source, at, r.extracted, r.written, r.merged, r.staled, r.queued, JSON.stringify(r.skipped), r.error, r.cli, r.model)
-    return { ...r, id: Number(res.lastInsertRowid), at }
+      .prepare(
+        'INSERT INTO learn_runs (crew_id, run_id, source, at, extracted, written, merged, staled, queued, skipped, error, cli, model, session_id, turns, tokens, usd, tokens_estimated) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)',
+      )
+      .run(info.crewId, info.runId, info.source, at, info.extracted, info.written, info.merged, info.staled, info.queued, JSON.stringify(info.skipped), info.error, info.cli, info.model, sessionId ?? '', turns ?? 0, Math.max(0, Math.round(info.tokens ?? 0)), Math.max(0, info.usd ?? 0), info.tokensEstimated ? 1 : 0)
+    return { ...info, id: Number(res.lastInsertRowid), at }
+  }
+
+  // The user turns of a session the last run that worked on it had read (0 when none did).
+  learnedTurns(sessionId: string): number {
+    const r = this.db.prepare("SELECT MAX(turns) AS t FROM learn_runs WHERE session_id = ? AND error = ''").get(sessionId) as Row | undefined
+    return Number(r?.t ?? 0)
   }
 
   lastLearnRun(crewId?: number): LearnRunInfo | null {

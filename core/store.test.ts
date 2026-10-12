@@ -2,7 +2,7 @@ import { mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
-import { LessonsDb } from './lessons-store'
+import { LESSON_LINKS_MIGRATION, LessonsDb } from './lessons-store'
 import { MIGRATIONS, Store } from './store'
 
 describe('store', () => {
@@ -19,7 +19,8 @@ describe('store', () => {
       const old = new Store(file)
       const crew = old.createCrew('alpha', '/code/alpha')
       old.db.exec('ALTER TABLE lessons DROP COLUMN related; ALTER TABLE lessons DROP COLUMN consolidated_into')
-      old.db.exec(`PRAGMA user_version = ${MIGRATIONS.length - 1}`)
+      for (const c of ['session_id', 'turns', 'tokens', 'usd', 'tokens_estimated']) old.db.exec(`ALTER TABLE learn_runs DROP COLUMN ${c}`)
+      old.db.exec(`PRAGMA user_version = ${MIGRATIONS.indexOf(LESSON_LINKS_MIGRATION)}`)
       old.db
         .prepare("INSERT INTO lessons (crew_id, text, kind, scope, created_at, updated_at) VALUES (?, 'keep it small', 'convention', 'project', 1, 1)")
         .run(crew.id)
@@ -32,6 +33,10 @@ describe('store', () => {
         expect(l).toMatchObject({ text: 'keep it small', related: [], consolidatedInto: null })
         expect(db.updateLesson(l!.id, { related: [7, 9], consolidatedInto: 3 })).toMatchObject({ related: [7, 9], consolidatedInto: 3 })
         expect(db.updateLesson(l!.id, { consolidatedInto: null }).consolidatedInto).toBeNull()
+        const run = db.addLearnRun({ crewId: crew.id, runId: null, source: 'conversation', extracted: 0, written: 0, merged: 0, staled: 0, queued: 0, skipped: [], error: '', cli: 'claude', model: 'haiku', tokens: 1200, usd: 0.002, sessionId: 's1', turns: 12 })
+        expect(db.lastLearnRun(crew.id)).toMatchObject({ id: run.id, tokens: 1200, usd: 0.002, tokensEstimated: false })
+        expect(db.learnedTurns('s1')).toBe(12)
+        expect(db.learnedTurns('other')).toBe(0)
       } finally {
         s.close()
       }

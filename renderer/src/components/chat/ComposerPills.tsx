@@ -1,6 +1,6 @@
 import { useState, type KeyboardEvent } from 'react'
 import { GraduationCap, Loader2, Navigation, Send } from 'lucide-react'
-import type { LearnRunInfo } from '@shared/learn'
+import { tokenText, type LearnRunInfo } from '@shared/learn'
 import { bridge } from '@/lib/bridge'
 import { useSettings } from '@/lib/queries'
 import { toast } from '@/lib/toast'
@@ -16,7 +16,7 @@ function describeRun(r: LearnRunInfo | null): { text: string; error: boolean } {
   if (r.error) return { text: r.error.startsWith('Skipped: ') ? `Nothing learned. ${r.error}` : r.error, error: !r.error.startsWith('Skipped: ') }
   const parts = [`${r.extracted} lesson${r.extracted === 1 ? '' : 's'} found`, `${r.written} written`, `${r.merged} merged`]
   if (r.queued) parts.push(`${r.queued} queued for review`)
-  return { text: `Learned from this session: ${parts.join(', ')}`, error: false }
+  return { text: `Learned from this session: ${parts.join(', ')}${tokenText(r)}`, error: false }
 }
 
 // Learns from this tile's Claude session now, instead of waiting for it to go quiet or close.

@@ -9,15 +9,21 @@ export interface MasterEvent {
   text?: string
 }
 
+// What a call used, when the CLI reports it: every input (cached too) and output token, and the cost.
+export interface RunUsage {
+  tokens: number
+  usd: number
+}
+
 export interface MasterRun {
   stop(): Promise<void>
-  done: Promise<{ ok: boolean; text: string }>
+  done: Promise<{ ok: boolean; text: string; usage?: RunUsage }>
 }
 
 // A one-shot model call's deadline: past `ms` the run is stopped (no child process is left behind) and the call fails.
 export const MODEL_TIMEOUT_MS = 120_000
 
-export async function resultWithin(run: MasterRun, ms: number, what: string): Promise<{ ok: boolean; text: string }> {
+export async function resultWithin(run: MasterRun, ms: number, what: string): Promise<{ ok: boolean; text: string; usage?: RunUsage }> {
   let timer: ReturnType<typeof setTimeout> | undefined
   const late = new Promise<never>((_, reject) => {
     timer = setTimeout(() => reject(new Error(`${what} timed out after ${Math.round(ms / 1000)} s`)), ms)
@@ -101,6 +107,16 @@ interface StreamLine {
   is_error?: boolean
   result?: string
   message?: { content?: Array<{ type?: string; text?: string; name?: string }> }
+  usage?: { input_tokens?: number; output_tokens?: number; cache_creation_input_tokens?: number; cache_read_input_tokens?: number }
+  total_cost_usd?: number
+}
+
+// The result line's usage as one token total and its cost; undefined when it has none.
+export function resultUsage(msg: Pick<StreamLine, 'usage' | 'total_cost_usd'>): RunUsage | undefined {
+  const u = msg.usage
+  if (!u) return undefined
+  const n = (v: unknown) => (typeof v === 'number' && Number.isFinite(v) && v > 0 ? v : 0)
+  return { tokens: n(u.input_tokens) + n(u.output_tokens) + n(u.cache_creation_input_tokens) + n(u.cache_read_input_tokens), usd: n(msg.total_cost_usd) }
 }
 
 // Claude Code: `claude -p` with stream-json output, built on the same checks as the interactive launch.
@@ -114,7 +130,7 @@ export class ClaudeAdapter implements MasterAdapter {
     )
     const child = (this.opts.spawn ?? realSpawn)(launch.file, launch.args, { cwd: launch.cwd })
 
-    let result: { ok: boolean; text: string } | null = null
+    let result: { ok: boolean; text: string; usage?: RunUsage } | null = null
     let lastText = ''
     let stderr = ''
     let buffer = ''
@@ -138,7 +154,8 @@ export class ClaudeAdapter implements MasterAdapter {
           } else if (block.type === 'tool_use') o.onEvent({ kind: 'tool', text: block.name })
         }
       } else if (msg.type === 'result') {
-        result = { ok: !msg.is_error && (msg.subtype === undefined || msg.subtype === 'success'), text: String(msg.result ?? lastText) }
+        const usage = resultUsage(msg)
+        result = { ok: !msg.is_error && (msg.subtype === undefined || msg.subtype === 'success'), text: String(msg.result ?? lastText), ...(usage ? { usage } : {}) }
       }
     }
     child.stdout.on('data', (chunk) => {
@@ -154,7 +171,7 @@ export class ClaudeAdapter implements MasterAdapter {
     })
 
     let stopped = false
-    const done = new Promise<{ ok: boolean; text: string }>((resolve) => {
+    const done = new Promise<{ ok: boolean; text: string; usage?: RunUsage }>((resolve) => {
       child.on('error', (err) => resolve({ ok: false, text: `Could not start claude: ${err.message}` }))
       child.on('exit', (code) => {
         if (buffer.trim()) line(buffer.trim())

@@ -65,6 +65,7 @@ describe('Operant: Chat view tiles', () => {
   let children: Array<{ spawn: { file: string; args: string[]; env: Record<string, string>; shell: boolean }; child: FakeChatChild }>
   let bin: string
   let learned: Array<[number, string | null]>
+  let freshTurns = 99
   let consolidated: number[]
   let pushed: Array<{ scratchId: number; ops: ChatOp[] }>
   let target: CliTarget
@@ -77,6 +78,7 @@ describe('Operant: Chat view tiles', () => {
     ptys = []
     children = []
     learned = []
+    freshTurns = 99
     consolidated = []
     pushed = []
     const spawn: PtyFactory = (file, _args, opts) => {
@@ -96,6 +98,7 @@ describe('Operant: Chat view tiles', () => {
       learnModel: async () => '[]',
       learn: {
         learnNow: async (crewId: number, sessionId: string | null) => void learned.push([crewId, sessionId]),
+        newTurns: () => freshTurns,
         consolidateNow: async (crewId: number) => (consolidated.push(crewId), { merged: 2, improved: 0, proposed: 1, failed: 0, skipped: '' }),
         lessonLookup: () => ({ isLive: () => true, related: () => [] }),
       } as unknown as LearnService,
@@ -362,6 +365,21 @@ describe('Operant: Chat view tiles', () => {
       await turn(t, true)
       op.pollUsage()
       expect(learned).toEqual([])
+      vi.advanceTimersByTime(6_000)
+      op.pollUsage()
+      expect(learned).toHaveLength(1)
+    })
+
+    it('waits for enough new messages before learning on its own', async () => {
+      const t = started()
+      freshTurns = 3
+      await turn(t, true)
+      vi.advanceTimersByTime(6_000)
+      op.pollUsage()
+      expect(learned).toEqual([])
+      op.handlers['settings:set']({ learn: { everyTurns: 0 } })
+      await turn(t, true)
+      op.pollUsage()
       vi.advanceTimersByTime(6_000)
       op.pollUsage()
       expect(learned).toHaveLength(1)

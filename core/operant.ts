@@ -1360,7 +1360,11 @@ export class Operant extends EventEmitter<PushEvents> {
       if ((scratch?.agent !== 'claude' && scratch?.agent !== 'opencode') || !scratch.sessionId) continue
       feed.activityAt = null
       feed.finished = false
-      this.learnedTiles.add(id)
+      // Claude tiles wait for enough new messages (OpenCode's transcript is read at run time, so it learns as before).
+      if (scratch.agent === 'claude' && l.everyTurns > 0) {
+        const fresh = this.learn.newTurns(scratch.crewId, scratch.sessionId)
+        if (fresh !== null && fresh < l.everyTurns) continue
+      }
       void this.learnFrom(scratch)
     }
   }
@@ -1407,6 +1411,7 @@ export class Operant extends EventEmitter<PushEvents> {
   // A closed Claude tile not learned from yet is learned from at once, then the project is tidied and merged; nobody is asked.
   private askLearnOnClose(scratch: ScratchTerminal): void {
     if (!scratch.sessionId || !this.settings.learn.enabled || this.settings.learn.mode === 'off' || this.learnedTiles.has(scratch.id)) return
+    if (scratch.agent === 'claude' && this.learn.newTurns(scratch.crewId, scratch.sessionId) === 0) return
     this.learnedTiles.add(scratch.id)
     void this.learnFrom(scratch)
   }
@@ -1481,7 +1486,24 @@ export class Operant extends EventEmitter<PushEvents> {
     return async (prompt, onUsed, opts) => {
       const bad = await problem?.()
       if (bad) throw new Error(bad)
-      return this.aux.call('learn', async () => ({ text: await base(prompt, onUsed, opts) }), { confirm: opts?.confirm }).then((r) => r.text)
+      // The daily counts get the CLI's own tokens and cost, else an estimate (about four characters a token).
+      const r = await this.aux.call(
+        'learn',
+        async () => {
+          let used: { tokens: number; usd: number } | null = null
+          const text = await base(prompt, onUsed, {
+            ...opts,
+            onUsage: (u) => {
+              used = u
+              opts?.onUsage?.(u)
+            },
+          })
+          const u = used as { tokens: number; usd: number } | null
+          return { text, tokens: u ? u.tokens : Math.ceil((prompt.length + text.length) / 4), usd: u?.usd ?? 0 }
+        },
+        { confirm: opts?.confirm },
+      )
+      return r.text
     }
   }
 

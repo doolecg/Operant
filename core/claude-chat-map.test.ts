@@ -584,6 +584,8 @@ describe('Learn row', () => {
   it('formats the result text', () => {
     expect(learnOutcomeText({ error: '', extracted: 1, written: 1, queued: 0 })).toBe('Learned 1 lesson: 1 saved')
     expect(learnOutcomeText({ error: 'Skipped: only 1 user turn (minimum 2)', extracted: 0, written: 0, queued: 0 })).toBe('Skipped: only 1 user turn (minimum 2)')
+    expect(learnOutcomeText({ error: '', extracted: 1, written: 1, queued: 0, tokens: 3120, tokensEstimated: true })).toBe('Learned 1 lesson: 1 saved · about 3.1k tokens')
+    expect(learnOutcomeText({ error: '', extracted: 1, written: 1, queued: 0, tokens: 420, usd: 0.0031 })).toBe('Learned 1 lesson: 1 saved · 420 tokens ($0.0031)')
     expect(learnOutcomeText(null)).toBe('Skipped: nothing to learn from')
   })
 })
