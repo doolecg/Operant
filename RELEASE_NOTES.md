@@ -1,3 +1,12 @@
+# Operant 3.2.2
+
+**Install:** download the file for your system from the assets below. Operant keeps itself up to date from these releases.
+
+## Fixed
+- **"Choose file" works in the browser.** Once an AI had used a project's browser, clicking a page's file upload button opened nothing. It now opens the normal file dialog. The AI still handles file pickers itself while it is acting on the page.
+
+---
+
 # Operant 3.2.1
 
 **Install:** download the file for your system from the assets below. Operant keeps itself up to date from these releases.

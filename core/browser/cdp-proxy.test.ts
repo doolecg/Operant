@@ -206,6 +206,28 @@ describe('cdp-proxy filtering', () => {
     expect((await c.next((m) => m['id'] === 5))['result']).toBeTruthy()
   })
 
+  it("opens the system dialog for the user's file chooser and passes the AI's own on", async () => {
+    let busy = false
+    const asked: boolean[] = []
+    Object.assign(hub, { aiBusy: () => busy })
+    host.chooseFiles = async (_crew, multiple) => (asked.push(multiple), ['C:/a.txt'])
+    const c = await connect()
+    c.send({ id: 1, method: 'Target.setAutoAttach', params: { autoAttach: true, flatten: true, waitForDebuggerOnStart: false } })
+    await c.next((m) => m['id'] === 1)
+    const s = upstreamSockets[0]!
+    s.send(JSON.stringify({ method: 'Target.attachedToTarget', params: { sessionId: 'SP', targetInfo: { targetId: 'PANEL' }, waitingForDebugger: false } }))
+    await c.next((m) => m['method'] === 'Target.attachedToTarget')
+    s.send(JSON.stringify({ sessionId: 'SP', method: 'Page.fileChooserOpened', params: { frameId: 'F', backendNodeId: 42, mode: 'selectMultiple' } }))
+    await tick()
+    expect(asked).toEqual([true])
+    expect(received.find((m) => m['method'] === 'DOM.setFileInputFiles')).toMatchObject({ sessionId: 'SP', params: { files: ['C:/a.txt'], backendNodeId: 42 } })
+    expect(c.inbox.some((m) => m['method'] === 'Page.fileChooserOpened')).toBe(false)
+    busy = true
+    s.send(JSON.stringify({ sessionId: 'SP', method: 'Page.fileChooserOpened', params: { frameId: 'F', backendNodeId: 43, mode: 'selectSingle' } }))
+    expect((await c.next((m) => m['method'] === 'Page.fileChooserOpened'))['params']).toMatchObject({ backendNodeId: 43 })
+    expect(asked).toHaveLength(1)
+  })
+
   it('fakes Target.createTarget through the host and emits the target events', async () => {
     const c = await connect()
     c.send({ id: 1, method: 'Target.setDiscoverTargets', params: { discover: true } })

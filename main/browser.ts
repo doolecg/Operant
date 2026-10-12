@@ -417,6 +417,14 @@ export class BrowserPanels implements BrowserHost {
     return file
   }
 
+  // A page's "Choose file" the user clicked while an AI client intercepts file choosers (see CdpProxy).
+  async chooseFiles(crewId: number, multiple: boolean): Promise<string[] | null> {
+    const win = this.hostWindow(crewId)
+    const opts: Electron.OpenDialogOptions = { properties: multiple ? ['openFile', 'multiSelections'] : ['openFile'] }
+    const r = win ? await dialog.showOpenDialog(win, opts) : await dialog.showOpenDialog(opts)
+    return r.canceled || r.filePaths.length === 0 ? null : r.filePaths
+  }
+
   private async saveAs(defaultPath: string, label: string, ext: string): Promise<string | null> {
     const win = this.o.getWindow()
     const opts = { defaultPath, filters: [{ name: label, extensions: [ext] }] }

@@ -17,6 +17,8 @@ export interface CdpProxyHub {
   on(event: 'browser:state', cb: (state: { crewId: number }) => void): unknown
   /** Optional: resolve a panel tab id for a targetId the proxy did not create. */
   tabIdOf?(crewId: number, targetId: string): number | null
+  /** Optional: an AI browser tool call is running for the project. */
+  aiBusy?(crewId: number): boolean
 }
 
 // Slice of BrowserHost (hub.ts).
@@ -24,6 +26,8 @@ export interface CdpProxyHost {
   newTab(crewId: number, url: string): Promise<{ tabId: number; targetId: string }>
   closeTab(crewId: number, tabId: number): void
   selectTab(crewId: number, tabId: number): void
+  /** Optional: the system's open-file dialog for the project's window; null when cancelled. */
+  chooseFiles?(crewId: number, multiple: boolean): Promise<string[] | null>
 }
 
 export interface CdpProxyOptions {
@@ -253,11 +257,40 @@ export class CdpProxy {
     if (!msg) return
     if (c.filter.isInternalResponse(msg)) return
     const r = c.filter.fromUpstream(msg)
+    if (msg.method === 'Page.fileChooserOpened' && r.toClient.includes(msg) && this.userChooser(c, msg)) {
+      r.toClient = r.toClient.filter((m) => m !== msg)
+    }
     if (r.toUpstream.length === 0 && r.toClient.length === 1 && r.toClient[0] === msg) {
       this.toClient(c, raw)
       return
     }
     this.emit(c, r)
+  }
+
+  // A connected AI client turns on file chooser interception, so the page's own "Choose file" opens nothing. When no AI
+  // tool call is running, the click was the user's: show the system dialog and set the picked files here, and keep the
+  // event from the AI. Every connected client gets the event, so one dialog per project at a time.
+  private readonly choosing = new Set<number>()
+
+  private userChooser(c: Client, msg: CdpMessage): boolean {
+    const choose = this.opts.host.chooseFiles
+    if (!choose || this.opts.hub.aiBusy?.(c.crewId)) return false
+    const params = (msg['params'] ?? {}) as { backendNodeId?: unknown; mode?: unknown }
+    const sessionId = typeof msg['sessionId'] === 'string' ? msg['sessionId'] : undefined
+    if (typeof params.backendNodeId !== 'number') return false
+    if (this.choosing.has(c.crewId)) return true
+    this.choosing.add(c.crewId)
+    void choose
+      .call(this.opts.host, c.crewId, params.mode === 'selectMultiple')
+      .then((files) => {
+        if (!files?.length || !this.clients.has(c)) return
+        const set: CdpMessage = { id: c.filter.internalId(), method: 'DOM.setFileInputFiles', params: { files, backendNodeId: params.backendNodeId } }
+        if (sessionId) set['sessionId'] = sessionId
+        this.toUpstream(c, JSON.stringify(set))
+      })
+      .catch(() => undefined)
+      .finally(() => this.choosing.delete(c.crewId))
+    return true
   }
 }
 

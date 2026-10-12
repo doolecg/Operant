@@ -312,6 +312,11 @@ export class BrowserHub {
     this.emit(crewId)
   }
 
+  // An AI browser tool call is running for the project now.
+  aiBusy(crewId: number): boolean {
+    return this.crew(crewId).busy > 0
+  }
+
   aiEnd(crewId: number): void {
     const c = this.crew(crewId)
     if (c.busy > 0) c.busy--

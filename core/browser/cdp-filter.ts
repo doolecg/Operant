@@ -385,7 +385,7 @@ export class CdpFilter {
   }
 
   private nextInternal = 2_000_000_000
-  private internalId(): number {
+  internalId(): number {
     return this.nextInternal++
   }
 
