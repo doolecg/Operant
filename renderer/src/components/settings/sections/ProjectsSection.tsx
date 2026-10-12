@@ -37,7 +37,7 @@ export function ProjectsSection() {
           <CardDescription>The IDE the project menu, the row button and its shortcut open. Detected on this computer.</CardDescription>
         </CardHeader>
         <CardContent className="divide-y">
-          <Row label="IDE" htmlFor="ide-default">
+          <Row label="IDE" info="The editor used by the project menu, the row button and the Open in IDE shortcut. Editors not found on this computer are marked not found. The default is Visual Studio Code (the code command)." htmlFor="ide-default">
             <Select value={s.ide.default} onValueChange={(v) => save.mutate({ ide: { default: v as IdeId } })}>
               <SelectTrigger id="ide-default" className="w-56">
                 <SelectValue />
@@ -52,7 +52,7 @@ export function ProjectsSection() {
               </SelectContent>
             </Select>
           </Row>
-          <Row label="Custom command" hint="Used when the IDE above is Custom command. The project folder is added at the end." htmlFor="ide-custom">
+          <Row label="Custom command" info="The command used when IDE is set to Custom command, for example myide --new-window. Operant adds the project folder in quotes at the end. Folder names containing characters like quotes or ampersands are refused for safety." hint="Used when the IDE above is Custom command. The project folder is added at the end." htmlFor="ide-custom">
             <CommitInput
               id="ide-custom"
               className="w-64 font-mono text-xs"
@@ -77,7 +77,7 @@ export function ProjectsSection() {
         <CardContent className="divide-y">
           {groups.length === 0 && <p className="text-muted-foreground py-3 text-sm">No groups yet.</p>}
           {groups.map((g) => (
-            <Row key={g.id} label={`${crews.filter((c) => c.groupId === g.id).length} projects`}>
+            <Row key={g.id} label={`${crews.filter((c) => c.groupId === g.id).length} projects`} info="Type a new name and press Enter or click away to save it. Groups only organise the project list, so renaming one changes nothing on disk and does not move any projects.">
               <div className="flex items-center gap-2">
                 <CommitInput
                   id={`group-${g.id}`}

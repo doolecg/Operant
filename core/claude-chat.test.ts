@@ -205,6 +205,21 @@ describe('ChatSession: process and protocol', () => {
     expect(c2.last().response.response).toEqual({ behavior: 'deny', message: 'nope' })
   })
 
+  it('stops one sub-agent with stop_task once its task id is known', () => {
+    const h = harness()
+    h.session.start()
+    const c = h.children[0]!
+    h.session.send({ text: 'go' })
+    c.out({ type: 'assistant', message: { id: 'm1', role: 'assistant', model: 'claude-haiku-5-5', content: [{ type: 'tool_use', id: 'toolu_A', name: 'Agent', input: { description: 'Look', prompt: 'p', subagent_type: 'Explore' } }] }, parent_tool_use_id: null })
+    expect(h.session.stopAgent('toolu_A')).toBe(false)
+    c.out({ type: 'system', subtype: 'task_started', task_id: 'task_1', tool_use_id: 'toolu_A', description: 'Look', task_type: 'local_agent' })
+    expect(h.session.stopAgent('toolu_A')).toBe(true)
+    expect(c.last()).toMatchObject({ type: 'control_request', request: { subtype: 'stop_task', task_id: 'task_1' } })
+    expect(h.session.stopAgent('toolu_missing')).toBe(false)
+    c.out({ type: 'system', subtype: 'task_notification', task_id: 'task_1', tool_use_id: 'toolu_A', status: 'stopped', summary: 'Stopped' })
+    expect(h.session.state.items.find((i) => i.kind === 'subagent')).toMatchObject({ status: 'interrupted', taskId: 'task_1' })
+  })
+
   it('interrupts: sends the request, clears the grace timer on the result, kills after 5 s otherwise', () => {
     const h = harness()
     h.session.start()

@@ -12,6 +12,7 @@ import { Toaster } from '@/components/ui/toaster'
 import { Sidebar } from '@/components/dashboard/Sidebar'
 import { TerminalView } from '@/components/terminal/TerminalView'
 import { LearningBadge } from '@/components/memory/LearningBadge'
+import { ServersPopover } from '@/components/dashboard/ServersPopover'
 import { MemoryPage } from '@/components/memory/MemoryPage'
 import { ProviderLimitBadge } from '@/components/cost/ProviderBadge'
 import { SettingsPage } from '@/components/settings/SettingsPage'
@@ -323,6 +324,7 @@ export function App() {
                   </TooltipTrigger>
                   <TooltipContent>Console (Ctrl+J)</TooltipContent>
                 </Tooltip>
+                <ServersPopover onOpened={(id) => (setCrewId(id), setPage('dashboard'), setMode('terminal'))} />
                 <LearningBadge onOpen={() => setMode('memory')} />
                 <ProviderLimitBadge onOpen={() => (setPage('dashboard'), setMode('terminal'), setUsageOpen(true))} />
                 <GitChip crewId={crewId} compact onOpen={() => setGitOpen(true)} />

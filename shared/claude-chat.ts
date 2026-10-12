@@ -86,6 +86,9 @@ export interface ThinkingItem {
 
 // Any tool call except Agent/Task (those are SubagentItem). `summary` is the one-line target (file path, command,
 // pattern, URL); `verb` the present participle ("Reading"); `label` the past form for finished rows ("Read").
+// The tool name of the row Operant adds while its learn step works on the session (UI only, never sent to Claude).
+export const LEARN_TOOL = 'Learn'
+
 export interface ToolItem {
   kind: 'tool'
   id: string // tool_use_id
@@ -123,6 +126,8 @@ export interface SubagentItem {
   model: string | null
   // Claude Code's id for the agent: names its transcript agent-<id>.jsonl (known once the call returns or launches).
   agentId: string | null
+  // Claude Code's task id for this call (from its task_started event): what the stop_task control request takes. Absent until known.
+  taskId?: string
   background: boolean
   status: SubagentStatus
   // The newest activity: the running tool as "Reading TileFrame.tsx", else the first line of its latest text.
@@ -513,6 +518,8 @@ export interface ChatApi {
   // Interrupt: the turn ends with an "Interrupted" notice; if Claude Code does not answer within 5 s the process is
   // killed and restarted with --resume on the next send.
   'chat:interrupt': (scratchId: number) => void
+  // Stops ONE sub-agent (stop_task with its task id); the rest of the turn carries on. Refused (CONFLICT) while Claude Code has not reported the agent's task id.
+  'chat:stopAgent': (scratchId: number, toolUseId: string) => void
   // A short note into the running turn: Claude Code reads it at its next step and changes course without the turn
   // stopping. The user item carries steer: true. With no turn running it is an ordinary message.
   'chat:steer': (scratchId: number, text: string) => void
@@ -541,6 +548,7 @@ export const CHAT_CHANNELS = [
   'chat:snapshot',
   'chat:send',
   'chat:interrupt',
+  'chat:stopAgent',
   'chat:steer',
   'chat:permission',
   'chat:setMode',

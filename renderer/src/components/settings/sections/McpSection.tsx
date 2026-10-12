@@ -8,7 +8,7 @@ import { Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle }
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Switch } from '@/components/ui/switch'
 import { useCrews, useMcpServers, useRefreshMcp, useRemoveMcp, useSetMcpEnabled } from '@/lib/queries'
-import { ConfirmDialog } from '../parts'
+import { ConfirmDialog, InfoTip } from '../parts'
 import { McpServerDialog } from './McpServerDialog'
 import { OptionalMcpCard } from './OptionalMcpCard'
 
@@ -91,6 +91,7 @@ export function McpSection() {
             Read from each CLI&apos;s own config. A job whose seats pick a server that is down still starts, and its brief says which one is down.
           </CardDescription>
           <CardAction className="flex items-center gap-2">
+            <InfoTip text="MCP servers give Claude and OpenCode extra tools. No project (user level) shows servers that every project gets. Choosing a project shows the servers for that project as well, and anything you add or change here applies to it." label="Project" />
             <Select value={crewId == null ? NO_PROJECT : String(crewId)} onValueChange={setProject}>
               <SelectTrigger aria-label="Project" className="h-8 w-44 text-xs">
                 <SelectValue />

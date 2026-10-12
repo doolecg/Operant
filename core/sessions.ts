@@ -1,7 +1,11 @@
 import { EventEmitter } from 'node:events'
+import { mkdirSync, writeFileSync } from 'node:fs'
+import { homedir } from 'node:os'
+import { dirname } from 'node:path'
 import { killTree } from './proc'
 import { hiddenConsoleEnv } from './hideshim'
 import { defaultShell, type PathEnv, type ShellSpec } from './paths'
+import { buildSoftPrompt } from './softprompt'
 
 // The subset of node-pty that sessions use, so tests can pass a fake.
 export interface Pty {
@@ -73,6 +77,7 @@ export interface SessionEvents {
 export class SessionManager extends EventEmitter<SessionEvents> {
   private readonly sessions = new Map<SessionKey, Session>()
   private shellOverride: ShellSpec | null = null
+  private softPromptDir: string | null = null
 
   constructor(
     private readonly spawn: PtyFactory,
@@ -86,14 +91,28 @@ export class SessionManager extends EventEmitter<SessionEvents> {
     this.shellOverride = spec
   }
 
+  // Operant's data folder turns the soft two-line prompt on for plain default-shell terminals started from now on; null turns it off.
+  setSoftPrompt(dataDir: string | null): void {
+    this.softPromptDir = dataDir
+  }
+
   isRunning(key: SessionKey): boolean {
     return this.sessions.has(key)
   }
 
   start({ key, cwd, env: extraEnv, command }: LaunchSpec, cols = 120, rows = 32): void {
     if (this.sessions.has(key)) return
-    const sh = this.shellOverride ?? defaultShell(this.pathEnv)
-    const env = hiddenConsoleEnv({ ...inheritedEnv(), ...extraEnv }) as Record<string, string>
+    let sh = this.shellOverride ?? defaultShell(this.pathEnv)
+    let shellEnv: Record<string, string> = {}
+    // Only a bare default-shell terminal (nothing typed into it) gets the soft prompt; a custom shell is left as set.
+    if (this.softPromptDir && !this.shellOverride && !command) {
+      const soft = this.softPromptFor(sh)
+      if (soft) {
+        sh = soft.spec
+        shellEnv = soft.env
+      }
+    }
+    const env = hiddenConsoleEnv({ ...inheritedEnv(), ...shellEnv, ...extraEnv }) as Record<string, string>
     const pty = this.spawn(sh.file, sh.args, { cwd, cols, rows, env })
     const session: Session = { pty, buffer: '' }
     this.sessions.set(key, session)
@@ -110,6 +129,22 @@ export class SessionManager extends EventEmitter<SessionEvents> {
     })
 
     if (command) pty.write(`${command}\r`)
+  }
+
+  // Writes the prompt scripts and returns the launch that reads them; null (the plain shell) if they cannot be written.
+  private softPromptFor(sh: ShellSpec): ReturnType<typeof buildSoftPrompt> {
+    const e = this.pathEnv ?? { platform: process.platform, home: homedir(), env: process.env }
+    const soft = buildSoftPrompt({ shell: sh, dataDir: this.softPromptDir ?? '', home: e.home, zdotdir: e.env.ZDOTDIR })
+    if (!soft) return null
+    try {
+      for (const f of soft.files) {
+        mkdirSync(dirname(f.path), { recursive: true })
+        writeFileSync(f.path, f.content, 'utf8')
+      }
+    } catch {
+      return null
+    }
+    return soft
   }
 
   stop(key: SessionKey): void {
@@ -145,6 +180,11 @@ export class SessionManager extends EventEmitter<SessionEvents> {
 
   resize(key: SessionKey, cols: number, rows: number): void {
     if (cols > 0 && rows > 0) this.sessions.get(key)?.pty.resize(cols, rows)
+  }
+
+  // The process id of a running session's shell.
+  pid(key: SessionKey): number | undefined {
+    return this.sessions.get(key)?.pty.pid
   }
 
   buffer(key: SessionKey): string {

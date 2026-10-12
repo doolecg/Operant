@@ -108,14 +108,27 @@ export function OperatorTerminal({ sessionKey, autoFocus = true, crewId, cli = '
         ctrlKey: e.ctrlKey,
         metaKey: e.metaKey,
         altKey: e.altKey,
+        shiftKey: e.shiftKey,
         code: e.code,
         hasSelection: term.hasSelection(),
         live: true,
         bound: !!binds && Object.values(binds).some((a) => matches(e, a)),
       })
       if (action === 'copy') {
-        void navigator.clipboard.writeText(term.getSelection())
-        if (!isMac) term.clearSelection()
+        if (term.hasSelection()) {
+          void navigator.clipboard.writeText(term.getSelection())
+          if (!isMac) term.clearSelection()
+        }
+        e.preventDefault()
+        return false
+      }
+      if (action === 'selectAll' || action.startsWith('scroll')) {
+        e.preventDefault()
+        if (action === 'selectAll') term.selectAll()
+        else if (action === 'scrollPageUp') term.scrollPages(-1)
+        else if (action === 'scrollPageDown') term.scrollPages(1)
+        else if (action === 'scrollTop') term.scrollToTop()
+        else term.scrollToBottom()
         return false
       }
       if (action === 'paste') {
@@ -130,6 +143,23 @@ export function OperatorTerminal({ sessionKey, autoFocus = true, crewId, cli = '
       if (settingsRef.current?.terminal.copyOnSelect && term.hasSelection()) void navigator.clipboard.writeText(term.getSelection())
     }
     el.addEventListener('mouseup', onUp)
+    // Right click, Windows Terminal style: copy and deselect when something is selected, otherwise paste.
+    const onContext = (e: MouseEvent) => {
+      e.preventDefault()
+      if (!settingsRef.current?.terminal.rightClickPaste) return
+      if (term.hasSelection()) {
+        void navigator.clipboard.writeText(term.getSelection())
+        term.clearSelection()
+      } else void pasteClipboard()
+    }
+    el.addEventListener('contextmenu', onContext)
+    // Middle click pastes on Linux only, like the X11 primary selection habit.
+    const onAux = (e: MouseEvent) => {
+      if (e.button !== 1) return
+      e.preventDefault()
+      if (b.platform === 'linux') void pasteClipboard()
+    }
+    el.addEventListener('auxclick', onAux)
     // A file path in the output is a link: Ctrl+click (Cmd on macOS) opens it, inside the project folder only.
     const links = term.registerLinkProvider({
       provideLinks(y, done) {
@@ -194,6 +224,8 @@ export function OperatorTerminal({ sessionKey, autoFocus = true, crewId, cli = '
       input.dispose()
       links.dispose()
       el.removeEventListener('mouseup', onUp)
+      el.removeEventListener('contextmenu', onContext)
+      el.removeEventListener('auxclick', onAux)
       el.removeEventListener('dragover', onOver)
       el.removeEventListener('drop', onDrop)
       offData()

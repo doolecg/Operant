@@ -275,6 +275,20 @@ export class BrowserPanels implements BrowserHost {
     return this.stateOf(crewId)
   }
 
+  // Shows a document address (served by core's docs server): a tab already on it is reloaded and selected, else a new
+  // tab opens. The tile appears if it was closed.
+  async openDoc(crewId: number, url: string): Promise<void> {
+    const p = this.panel(crewId)
+    const same = [...p.tabs.values()].find((t) => t.view.webContents.getURL() === url)
+    if (!same) {
+      await this.createTab(p, url)
+      return
+    }
+    this.hub.setOpen(crewId, true)
+    this.selectTab(crewId, same.id)
+    same.view.webContents.reload()
+  }
+
   // The user closed the tile: views go, the partition stays.
   close(crewId: number): void {
     const p = this.panels.get(crewId)

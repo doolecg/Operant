@@ -8,6 +8,7 @@ import type { BrowserAction, BrowserCapture, BrowserConfirm, BrowserConfirmEnd, 
 import type { Bookmark, ClearResult, CookieDraft, CookieInfo, CookieKey, Emulation, InspectLogs, InspectLogsChanged } from './browser-inspect'
 import type { BrowserPromptAnswer, BrowserPromptsState } from './browser-prompts'
 import type { EnhanceContext } from './prompt-enhance'
+import type { ServersResult } from './servers'
 import type {
   AppInfo,
   BudgetConfig,
@@ -58,6 +59,7 @@ import type { Settings, SettingsPatch } from './settings'
 import type { MediaState, MediaTimeline } from './media'
 import type { CapabilityReport, ClaudeTileState } from './claude-mods'
 import type { RunningCounts } from './notify'
+import type { TilePopoutRequest } from './tile-popout'
 import { CHAT_CHANNELS, type ChatApi, type ChatEvents } from './claude-chat'
 
 // Request/response calls: renderer -> main via ipcRenderer.invoke. Every one is validated in core; a
@@ -101,6 +103,8 @@ export interface IpcApi extends ChatApi {
   'git:stageHunk': (crewId: number, ref: GitHunkRef, stage: boolean) => GitResult
   'git:commit': (crewId: number, message: string, amend?: boolean) => GitCommitResult
   'git:lastMessage': (crewId: number) => string
+  // Opens an .html or .md file of the project in its browser tile; the path is checked against the project folder.
+  'docs:open': (crewId: number, path: string) => void
   'git:log': (crewId: number, limit?: number, skip?: number) => GitCommit[]
   'git:commitDetails': (crewId: number, hash: string) => GitCommitDetails
   'git:branches': (crewId: number) => GitBranches
@@ -202,6 +206,8 @@ export interface IpcApi extends ChatApi {
   // Plan limits and usage of the services behind the CLIs (Claude, OpenCode providers, z.ai).
   'providers:status': () => ProvidersStatus
   'providers:refresh': () => ProvidersStatus
+  // The dev servers (listening ports) started by the projects' tiles.
+  'servers:list': () => ServersResult
 
 
   'index:status': (crewId: number) => IndexStatus | null
@@ -398,6 +404,10 @@ export interface IpcApi extends ChatApi {
   // The panel in its own window, and back.
   'browser:popOut': (crewId: number) => void
   'browser:popIn': (crewId: number) => void
+  // A terminal tile in its own window (the same live session), and back; the list is the scratch ids that are out.
+  'tile:popOut': (req: TilePopoutRequest) => void
+  'tile:popIn': (scratchId: number) => void
+  'tile:popouts': () => number[]
 }
 
 export type IpcChannel = keyof IpcApi
@@ -468,6 +478,9 @@ export type MainChannel =
   | 'browser:historyClear'
   | 'browser:popOut'
   | 'browser:popIn'
+  | 'tile:popOut'
+  | 'tile:popIn'
+  | 'tile:popouts'
 export type CoreChannel = Exclude<IpcChannel, MainChannel>
 
 // Push messages: main -> renderer.
@@ -498,6 +511,8 @@ export interface IpcEvents {
   'app:closeRequest': RunningCounts
   // A finished or waiting Claude tile was clicked in a notification: show that tile.
   'notify:open': { scratchId: number; crewId: number }
+  // A tile's output looked like a server starting, or a tile ended: the list of servers may have changed.
+  'servers:changed': Record<string, never>
   // A project's browser panel changed (tabs, navigation, AI activity or control).
   'browser:state': BrowserState
   // The project's visited pages changed (address bar suggestions).
@@ -516,6 +531,8 @@ export interface IpcEvents {
   // The console or network log of a tab changed (coalesced); the renderer refetches while the panel is open.
   'browser:inspectLogs': InspectLogsChanged
   'browser:bookmarks': { crewId: number; entries: Bookmark[] }
+  // The scratch ids of the tiles that are in their own windows changed.
+  'tile:popouts': number[]
 }
 
 export type IpcEventName = keyof IpcEvents
@@ -555,6 +572,7 @@ export const CORE_CHANNELS: CoreChannel[] = [
   'git:stageHunk',
   'git:commit',
   'git:lastMessage',
+  'docs:open',
   'git:log',
   'git:commitDetails',
   'git:branches',
@@ -672,6 +690,7 @@ export const CORE_CHANNELS: CoreChannel[] = [
   'data:exportFile',
   'providers:status',
   'providers:refresh',
+  'servers:list',
   'index:status',
   'index:run',
   'events:recent',
@@ -753,6 +772,9 @@ export const MAIN_CHANNELS: MainChannel[] = [
   'browser:historyClear',
   'browser:popOut',
   'browser:popIn',
+  'tile:popOut',
+  'tile:popIn',
+  'tile:popouts',
 ]
 
 // What a rejected call carries. Electron only passes an error's message across the bridge, so main encodes

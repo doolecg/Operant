@@ -23,6 +23,12 @@ const STORE_HINT: Record<LearnStore, string> = {
   memory: "Writes each lesson as a file in the project's personal memory folder.",
 }
 
+const STORE_INFO: Record<LearnStore, string> = {
+  hindsight: 'Saves lessons to the Hindsight memory server, so any session on this project can recall them.',
+  codegraph: 'Saves lessons as notes tied to files and functions, so they show up next to code results.',
+  memory: "Saves lessons as files in the project's memory folder, which Claude reads at the start of a session.",
+}
+
 const RECALL_LABEL: Record<RecallMode, string> = { off: 'Off', 'session-start': 'Session start' }
 
 type WhenToLearn = 'off' | 'finished'
@@ -203,7 +209,7 @@ export function LearningSection() {
           <CardDescription>When and where lessons are kept. See the Memory page to read, edit and delete them.</CardDescription>
         </CardHeader>
         <CardContent className="divide-y">
-          <Row label="When to learn" hint={WHEN_HINT[when]} htmlFor="learn-enabled">
+          <Row label="When to learn" info="Turns the learning step on or off. When on, Operant reads each Claude Code session once it ends and keeps any lessons worth remembering. When off, nothing new is learned and no lessons are added to briefs. It is on by default." hint={WHEN_HINT[when]} htmlFor="learn-enabled">
             <Select value={when} onValueChange={(v) => save.mutate({ learn: { enabled: v === 'finished' } })}>
               <SelectTrigger id="learn-enabled" className="w-52">
                 <SelectValue />
@@ -230,7 +236,7 @@ export function LearningSection() {
             </Button>
           </Row>
           {LEARN_STORES.map((id) => (
-            <Row key={id} label={`Write to ${STORE_LABEL[id]}`} hint={STORE_HINT[id]} htmlFor={`learn-${id}`}>
+            <Row key={id} info={STORE_INFO[id]} label={`Write to ${STORE_LABEL[id]}`} hint={STORE_HINT[id]} htmlFor={`learn-${id}`}>
               <Switch id={`learn-${id}`} disabled={!l.enabled} checked={l[id]} onCheckedChange={(v) => save.mutate({ learn: { [id]: v } })} />
             </Row>
           ))}
@@ -242,22 +248,22 @@ export function LearningSection() {
           <details className="group py-3">
             <summary className="cursor-pointer text-sm font-medium select-none">Limits</summary>
             <div className="divide-y pt-1">
-              <Row label="Calls per review" hint="Includes validation retries. 0 means no limit." htmlFor="learn-calls">
+              <Row label="Calls per review" info="Sets the most requests to the AI that a single review may send, including retries. Lower values keep costs down but may cut a review short. 0 means no limit, which is the default." hint="Includes validation retries. 0 means no limit." htmlFor="learn-calls">
                 <NumberField id="learn-calls" value={l.maxCallsPerReview} min={0} max={50} onCommit={(n) => save.mutate({ learn: { maxCallsPerReview: n } })} />
               </Row>
-              <Row label="Tokens per review" hint="0 means no limit." htmlFor="learn-tokens">
+              <Row label="Tokens per review" info="Sets the most text, counted in tokens (small chunks of words), that one review may send to the AI. Lower values save money but may stop a long session being fully read. 0 means no limit, which is the default." hint="0 means no limit." htmlFor="learn-tokens">
                 <NumberField id="learn-tokens" value={l.maxTokensPerReview} min={0} max={2000000} onCommit={(n) => save.mutate({ learn: { maxTokensPerReview: n } })} />
               </Row>
-              <Row label="Changes per review" hint="0 means no limit." htmlFor="learn-changes">
+              <Row label="Changes per review" info="Sets the most lessons one review may add or change, so a single session cannot flood your memory. Once the cap is reached the review stops making changes. 0 means no limit, which is the default." hint="0 means no limit." htmlFor="learn-changes">
                 <NumberField id="learn-changes" value={l.maxChangesPerReview} min={0} max={100} onCommit={(n) => save.mutate({ learn: { maxChangesPerReview: n } })} />
               </Row>
-              <Row label="Validation retries" htmlFor="learn-retries">
+              <Row label="Validation retries" info="If the AI replies in a form Operant cannot read, it is asked again up to this many times. More retries rescue more reviews but can use more of your plan or credit. The default is 1." htmlFor="learn-retries">
                 <NumberField id="learn-retries" value={l.validationRetries} min={0} max={5} onCommit={(n) => save.mutate({ learn: { validationRetries: n } })} />
               </Row>
-              <Row label={`Daily budget (${symbol})`} hint="0 means no cap." htmlFor="learn-usd">
+              <Row info="Sets the most money learning may spend in one day. Once reached, further reviews are blocked until the next day. If you also set a daily cap for background AI jobs, the lower of the two applies. 0 means no cap, which is the default." label={`Daily budget (${symbol})`} hint="0 means no cap." htmlFor="learn-usd">
                 <NumberField id="learn-usd" value={toField(l.dailyUsdBudget)} min={0} max={10000000} step="0.01" onCommit={(n) => save.mutate({ learn: { dailyUsdBudget: fromField(n) } })} />
               </Row>
-              <Row label="When a limit is hit" hint="Stop ends the run. Confirm stops it and waits for you." htmlFor="learn-onlimit">
+              <Row label="When a limit is hit" info="Chooses what happens when a review hits one of the limits above. Stop ends the review. Stop and confirm also ends it but lets you choose to carry on past the limit afterwards. The default is Stop." hint="Stop ends the run. Confirm stops it and waits for you." htmlFor="learn-onlimit">
                 <Select value={l.onLimit} onValueChange={(v) => save.mutate({ learn: { onLimit: v as LearnOnLimit } })}>
                   <SelectTrigger id="learn-onlimit" className="w-44">
                     <SelectValue />
@@ -268,13 +274,13 @@ export function LearningSection() {
                   </SelectContent>
                 </Select>
               </Row>
-              <Row label="Minimum user turns" hint="Shorter sessions are skipped without a model call." htmlFor="learn-turns">
+              <Row label="Minimum user turns" info="A session with fewer of your own messages than this is skipped, because short chats rarely hold lasting lessons. Skipped sessions cost nothing, as no AI call is made. The default is 3." hint="Shorter sessions are skipped without a model call." htmlFor="learn-turns">
                 <NumberField id="learn-turns" value={l.minUserTurns} min={0} max={100} onCommit={(n) => save.mutate({ learn: { minUserTurns: n } })} />
               </Row>
-              <Row label="Minimum tokens" hint="Smaller sessions are skipped without a model call." htmlFor="learn-mintokens">
+              <Row label="Minimum tokens" info="A session with less text than this, counted in tokens (small chunks of words), is skipped without calling the AI. Raise it to learn only from bigger sessions. The default is 500." hint="Smaller sessions are skipped without a model call." htmlFor="learn-mintokens">
                 <NumberField id="learn-mintokens" value={l.minTokens} min={0} max={10000000} onCommit={(n) => save.mutate({ learn: { minTokens: n } })} />
               </Row>
-              <Row label="Learn when idle (minutes)" hint="Learns from a Claude session on its own after it has been quiet this long, or right after a turn finishes. 0 turns it off; closing a tile still learns." htmlFor="learn-idle">
+              <Row label="Learn when idle (minutes)" info="Starts learning from a Claude session by itself once its transcript has not grown for this many minutes, as long as it is not mid-turn. A session also gets reviewed a few seconds after a turn finishes. 0 turns this off. The default is 5." hint="Learns from a Claude session on its own after it has been quiet this long, or right after a turn finishes. 0 turns it off; closing a tile still learns." htmlFor="learn-idle">
                 <NumberField id="learn-idle" value={l.idleMinutes} min={0} max={1440} onCommit={(n) => save.mutate({ learn: { idleMinutes: n } })} />
               </Row>
             </div>
@@ -290,7 +296,7 @@ export function LearningSection() {
           </CardDescription>
         </CardHeader>
         <CardContent className="divide-y">
-          <Row label={local ? 'AI and model' : 'CLI, model and effort'} hint="Applies to the next learn run.">
+          <Row info="Chooses which AI reads your sessions and picks the lessons: Claude Code, OpenCode, or a model server on your own computer. Leaving the model empty uses a cheap default, and a bigger model costs more for little gain. Changes apply from the next review." label={local ? 'AI and model' : 'CLI, model and effort'} hint="Applies to the next learn run.">
             <div className="flex flex-wrap items-center justify-end gap-2">
               <Select value={l.cli} onValueChange={(cli) => save.mutate({ learn: { cli: cli as LearnCli, model: '', effort: '' } })}>
                 <SelectTrigger aria-label="Learning CLI" className="w-44">
@@ -332,7 +338,7 @@ export function LearningSection() {
           </Row>
           {local && (
             <>
-              <Row label="Endpoint" hint="LM Studio is http://127.0.0.1:1234. Ollama is http://127.0.0.1:11434. Any OpenAI-compatible server works.">
+              <Row label="Endpoint" info="Where Operant finds your local AI server, such as LM Studio or Ollama. Any server that speaks the OpenAI format works. If the address is wrong, the list of models cannot load and learning with this server fails. The default is http://127.0.0.1:1234." hint="LM Studio is http://127.0.0.1:1234. Ollama is http://127.0.0.1:11434. Any OpenAI-compatible server works.">
                 <CommitInput id="learn-local-url" aria-label="Local server endpoint" className="w-72 font-mono text-xs" value={l.localUrl} onCommit={(v) => save.mutate({ learn: { localUrl: v } })} />
               </Row>
               {localModels.data?.error && (
@@ -340,7 +346,7 @@ export function LearningSection() {
                   Could not list models: {localModels.data.error}
                 </p>
               )}
-              <Row label="API key" hint={localKey.data ? 'A key is saved (encrypted). Leave empty to clear it.' : 'Most local servers need none.'}>
+              <Row label="API key" info="Only needed if your local AI server requires a password. It is saved encrypted and sent with each request to that server. Most local servers need none, so you can leave it empty." hint={localKey.data ? 'A key is saved (encrypted). Leave empty to clear it.' : 'Most local servers need none.'}>
                 <div className="flex items-center gap-2">
                   <Input aria-label="Local server API key" type="password" className="w-48" placeholder={localKey.data ? 'Saved' : 'None'} value={keyDraft} onChange={(e) => setKeyDraft(e.target.value)} />
                   <Button variant="outline" size="sm" disabled={setKey.isPending || (keyDraft === '' && !localKey.data)} onClick={() => setKey.mutate([keyDraft], { onSuccess: () => setKeyDraft('') })}>
@@ -348,7 +354,7 @@ export function LearningSection() {
                   </Button>
                 </div>
               </Row>
-              <Row label="Allow plain http outside my network" hint="Off refuses an http endpoint that is not on this PC or the LAN, since prompts would travel unencrypted." htmlFor="learn-local-insecure">
+              <Row label="Allow plain http outside my network" info="Operant normally refuses a plain http address that is not on this PC or your home network, because what you send could be read in transit. Turning this on allows it anyway. Leave it off unless you trust the connection. It is off by default." hint="Off refuses an http endpoint that is not on this PC or the LAN, since prompts would travel unencrypted." htmlFor="learn-local-insecure">
                 <Switch id="learn-local-insecure" checked={l.localInsecureOk} onCheckedChange={(v) => save.mutate({ learn: { localInsecureOk: v } })} />
               </Row>
               <p className="text-muted-foreground py-3 text-xs">

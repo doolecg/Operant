@@ -106,7 +106,7 @@ export interface Settings {
   // notesOpen shows the Notes panel beside the tiles; notesWidth is its dragged width (0 keeps the built-in 260).
   layout: { sidebarWidth: number; sidebarHidden: boolean; notesOpen: boolean; notesWidth: number }
   // Terminal text: copy once on mouseup, font size in px, scrollback lines, Ctrl+click file paths, dropped files type their paths.
-  terminal: { copyOnSelect: boolean; fontSize: number; scrollback: number; fileLinks: boolean; dropPaths: boolean }
+  terminal: { copyOnSelect: boolean; fontSize: number; scrollback: number; fileLinks: boolean; dropPaths: boolean; rightClickPaste: boolean; softPrompt: boolean }
   // The tiles surface: layout kind, gap in px and the strip's size.
   tiles: { layout: TileLayout; gaps: number; strip: TileStrip }
   // Claude Code tiles: Operant's hooks and status line (sub-agent state, context and cost), and the sub-agent panel.
@@ -215,7 +215,7 @@ export const DEFAULT_SETTINGS: Settings = {
   uiScale: 0,
   appearance: DEFAULT_APPEARANCE,
   layout: { sidebarWidth: 0, sidebarHidden: false, notesOpen: false, notesWidth: 0 },
-  terminal: { copyOnSelect: false, fontSize: 13, scrollback: 5000, fileLinks: true, dropPaths: true },
+  terminal: { copyOnSelect: true, fontSize: 13, scrollback: 5000, fileLinks: true, dropPaths: true, rightClickPaste: true, softPrompt: true },
   tiles: { layout: 'dwindle', gaps: 6, strip: 'normal' },
   claudeMods: { enabled: true, mods: { ...MOD_DEFAULT_ENABLED }, keepWarm: true, commandMenu: true },
   browser: { ...DEFAULT_BROWSER_SETTINGS },
@@ -381,6 +381,8 @@ export function sanitizeSettings(raw: unknown): Settings {
       scrollback: Math.round(num(term.scrollback, d.terminal.scrollback, 500, 100_000)),
       fileLinks: flag(term.fileLinks, d.terminal.fileLinks),
       dropPaths: flag(term.dropPaths, d.terminal.dropPaths),
+      rightClickPaste: flag(term.rightClickPaste, d.terminal.rightClickPaste),
+      softPrompt: flag(term.softPrompt, d.terminal.softPrompt),
     },
     tiles: {
       layout: tiles.layout === 'master' || tiles.layout === 'dwindle' ? tiles.layout : d.tiles.layout,
@@ -400,6 +402,7 @@ export function sanitizeSettings(raw: unknown): Settings {
       homeUrl: webUrl(browser.homeUrl, d.browser.homeUrl),
       searchUrl: webUrl(browser.searchUrl, d.browser.searchUrl, true),
       autonomy: browser.autonomy === 'full' || browser.autonomy === 'confirm' ? browser.autonomy : d.browser.autonomy,
+      autoOpenDocs: flag(browser.autoOpenDocs, d.browser.autoOpenDocs),
       perCrew: sanitizePerCrew(browser.perCrew),
     },
     confirm: {

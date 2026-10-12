@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button'
 import { Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { ToolRow } from './ToolRow'
+import { InfoTip } from '../parts'
 import { useAddOptionalMcp, useOptionalMcp, useRecheckOptionalMcp, useRemoveOptionalMcp } from '@/lib/queries'
 
 const CLI_LABEL: Record<McpCli, string> = { claude: 'Claude Code', opencode: 'OpenCode' }
@@ -98,6 +99,7 @@ export function OptionalMcpPanel({ crewId, e, row }: { crewId: number | null; e:
             />
             {CLI_LABEL[cli]}
           </label>
+          <InfoTip text="Tick to add this server to this tool's own config, then pick a scope. A wider scope such as User or Global reaches every project. A narrower one, such as Local or This project, reaches only the project chosen above. Leave both unticked to add nothing." label={`Add to ${CLI_LABEL[cli]}`} />
           {picks[cli].on && (
             <Select value={picks[cli].scope} onValueChange={(v) => setPicks((p) => ({ ...p, [cli]: { ...p[cli], scope: v as McpScope } }))}>
               <SelectTrigger aria-label={`${CLI_LABEL[cli]} scope`} className="h-8 w-64 text-xs">

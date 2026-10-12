@@ -2,18 +2,39 @@ import { useEffect, useState, type ReactNode } from 'react'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Button } from '@/components/ui/button'
+import { Info } from 'lucide-react'
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { Dialog, DialogBody, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { eventToAccel, formatAccel, mouseEventToAccel } from '@/lib/keys'
 import { cn } from '@/lib/utils'
 
 // Shared building blocks for the settings sections.
-export function Row({ label, hint, htmlFor, children }: { label: string; hint?: string; htmlFor?: string; children: ReactNode }) {
+// The small info icon next to a setting: hover or focus it for a short plain explanation.
+export function InfoTip({ text, label }: { text: string; label: string }) {
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <button type="button" aria-label={`About ${label}`} className="text-muted-foreground hover:text-foreground focus-visible:ring-ring inline-flex shrink-0 rounded-full outline-none focus-visible:ring-2">
+          <Info className="size-3.5" />
+        </button>
+      </TooltipTrigger>
+      <TooltipContent side="top" className="max-w-64">
+        {text}
+      </TooltipContent>
+    </Tooltip>
+  )
+}
+
+export function Row({ label, hint, info, htmlFor, children }: { label: string; hint?: string; info?: string; htmlFor?: string; children: ReactNode }) {
   return (
     <div className="flex items-center justify-between gap-6 py-3">
       <div className="min-w-0">
-        <Label htmlFor={htmlFor} className="text-sm">
-          {label}
-        </Label>
+        <div className="flex items-center gap-1.5">
+          <Label htmlFor={htmlFor} className="text-sm">
+            {label}
+          </Label>
+          {info && <InfoTip text={info} label={label} />}
+        </div>
         {hint && <p className="text-muted-foreground mt-0.5 text-xs">{hint}</p>}
       </div>
       <div className="shrink-0">{children}</div>

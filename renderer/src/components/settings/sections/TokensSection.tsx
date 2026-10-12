@@ -43,7 +43,7 @@ export function TokensSection() {
           </CardDescription>
         </CardHeader>
         <CardContent className="divide-y">
-          <Row label={`Daily budget (${symbol})`} hint="All projects and scratch terminals together. 0 turns it off." htmlFor="budget">
+          <Row label={`Daily budget (${symbol})`} hint="All projects and scratch terminals together. 0 turns it off." info="A spending guide for each day, across all projects and scratch terminals. When spend since midnight nears it, Operant raises a warning. Nothing is stopped. Spend is estimated from session records at list prices. 0 turns it off, which is the default." htmlFor="budget">
             <NumberField
               id="budget"
               min={0}
@@ -53,13 +53,13 @@ export function TokensSection() {
               onCommit={(v) => save.mutate({ dailyBudgetUsd: fromField(v) })}
             />
           </Row>
-          <Row label={`5-hour budget (${symbol})`} hint="The last 5 hours, all projects together. 0 turns it off." htmlFor="budget-5h">
+          <Row label={`5-hour budget (${symbol})`} hint="The last 5 hours, all projects together. 0 turns it off." info="A spending guide for any rolling 5-hour period, across all projects. This suits plans that limit use in 5-hour windows. It only warns and never stops anything. Spend is an estimate at list prices. 0 turns it off, which is the default." htmlFor="budget-5h">
             <NumberField id="budget-5h" min={0} max={10000000} step="0.5" value={toField(s.fiveHourBudgetUsd)} onCommit={(v) => save.mutate({ fiveHourBudgetUsd: fromField(v) })} />
           </Row>
-          <Row label={`Weekly budget (${symbol})`} hint="The last 7 days, all projects together. 0 turns it off." htmlFor="budget-week">
+          <Row label={`Weekly budget (${symbol})`} hint="The last 7 days, all projects together. 0 turns it off." info="A spending guide for the last 7 days, across all projects. It only warns and never stops anything. Spend is an estimate from session records at list prices, so your real bill may differ. 0 turns it off, which is the default." htmlFor="budget-week">
             <NumberField id="budget-week" min={0} max={10000000} step="0.5" value={toField(s.weeklyBudgetUsd)} onCommit={(v) => save.mutate({ weeklyBudgetUsd: fromField(v) })} />
           </Row>
-          <Row label="Warn at (% of a cap)" hint="Raises an activity event and an amber badge." htmlFor="warn-pct">
+          <Row label="Warn at (% of a cap)" hint="Raises an activity event and an amber badge." info="The share of a spending limit you must reach before Operant shows an amber badge and logs an activity event. With a daily limit of 10 and this at 80, the warning appears at 8. Use 1 to 100. The default is 80." htmlFor="warn-pct">
             <NumberField id="warn-pct" min={1} max={100} value={t.capWarnPct} onCommit={(v) => set({ capWarnPct: v })} />
           </Row>
         </CardContent>
@@ -74,7 +74,7 @@ export function TokensSection() {
           <Row
             label="Cold turn threshold (%)"
             hint="A turn is cold when cache writes exceed this share of its context: the cache was rebuilt and the turn cost full price."
-            htmlFor="cold-pct"
+            info="Claude saves repeated context in a cache so it costs less. A turn is flagged cold when more than this share of its context had to be written to the cache again, so it cost full price. This only changes reports, not spending. Use 1 to 100. The default is 50." htmlFor="cold-pct"
           >
             <NumberField id="cold-pct" min={1} max={100} value={t.coldThresholdPct} onCommit={(v) => set({ coldThresholdPct: v })} />
           </Row>
@@ -97,21 +97,21 @@ export function TokensSection() {
           <Row
             label="Default cache lifetime"
             hint="For operators whose preset says auto. Auto leaves Claude Code's own default alone. 1 hour costs more to write but survives long idle gaps."
-            htmlFor="default-ttl"
+            info="How long Claude Code keeps your conversation's repeated context cached at the cheaper rate. 1 hour costs more to write but survives long pauses. 5 minutes is cheaper to write. Auto leaves Claude Code's own default. Applies to tiles started after the change." htmlFor="default-ttl"
           >
             <TtlSelect id="default-ttl" value={t.defaultCacheTtl} onChange={(v) => set({ defaultCacheTtl: v })} autoLabel="Auto (Claude Code default)" />
           </Row>
           <Row
             label="Sub-agent cache lifetime"
             hint="Sub-agents are short-lived, so 5 minutes avoids paying for a 1-hour write they won't reuse."
-            htmlFor="sub-ttl"
+            info="The cache lifetime for sub-agents, the short-lived helpers Claude starts. They finish quickly, so 5 minutes avoids paying more for a 1-hour cache they never reuse. Auto sets nothing. The default is 5 minutes. Applies to tiles started after the change." htmlFor="sub-ttl"
           >
             <TtlSelect id="sub-ttl" value={t.subagentCacheTtl} onChange={(v) => set({ subagentCacheTtl: v })} autoLabel="Auto (not set)" />
           </Row>
           <Row
             label="Pin the Claude Code version for operators"
             hint="Stops Claude Code updating itself in an operator's terminal: an upgrade changes the prefix and rebuilds every cache. Update it yourself between runs."
-            htmlFor="pin-version"
+            info="A Claude Code upgrade changes what is cached and forces every cache to be rebuilt at full price. When on, Operant tells Claude Code in its tiles not to update itself, so you update it between runs. On by default." htmlFor="pin-version"
           >
             <Switch id="pin-version" checked={t.pinClaudeVersion} onCheckedChange={(v) => set({ pinClaudeVersion: v })} />
           </Row>

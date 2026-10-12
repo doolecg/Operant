@@ -1,3 +1,25 @@
+# Operant 3.2.0
+
+**Install:** download the file for your system from the assets below. Operant keeps itself up to date from these releases.
+
+## New
+- **Info icons in Settings.** Every setting has a small info icon. Hover it to read what the setting does and what changes when you turn it on or off.
+- **Move and resize tiles.** Each tile header has a grip. Drag it onto another tile to swap places, including the browser tile. Drag the gap between tiles to resize them, and double-click the gap to reset.
+- **Pop out any tile.** Shells, Claude Code, OpenCode and the browser can each open in their own window with the same live session. Pop back in from the window or the tile.
+- **Documents open in the browser.** HTML and Markdown plans, docs and artifacts that Claude creates open in the project's browser. Click a file in Right now to open it. A new "Open documents in the browser" setting turns the automatic opening off.
+- **Stop button on subagents.** Each running subagent has a Stop button. In the Chat view it stops just that subagent. Elsewhere it says it stops the whole turn.
+- **Running servers list.** A Servers button lists the dev servers your tiles started, with Open in browser and Copy address.
+- **Soft two-line shell prompt.** New shell tiles show the folder and git branch on one line and a soft arrow on the next. The arrow turns red when a command fails. A new setting turns it off.
+- **Learning shows in the chat.** A "Learn" row appears in the Chat view while Operant learns from the session, then shows what it saved.
+
+---
+
+## Changed
+- **Terminals work like a normal terminal.** Selecting text copies it. Right click copies a selection or pastes. Ctrl+Shift+C and Ctrl+Shift+V, Shift+Insert, Ctrl+Insert and Ctrl+Shift+A work. Shift+PageUp, PageDown, Home and End scroll. A new "Right click pastes" setting turns the right click off.
+- **Copy on select is on by default.**
+
+---
+
 # Operant 3.1.3
 
 **Install:** download the file for your system from the assets below. Operant keeps itself up to date from these releases.

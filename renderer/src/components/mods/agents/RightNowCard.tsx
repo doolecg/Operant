@@ -1,10 +1,12 @@
-import { useMemo } from 'react'
+import { useMemo, useState } from 'react'
 import { Brain, GitBranch, Loader2 } from 'lucide-react'
 import type { ChatItem } from '@shared/claude-chat'
-import type { LearnStatus } from '@shared/learn'
+import { decodeIpcError } from '@shared/ipc'
+import { isDocFile } from '@shared/docs'
+import { learnOutcomeText, type LearnStatus } from '@shared/learn'
 import { cn } from '@/lib/utils'
 import { useChatState } from '@/components/chat/useChat'
-import { useGitInfo, useLearnStatus, useRepoStatus } from '@/lib/queries'
+import { call, useGitInfo, useLearnStatus, useRepoStatus } from '@/lib/queries'
 import { legendFiles, rightNowHeadline, touchedFiles, type TouchedFile } from './rightNow'
 
 // The dot colours of the legend and the file list: purple read, orange edited, yellow not committed in git.
@@ -12,12 +14,34 @@ const READ_DOT = 'bg-chart-4'
 const EDIT_DOT = 'bg-chart-6'
 const UNCOMMITTED_DOT = 'bg-warning'
 
-function FileRow({ file }: { file: TouchedFile }) {
+// An .html or .md file opens in the project's browser tile when clicked; other files are plain rows.
+function FileRow({ file, crewId }: { file: TouchedFile; crewId: number | null }) {
+  const [error, setError] = useState<string | null>(null)
+  const openable = crewId !== null && isDocFile(file.path)
+  const open = () => {
+    if (crewId === null) return
+    setError(null)
+    call('docs:open', crewId, file.path).catch((e: unknown) => setError(decodeIpcError(e).message))
+  }
+  const name = <span className="min-w-0 truncate font-mono text-[11px]">{file.name}</span>
   return (
-    <li className="flex min-w-0 items-center gap-2 text-xs" title={file.path}>
-      <i aria-hidden className={cn('size-[7px] shrink-0 rounded-full', file.kind === 'edited' ? EDIT_DOT : READ_DOT)} />
-      {file.uncommitted && <i role="img" aria-label="Not committed" className={cn('size-[7px] shrink-0 rounded-full', UNCOMMITTED_DOT)} />}
-      <span className="min-w-0 truncate font-mono text-[11px]">{file.name}</span>
+    <li className="min-w-0 text-xs" title={file.path}>
+      <div className="flex min-w-0 items-center gap-2">
+        <i aria-hidden className={cn('size-[7px] shrink-0 rounded-full', file.kind === 'edited' ? EDIT_DOT : READ_DOT)} />
+        {file.uncommitted && <i role="img" aria-label="Not committed" className={cn('size-[7px] shrink-0 rounded-full', UNCOMMITTED_DOT)} />}
+        {openable ? (
+          <button type="button" aria-label={`Open ${file.name} in the browser`} onClick={open} className="hover:text-primary focus-visible:ring-ring flex min-w-0 cursor-pointer items-center rounded-sm underline-offset-2 outline-none hover:underline focus-visible:ring-2">
+            {name}
+          </button>
+        ) : (
+          name
+        )}
+      </div>
+      {error && (
+        <div role="alert" className="text-destructive mt-0.5 pl-[15px] text-[11px]">
+          {error}
+        </div>
+      )}
     </li>
   )
 }
@@ -28,8 +52,7 @@ function learnLine(s: LearnStatus): string {
   const r = s.lastRun
   if (!r) return 'Memory: nothing learned yet'
   if (r.error) return `Memory: ${r.error}`
-  const queued = r.queued > 0 ? `, ${r.queued} to review` : ''
-  return `Learned ${r.extracted} ${r.extracted === 1 ? 'lesson' : 'lessons'}: ${r.written} saved${queued}`
+  return learnOutcomeText(r)
 }
 
 // The "Right now" card at the top of the Agents panel. Terminal tiles show only the branch: their conversation is not in
@@ -109,7 +132,7 @@ export function RightNowCard({ tileId, crewId, chat }: { tileId: number; crewId:
           {legend.shown.length > 0 && (
             <ul className="border-border mt-2.5 flex flex-col gap-1.5 border-t pt-2.5" aria-label="Files this session touched">
               {legend.shown.map((f) => (
-                <FileRow key={f.path} file={f} />
+                <FileRow key={f.path} file={f} crewId={crewId} />
               ))}
               {legend.more > 0 && <li className="text-muted-foreground text-[11px]">+{legend.more} more</li>}
             </ul>

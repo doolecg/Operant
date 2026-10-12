@@ -19,6 +19,7 @@ import { SessionManager } from '../core/sessions'
 import { Store } from '../core/store'
 import { DEFAULT_CREW_BROWSER, sanitizeCrewBrowser } from '../shared/browser-compat'
 import { DEFAULT_APPEARANCE, windowBackground } from '../shared/themes'
+import { tilePopoutQuery } from '../shared/tile-popout'
 import { BrowserPanels } from './browser'
 import { BrowserPopout } from './browser-popout'
 import { hideAutomationFlag } from './browser-stealth'
@@ -27,6 +28,7 @@ import { isAppUrl, type AppOrigin } from './guard'
 import { attachCloseGuard, type CloseGuard } from './closeGuard'
 import { push, registerIpc } from './ipc'
 import { watchClaudeTurns, type TurnWatch } from './notify'
+import { TilePopout } from './tile-popout'
 import { createUpdater } from './updater'
 import { attachWindowSync } from './windowSync'
 
@@ -80,6 +82,7 @@ let cliTarget: CliTarget | null = null
 let browserHub: BrowserHub | null = null
 let browserPanels: BrowserPanels | null = null
 let browserPopout: BrowserPopout | null = null
+let tilePopout: TilePopout | null = null
 let browserProxy: CdpProxy | null = null
 let browserMcp: McpHost | null = null
 let browserExtras: Extras | null = null
@@ -271,6 +274,7 @@ function createWindow(): void {
   win.on('closed', () => {
     // The pop-out windows go with the app window.
     browserPopout?.closeAll()
+    tilePopout?.closeAll()
     guard = null
     win = null
   })
@@ -313,6 +317,7 @@ app.whenReady().then(() => {
     },
     // Claude tiles get the browser's MCP endpoint once it is listening (null until then, or when it failed).
     browserMcp: () => browserMcpUrl,
+    openInBrowser: async (crewId, url) => void (await browserPanels?.openDoc(crewId, url)),
     onCrewDeleted: (crewId) => {
       browserMcp?.closeCrew(crewId)
       browserExtras?.dropCrew(crewId)
@@ -350,6 +355,24 @@ app.whenReady().then(() => {
   // First plan-limit and provider reading now; the core asks again when each is due.
   void core.providers.refresh().catch(() => undefined)
   startBrowser(core)
+  // A terminal tile can sit in its own window; the set that are out is pushed to every window.
+  const tiles = new TilePopout({
+    getMainWindow: () => win,
+    load: (w, req) => {
+      const query = tilePopoutQuery(req)
+      if (devUrl) void w.loadURL(`${devUrl}?${new URLSearchParams(query).toString()}`)
+      else void w.loadFile(appOrigin.indexFile, { query })
+    },
+    webPreferences: windowWebPreferences(),
+    icon: iconFile,
+    background,
+    isAppUrl: (u) => isAppUrl(u, appOrigin),
+    onChange: (ids) => {
+      push(win, 'tile:popouts', ids)
+      for (const w of tiles.windows()) push(w, 'tile:popouts', ids)
+    },
+  })
+  tilePopout = tiles
   const updater = createUpdater({ send: (s) => push(win, 'update', s), getSettings: () => core.currentSettings, beforeInstall: (v) => core.snapshotBeforeUpdate(v) })
   core.on('settings', () => updater.reschedule())
   installing = () => updater.status.state === 'installing'
@@ -358,6 +381,7 @@ app.whenReady().then(() => {
     turnBusy: (scratchId) => turns?.busy(scratchId) ?? false,
     setVisible: (scratchId) => turns?.setVisible(scratchId),
     browser: { panels: browserPanels!, hub: browserHub!, popout: browserPopout! },
+    tiles,
   })
   updater.start()
   createWindow()
@@ -384,6 +408,7 @@ app.on('before-quit', (e) => {
 
 app.on('will-quit', () => {
   browserPopout?.closeAll()
+  tilePopout?.closeAll()
   browserExtras?.dispose()
   void browserMcp?.close().catch(() => undefined)
   void browserProxy?.close().catch(() => undefined)

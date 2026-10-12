@@ -8,7 +8,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Input } from '@/components/ui/input'
 import { useBackups, useCreateBackup, useDeleteBackup, useRestoreBackup } from '@/lib/queries'
 import { toast } from '@/lib/toast'
-import { ConfirmDialog } from '../parts'
+import { ConfirmDialog, InfoTip } from '../parts'
 
 const formatBytes = (n: number) => (n < 1024 ? `${n} B` : n < 1024 * 1024 ? `${(n / 1024).toFixed(1)} KB` : `${(n / 1024 / 1024).toFixed(1)} MB`)
 const formatDate = (ms: number) => new Date(ms).toLocaleString()
@@ -69,6 +69,7 @@ export function BackupsSection() {
             onChange={(e) => setLabel(e.target.value)}
             onKeyDown={(e) => e.key === 'Enter' && void doCreate()}
           />
+          <InfoTip text="An optional note saved inside the backup file, for example before trying new presets. If you leave it empty the backup is labelled Manual backup. The list below shows each backup by its file name, date and size, not by this note." label="Backup label" />
           <Button size="sm" disabled={create.isPending} onClick={() => void doCreate()}>
             <Plus /> Create backup
           </Button>

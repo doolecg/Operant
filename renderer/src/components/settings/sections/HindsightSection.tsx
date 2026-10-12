@@ -19,7 +19,7 @@ import {
   useSettings,
 } from '@/lib/queries'
 import { cn } from '@/lib/utils'
-import { CommitInput, ConfirmDialog, NumberField, Row } from '../parts'
+import { CommitInput, ConfirmDialog, InfoTip, NumberField, Row } from '../parts'
 
 const URL_RE = /^https?:\/\/\S+$/i
 
@@ -235,7 +235,7 @@ export function HindsightSection() {
 
           {h.mode === 'lan' && (
             <div className="divide-y">
-              <Row label="Network address" hint="The address other machines reach this PC on. Tailscale addresses are marked." htmlFor="hindsight-adapter">
+              <Row label="Network address" info="Picks which of this PC's network connections the server listens on. Other computers can only connect through that address. Choosing all adapters opens it on every network, including public Wi-Fi, so one adapter such as Tailscale is safer." hint="The address other machines reach this PC on. Tailscale addresses are marked." htmlFor="hindsight-adapter">
                 <Adapters list={list} value={h.bindHost} onChange={(v) => set({ bindHost: v })} />
               </Row>
               {h.bindHost === '0.0.0.0' && (
@@ -244,11 +244,14 @@ export function HindsightSection() {
                   All adapters means every network this PC is on, including public Wi-Fi. Prefer one adapter, such as the Tailscale one.
                 </p>
               )}
-              <Row label="Port" htmlFor="hindsight-port" hint="Operant itself reaches the server on 127.0.0.1 at this port.">
+              <Row label="Port" info="The port is the numbered door the server listens on. Change it only if another program already uses 9077, the default. Other computers must use the same number, and Operant itself connects to it on this PC." htmlFor="hindsight-port" hint="Operant itself reaches the server on 127.0.0.1 at this port.">
                 <NumberField id="hindsight-port" value={h.port} min={1} max={65535} className="w-28" onCommit={(v) => set({ port: v })} />
               </Row>
               <div className="space-y-2 py-3">
-                <div className="text-sm">API key</div>
+                <div className="flex items-center gap-1.5 text-sm">
+                  API key
+                  <InfoTip text="A password that other computers must send to read or write memories on this server. Without one, sharing is blocked unless you allow an open server. It is stored encrypted and cannot be viewed again once saved." label="API key" />
+                </div>
                 <p className="text-muted-foreground text-xs">
                   Other machines send it as <code>Authorization: Bearer &lt;key&gt;</code>. The key is stored encrypted by Operant and is not shown again after it is saved.
                 </p>
@@ -289,7 +292,7 @@ export function HindsightSection() {
           {h.mode === 'remote' && (
             <div className="divide-y">
               <div className="py-3">
-                <Row label="Hindsight URL" hint="The full http:// or https:// address of the server." htmlFor="hindsight-url">
+                <Row label="Hindsight URL" info="The full web address of a Hindsight server running on another machine, for example http://server:9077. Operant uses it instead of starting its own, so lessons are stored on that server. If the address is wrong, memory features fail." hint="The full http:// or https:// address of the server." htmlFor="hindsight-url">
                   <CommitInput id="hindsight-url" value={h.url} placeholder="http://server:9077" className="w-72" aria-invalid={urlError !== ''} onCommit={commitUrl} />
                 </Row>
                 {urlError && (

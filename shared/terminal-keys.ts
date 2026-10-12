@@ -1,11 +1,12 @@
-// Which way a terminal key press goes: to the app (a bound shortcut), a copy, a paste, or on to the PTY.
-export type TermKeyAction = 'app' | 'copy' | 'paste' | 'terminal'
+// Which way a terminal key press goes: to the app (a bound shortcut), a clipboard action, a scroll, or on to the PTY.
+export type TermKeyAction = 'app' | 'copy' | 'paste' | 'selectAll' | 'scrollPageUp' | 'scrollPageDown' | 'scrollTop' | 'scrollBottom' | 'terminal'
 
 export interface TermKeyInput {
   mac: boolean
   ctrlKey: boolean
   metaKey: boolean
   altKey: boolean
+  shiftKey: boolean
   code: string
   hasSelection: boolean
   // The session is running, so a paste has somewhere to go.
@@ -15,9 +16,24 @@ export interface TermKeyInput {
 }
 
 // Windows-style clipboard: Ctrl+C copies when there is a selection, Ctrl+V pastes. On macOS it is Cmd+C and Cmd+V,
-// and Ctrl+C (interrupt) and Ctrl+V go through to the terminal.
+// and Ctrl+C (interrupt) and Ctrl+V go through to the terminal. Off macOS the terminal-style chords also work:
+// Ctrl+Shift+C and Ctrl+Insert copy, Ctrl+Shift+V and Shift+Insert paste, Ctrl+Shift+A selects all. Ctrl+Shift+C is
+// always swallowed so it never reaches the PTY. Shift+PageUp/PageDown/Home/End scroll the scrollback.
 export function decideTermKey(k: TermKeyInput): TermKeyAction {
   if (k.bound) return 'app'
+  if (!k.ctrlKey && !k.metaKey && !k.altKey && k.shiftKey) {
+    if (k.code === 'PageUp') return 'scrollPageUp'
+    if (k.code === 'PageDown') return 'scrollPageDown'
+    if (k.code === 'Home') return 'scrollTop'
+    if (k.code === 'End') return 'scrollBottom'
+    if (k.code === 'Insert' && !k.mac && k.live) return 'paste'
+  }
+  if (!k.mac && k.ctrlKey && !k.metaKey && !k.altKey) {
+    if (k.shiftKey && k.code === 'KeyC') return 'copy'
+    if (k.shiftKey && k.code === 'KeyV' && k.live) return 'paste'
+    if (k.shiftKey && k.code === 'KeyA') return 'selectAll'
+    if (!k.shiftKey && k.code === 'Insert' && k.hasSelection) return 'copy'
+  }
   const clip = k.mac ? k.metaKey && !k.ctrlKey && !k.altKey : k.ctrlKey && !k.altKey
   if (clip && k.code === 'KeyC' && k.hasSelection) return 'copy'
   if (clip && k.code === 'KeyV' && k.live) return 'paste'

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { hasTile, insertTile, promoteTile, removeTile, setRatio, tileIds, tileRects, toggleSplit, type Rect, type TileNode } from './tiling'
+import { hasTile, insertTile, promoteTile, removeTile, setRatio, setRatioAt, splitHandles, swapTiles, tileIds, tileRects, toggleSplit, type Rect, type TileNode } from './tiling'
 
 const A: Rect = { x: 0, y: 0, w: 1000, h: 600 }
 const GAP = 10
@@ -203,5 +203,43 @@ describe('promoteTile and helpers', () => {
     expect(hasTile(t, 'a')).toBe(true)
     expect(hasTile(t, 'z')).toBe(false)
     expect(hasTile(null, 'a')).toBe(false)
+  })
+})
+
+describe('swapTiles, splitHandles and setRatioAt', () => {
+  it('swaps two tiles and ignores bad input', () => {
+    const t = build(['m', 'a', 'b'])!
+    expect(tileIds(swapTiles(t, 'm', 'b'))).toEqual(['b', 'a', 'm'])
+    expect(swapTiles(t, 'a', 'a')).toBe(t)
+    expect(swapTiles(t, 'a', 'x')).toBe(t)
+  })
+
+  it('handle rects sit in the gaps between tiles', () => {
+    const t = build(['m', 'a', 'b'])!
+    const rs = tileRects(t, A, 'dwindle', 0.5, GAP)
+    const hs = splitHandles(t, A, GAP)
+    expect(hs).toHaveLength(2)
+    const root = hs[0]!
+    expect(root.path).toEqual([])
+    expect(root.parent).toEqual(A)
+    expect(root.rect.x).toBe(rs.get('m')!.x + rs.get('m')!.w)
+    expect(root.rect.w).toBe(GAP)
+    expect(root.rect.x + root.rect.w).toBe(rs.get('a')!.x)
+    const inner = hs[1]!
+    expect(inner.path).toEqual(['b'])
+    expect(inner.rect.y).toBe(rs.get('a')!.y + rs.get('a')!.h)
+    expect(inner.rect.y + inner.rect.h).toBe(rs.get('b')!.y)
+  })
+
+  it('sets a ratio by path, clamped', () => {
+    const t = build(['m', 'a', 'b'])!
+    const r = (n: TileNode) => (n as SplitNode).ratio
+    expect(r(setRatioAt(t, [], 0.3))).toBe(0.3)
+    expect(r(setRatioAt(t, [], 5))).toBe(0.9)
+    expect(r(setRatioAt(t, [], -1))).toBe(0.1)
+    const inner = (setRatioAt(t, ['b'], 0.7) as SplitNode).b
+    expect(r(inner)).toBe(0.7)
+    expect(r(setRatioAt(t, ['b'], 0.7))).toBe(0.5)
+    expect(setRatioAt({ tile: 'x' }, [], 0.3)).toEqual({ tile: 'x' })
   })
 })

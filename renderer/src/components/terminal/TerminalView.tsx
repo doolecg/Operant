@@ -6,9 +6,11 @@ import { Sparkles, SquareTerminal } from 'lucide-react'
 import type { MainCli } from '@shared/settings'
 import { decodeIpcError } from '@shared/ipc'
 import type { ScratchView } from '@shared/types'
+import { isTileOut } from '@shared/tile-popout'
 import { Button } from '@/components/ui/button'
 import { BrowserTile } from '@/components/browser/BrowserTile'
-import { useBrowserActions } from '@/components/browser/useBrowser'
+import { PoppedOutNotice } from '@/components/browser/BrowserPopout'
+import { useBrowserActions, useBrowserState } from '@/components/browser/useBrowser'
 import { OperatorTerminal } from '@/components/dashboard/OperatorTerminal'
 import { ChatView } from '@/components/chat/ChatView'
 import { ChatHeaderControls, ChatStateBadge, ViewSwitch } from '@/components/chat/ChatHeader'
@@ -19,6 +21,7 @@ import { NOTES_DEFAULT, NOTES_MAX, NOTES_MIN, NOTES_RAIL, NotesPanel, NotesRail 
 import { TileIcon } from './TileFrame'
 import { TileInfoBar, TileStatus } from './TileInfoBar'
 import { TileSurface } from './TileSurface'
+import { useTilePopouts } from './useTilePopouts'
 import { isScratchTile, useProjectTiles, type ScratchTileInfo, type TileInfo } from './useProjectTiles'
 import type { TerminalTab } from './useTerminals'
 
@@ -45,6 +48,8 @@ export function TerminalView({ crewId, scratch, active, onCloseScratch, onStart 
   const tiles = useProjectTiles(crewId, scratch)
   const scratchTiles = tiles.filter(isScratchTile)
   const browser = useBrowserActions(crewId)
+  const out = useTilePopouts()
+  const browserOut = useBrowserState(crewId).data?.poppedOut === true
   const activeTile = scratchTiles.find((t) => t.scratch.scratchId === active)?.id ?? null
   const crew = useCrews().data?.find((c) => c.id === crewId)
   const [focusedId, setFocusedId] = useState<string | null>(null)
@@ -91,6 +96,8 @@ export function TerminalView({ crewId, scratch, active, onCloseScratch, onStart 
   const body = (tile: TileInfo) => {
     if (!isScratchTile(tile)) return <BrowserTile crewId={crewId} />
     const t = tile
+    // The session lives in its own window: no terminal here, so two of them do not fight over the PTY size.
+    if (isTileOut(out, t.scratch.scratchId)) return <PoppedOutNotice title={t.title} onPopIn={() => void call('tile:popIn', t.scratch.scratchId).catch(() => undefined)} />
     const view = viewOf(t)
     if (view === undefined) return null
     if (t.scratch.kind === 'claude' && view === 'chat')
@@ -155,6 +162,13 @@ export function TerminalView({ crewId, scratch, active, onCloseScratch, onStart 
             crewId={crewId}
             tiles={tiles}
             onClose={close}
+            popOut={(tile) => {
+              if (!isScratchTile(tile)) return browserOut ? null : () => void browser.popOut.mutate()
+              const t = tile
+              if (isTileOut(out, t.scratch.scratchId)) return null
+              return () =>
+                void call('tile:popOut', { scratchId: t.scratch.scratchId, crewId, kind: t.scratch.kind, title: t.title }).catch((e) => toast(decodeIpcError(e).message, true))
+            }}
             body={body}
             chrome={(tile) => {
               if (!isScratchTile(tile)) return { icon: <TileIcon kind="browser" compact={strip === 'compact'} />, heading: 'Browser', subtitle: crew?.name }

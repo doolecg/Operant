@@ -259,3 +259,11 @@ export interface ConsolidateResult {
   // Why the pass did nothing or stopped early ('' when it ran through).
   skipped: string
 }
+
+// The one-line result of a learn run: "Learned 3 lessons: 2 saved, 1 to review", or why it did nothing (null: it did nothing).
+export function learnOutcomeText(r: Pick<LearnRunInfo, 'error' | 'extracted' | 'written' | 'queued'> | null): string {
+  if (!r) return 'Skipped: nothing to learn from'
+  if (r.error) return r.error
+  const queued = r.queued > 0 ? `, ${r.queued} to review` : ''
+  return `Learned ${r.extracted} ${r.extracted === 1 ? 'lesson' : 'lessons'}: ${r.written} saved${queued}`
+}

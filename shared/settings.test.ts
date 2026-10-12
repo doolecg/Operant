@@ -95,7 +95,7 @@ describe('settings', () => {
   it('sanitises the hide flag, terminal and tiles settings', () => {
     const d = sanitizeSettings({})
     expect(d.layout).toEqual({ sidebarWidth: 0, sidebarHidden: false, notesOpen: false, notesWidth: 0 })
-    expect(d.terminal).toEqual({ copyOnSelect: false, fontSize: 13, scrollback: 5000, fileLinks: true, dropPaths: true })
+    expect(d.terminal).toEqual({ copyOnSelect: true, fontSize: 13, scrollback: 5000, fileLinks: true, dropPaths: true, rightClickPaste: true, softPrompt: true })
     expect(d.tiles).toEqual({ layout: 'dwindle', gaps: 6, strip: 'normal' })
     const bad = sanitizeSettings({
       layout: { sidebarHidden: 'yes' },
@@ -103,9 +103,9 @@ describe('settings', () => {
       tiles: { layout: 'grid', gaps: -4, strip: 'big' },
     })
     expect(bad.layout).toEqual({ sidebarWidth: 0, sidebarHidden: false, notesOpen: false, notesWidth: 0 })
-    expect(bad.terminal).toEqual({ copyOnSelect: false, fontSize: 32, scrollback: 500, fileLinks: false, dropPaths: true })
+    expect(bad.terminal).toEqual({ copyOnSelect: true, fontSize: 32, scrollback: 500, fileLinks: false, dropPaths: true, rightClickPaste: true, softPrompt: true })
     // A saved chat composer switch from before the Chat view is dropped on load.
-    expect(sanitizeSettings({ terminal: { chatComposer: true } }).terminal).toEqual({ copyOnSelect: false, fontSize: 13, scrollback: 5000, fileLinks: true, dropPaths: true })
+    expect(sanitizeSettings({ terminal: { chatComposer: true } }).terminal).toEqual({ copyOnSelect: true, fontSize: 13, scrollback: 5000, fileLinks: true, dropPaths: true, rightClickPaste: true, softPrompt: true })
     expect(bad.tiles).toEqual({ layout: 'dwindle', gaps: 0, strip: 'normal' })
     // A saved layout from before the side panel was removed keeps the project list and drops the rest.
     const old = sanitizeSettings({ layout: { sidebarHidden: true, panelHidden: true, rightWidth: 300 }, keybinds: { toggleSidePanel: 'Alt+X' } })
@@ -148,6 +148,11 @@ describe('browser settings', () => {
   it('drops malformed values', () => {
     const b = sanitizeSettings({ browser: { aiControl: 'no', homeUrl: 'javascript:alert(1)', searchUrl: 'https://s.example/' } }).browser
     expect(b).toEqual(DEFAULT_SETTINGS.browser)
+  })
+  it('opens documents by itself unless turned off, and ignores a non-boolean', () => {
+    expect(DEFAULT_SETTINGS.browser.autoOpenDocs).toBe(true)
+    expect(sanitizeSettings({ browser: { autoOpenDocs: false } }).browser.autoOpenDocs).toBe(false)
+    expect(sanitizeSettings({ browser: { autoOpenDocs: 'no' } }).browser.autoOpenDocs).toBe(true)
   })
   it('keeps good values and merges a patch', () => {
     const b = mergeSettings(DEFAULT_SETTINGS, { browser: { aiControl: false, homeUrl: 'http://localhost:3000', searchUrl: 'https://s.example/?q=%s' } }).browser

@@ -23,11 +23,12 @@ export function BrowserPopoutPage({ crewId, onPopIn }: { crewId: number; onPopIn
 }
 
 // What the tile area shows in the main window while the browser lives in its own window.
-export function PoppedOutNotice({ onPopIn }: { onPopIn: () => void }) {
+// A terminal tile passes its title; the browser says nothing and gets its own wording.
+export function PoppedOutNotice({ onPopIn, title }: { onPopIn: () => void; title?: string }) {
   return (
     <div className="text-muted-foreground flex h-full flex-col items-center justify-center gap-3 text-sm">
-      <p>The browser is in its own window.</p>
-      <Button type="button" variant="outline" size="sm" aria-label="Pop browser back in" onClick={onPopIn}>
+      <p>{title ? `${title} is in its own window.` : 'The browser is in its own window.'}</p>
+      <Button type="button" variant="outline" size="sm" aria-label={title ? `Pop ${title} back in` : 'Pop browser back in'} onClick={onPopIn}>
         Pop back in
       </Button>
     </div>

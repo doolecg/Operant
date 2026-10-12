@@ -22,6 +22,7 @@ import {
   type SubagentItem,
   type ToolItem,
 } from '../shared/claude-chat'
+import { learnOutcomeText } from '../shared/learn'
 import { ChatMapper, mapTranscript } from './claude-chat-map'
 
 const fixture = (name: string): Array<Record<string, unknown>> =>
@@ -556,5 +557,33 @@ describe('keep-warm ping turn', () => {
     expect(m.state.items.map((i) => i.kind)).toEqual(['notice'])
     expect(m.takePingResult()).toMatchObject({ ok: true, reply: 'warm', cacheRead: 61000 })
     expect(m.takePingResult()).toBeNull()
+  })
+})
+
+describe('Learn row', () => {
+  it('adds a running Learn tool row, then finishes it with the result, without touching the turn', () => {
+    const m = mapper()
+    const start = m.noteLearnStart('learn:1', 'Operant')
+    expect(start).toHaveLength(1)
+    expect(start[0]).toMatchObject({ op: 'upsert', item: { kind: 'tool', id: 'learn:1', name: 'Learn', summary: 'Operant', status: 'running' } })
+    expect(m.state.turn.phase).toBe('idle')
+    expect(m.state.items.some((i) => i.kind === 'user')).toBe(false)
+
+    const end = m.noteLearnEnd('learn:1', learnOutcomeText({ error: '', extracted: 3, written: 2, queued: 1 }), false)
+    expect(end[0]).toMatchObject({ op: 'upsert', item: { id: 'learn:1', status: 'done', result: { text: 'Learned 3 lessons: 2 saved, 1 to review', isError: false } } })
+    expect(m.state.turn.phase).toBe('idle')
+  })
+
+  it('marks the row failed and ignores unknown ids', () => {
+    const m = mapper()
+    m.noteLearnStart('learn:2', 'Operant')
+    expect(m.noteLearnEnd('learn:2', 'Could not extract lessons: x', true)[0]).toMatchObject({ item: { status: 'failed' } })
+    expect(m.noteLearnEnd('nope', 'x', false)).toEqual([])
+  })
+
+  it('formats the result text', () => {
+    expect(learnOutcomeText({ error: '', extracted: 1, written: 1, queued: 0 })).toBe('Learned 1 lesson: 1 saved')
+    expect(learnOutcomeText({ error: 'Skipped: only 1 user turn (minimum 2)', extracted: 0, written: 0, queued: 0 })).toBe('Skipped: only 1 user turn (minimum 2)')
+    expect(learnOutcomeText(null)).toBe('Skipped: nothing to learn from')
   })
 })

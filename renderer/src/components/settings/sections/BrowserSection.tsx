@@ -79,16 +79,19 @@ export function BrowserSection() {
           <CardDescription>Each project has its own browser tile with its own saved logins. Open it from the globe button on the project row.</CardDescription>
         </CardHeader>
         <CardContent className="divide-y">
-          <Row label="Let the AI use the browser" hint="Claude tiles can open pages, click and type in the project's browser. You can take control at any time. Takes effect after restart." htmlFor="browser-ai">
+          <Row label="Let the AI use the browser" hint="Claude tiles can open pages, click and type in the project's browser. You can take control at any time. Takes effect after restart." info="When on, Claude tiles can open pages, click and type in the project's built-in browser, and you can still take over at any time. When off, Claude cannot reach the browser at all. It is on by default and changes apply after a restart." htmlFor="browser-ai">
             <Switch id="browser-ai" checked={b.aiControl} onCheckedChange={(v) => save.mutate({ browser: { aiControl: v } })} />
           </Row>
-          <Row label="Home page" hint="Where a new browser or tab starts. Must be an http or https address." htmlFor="browser-home">
+          <Row label="Open documents in the browser" hint="New HTML and Markdown files Claude writes in docs, plans, specs, artifacts or design folders, and plans it presents, open in the browser tile." info="When on, a new .html, .htm or .md file that Claude creates inside a folder named docs, plans, specs, artifacts or design (or below one), and every plan Claude presents for approval, opens in the project's browser tile and shows as a readable page. Ordinary edits never open anything, and clicking a file in the Right now card always opens it, whatever this is set to. It is on by default." htmlFor="browser-auto-docs">
+            <Switch id="browser-auto-docs" checked={b.autoOpenDocs} onCheckedChange={(v) => save.mutate({ browser: { autoOpenDocs: v } })} />
+          </Row>
+          <Row label="Home page" hint="Where a new browser or tab starts. Must be an http or https address." info="The page a new browser or tab opens on when you have not typed an address. It must start with http or https. The default is DuckDuckGo." htmlFor="browser-home">
             <CommitInput id="browser-home" value={b.homeUrl} className="w-80" spellCheck={false} onCommit={(v) => save.mutate({ browser: { homeUrl: v } })} />
           </Row>
-          <Row label="Search address" hint="Used for text that is not an address. %s stands for what you typed." htmlFor="browser-search">
+          <Row label="Search address" hint="Used for text that is not an address. %s stands for what you typed." info="When you type words rather than a web address in the address bar, Operant puts them into this address and loads the result. Write %s where your words should go. The default searches DuckDuckGo." htmlFor="browser-search">
             <CommitInput id="browser-search" value={b.searchUrl} className="w-80" spellCheck={false} onCommit={(v) => save.mutate({ browser: { searchUrl: v } })} />
           </Row>
-          <Row label="AI autonomy" hint="Ask first: the AI asks you before sensitive browser actions. Full: it acts on its own." htmlFor="browser-autonomy">
+          <Row label="AI autonomy" hint="Ask first: the AI asks you before sensitive browser actions. Full: it acts on its own." info="Ask first makes Claude wait for your approval before risky browser actions, such as paying, deleting, downloading, uploading files, running scripts or typing into password and card fields. Full lets it do these without asking. Ask first is the default." htmlFor="browser-autonomy">
             <Select value={b.autonomy} onValueChange={(v) => save.mutate({ browser: { autonomy: v === 'full' ? 'full' : 'confirm' } })}>
               <SelectTrigger id="browser-autonomy" className="w-48" aria-label="AI autonomy">
                 <SelectValue />
@@ -108,7 +111,7 @@ export function BrowserSection() {
           <CardDescription>Options for pages that need more than the defaults, set for one project at a time. They apply to open tabs straight away.</CardDescription>
         </CardHeader>
         <CardContent className="divide-y">
-          <Row label="Project" htmlFor="browser-compat-project">
+          <Row label="Project" info="Each project has its own browser, so these options are saved per project. Pick the project here, then change the options below. They affect only that project and apply to its open tabs straight away." htmlFor="browser-compat-project">
             <Select value={compatCrew ? String(compatCrew.id) : ''} onValueChange={setCompatId}>
               <SelectTrigger id="browser-compat-project" className="w-48" aria-label="Project for site compatibility">
                 <SelectValue placeholder="Choose a project" />
@@ -124,7 +127,7 @@ export function BrowserSection() {
           </Row>
           {compatCrew && (
             <>
-              <Row label="Ignore certificate errors" hint="Auto only lets localhost, 127.0.0.1, ::1, .test and .local through. On accepts every bad certificate, so use it only for sites you trust." htmlFor="browser-certs">
+              <Row label="Ignore certificate errors" hint="Auto only lets localhost, 127.0.0.1, ::1, .test and .local through. On accepts every bad certificate, so use it only for sites you trust." info="A certificate proves a site is who it says it is. Auto lets only local test addresses (localhost, 127.0.0.1, .test, .local) open with a bad certificate. On allows every site, which is risky. Off blocks them all. Auto is the default." htmlFor="browser-certs">
                 <Select value={opts.ignoreCertErrors} onValueChange={(v) => setOpts({ ignoreCertErrors: v as CertMode })}>
                   <SelectTrigger id="browser-certs" className="w-48" aria-label="Ignore certificate errors">
                     <SelectValue />
@@ -136,16 +139,16 @@ export function BrowserSection() {
                   </SelectContent>
                 </Select>
               </Row>
-              <Row label="Relax cross-origin checks (CORS)" hint="Lets pages in this project call APIs on other origins. For local development only; the toolbar shows a warning while it is on." htmlFor="browser-cors">
+              <Row label="Relax cross-origin checks (CORS)" hint="Lets pages in this project call APIs on other origins. For local development only; the toolbar shows a warning while it is on." info="Browsers normally stop a page calling a server on a different address (CORS). When on, this project's browser answers those checks permissively so local test pages can call other servers. Use it only while developing. It is off by default." htmlFor="browser-cors">
                 <Switch id="browser-cors" checked={opts.relaxCors} onCheckedChange={(v) => setOpts({ relaxCors: v })} />
               </Row>
-              <Row label="Proxy" hint="For example http://127.0.0.1:8080 or socks5://host:1080. Empty means no proxy." htmlFor="browser-proxy">
+              <Row label="Proxy" hint="For example http://127.0.0.1:8080 or socks5://host:1080. Empty means no proxy." info="Routes everything this project's browser loads through a proxy server, for example to inspect traffic or reach a company network. Type an address like http://127.0.0.1:8080 or socks5://host:1080. Leave it empty for no proxy, which is the default." htmlFor="browser-proxy">
                 <CommitInput id="browser-proxy" value={opts.proxy} className="w-80" spellCheck={false} onCommit={(v) => setOpts({ proxy: v })} />
               </Row>
-              <Row label="Custom request headers" hint="Sent with every request of this project's browser. Stored in plain text." htmlFor="browser-headers">
+              <Row label="Custom request headers" hint="Sent with every request of this project's browser. Stored in plain text." info="Each header is added to every request this project's browser sends, for example an access token a test site expects. Up to 20 headers are kept. They are stored as plain text, so do not paste secrets you want kept private." htmlFor="browser-headers">
                 <HeadersInput value={headersToText(opts)} onCommit={(v) => setOpts({ headers: textToHeaders(v) })} />
               </Row>
-              <Row label="User agent" hint="Empty uses a normal Chrome user agent." htmlFor="browser-ua">
+              <Row label="User agent" hint="Empty uses a normal Chrome user agent." info="The user agent is the label a browser sends so sites know what it is. Leave this empty and Operant sends a normal Chrome one, which is the default. Fill it in only if a site needs a different label, such as a mobile phone." htmlFor="browser-ua">
                 <CommitInput id="browser-ua" value={opts.userAgent} className="w-80" spellCheck={false} onCommit={(v) => setOpts({ userAgent: v })} />
               </Row>
             </>
@@ -159,7 +162,7 @@ export function BrowserSection() {
           <CardDescription>Cookies, logins and site data are kept per project. Clearing one project leaves the others alone.</CardDescription>
         </CardHeader>
         <CardContent className="divide-y">
-          <Row label="Clear browser data" hint="Signs the project out of every site." htmlFor="browser-clear-project">
+          <Row label="Clear browser data" hint="Signs the project out of every site." info="Clears cookies, saved site data and the cache for the chosen project, so you are signed out of every site there. Other projects keep their logins. You cannot undo it, so you would need to sign in again." htmlFor="browser-clear-project">
             <div className="flex items-center gap-2">
               <Select value={crewId} onValueChange={setCrewId}>
                 <SelectTrigger id="browser-clear-project" className="w-48" aria-label="Project">

@@ -86,10 +86,10 @@ export function GeneralSection() {
           <CardDescription>Automatic grows the interface with the window, so a maximized screen looks as roomy as a small one. Ctrl+= and Ctrl+- step it, Ctrl+0 returns to automatic.</CardDescription>
         </CardHeader>
         <CardContent className="divide-y">
-          <Row label="UI scale" htmlFor="ui-scale">
+          <Row label="UI scale" info="Zooms the whole app between 80% and 200%. Automatic starts from 100% and grows the interface on larger windows, up to 175%, so a maximised big screen is not tiny. A fixed percentage stays put whatever the window size." htmlFor="ui-scale">
             <UiScaleSelect id="ui-scale" className="w-36" />
           </Row>
-          <Row label="Currency" hint="Costs, spend and budgets are shown in this currency. Amounts are kept in US dollars; there is no online lookup, so type the rate yourself." htmlFor="currency">
+          <Row label="Currency" info="Changes the currency symbol and amounts on costs, spend and budgets. Operant works out everything in US dollars underneath, so this only changes how the numbers are shown. Choose from ten currencies; the default is US dollars." hint="Costs, spend and budgets are shown in this currency. Amounts are kept in US dollars; there is no online lookup, so type the rate yourself." htmlFor="currency">
             <Select value={s.currency.code} onValueChange={(v) => save.mutate({ currency: { code: v as CurrencyCode } })}>
               <SelectTrigger id="currency" className="w-48">
                 <SelectValue />
@@ -104,7 +104,7 @@ export function GeneralSection() {
             </Select>
           </Row>
           {s.currency.code !== 'USD' && (
-            <Row label="Rate: 1 USD =" hint={`How many ${s.currency.code} one US dollar buys.`} htmlFor="currency-rate">
+            <Row label="Rate: 1 USD =" info="How many units of your currency one US dollar buys, for example 0.8 for pounds. Every dollar amount is multiplied by this number before it is shown. It is never looked up online, so update it yourself when rates change." hint={`How many ${s.currency.code} one US dollar buys.`} htmlFor="currency-rate">
               <NumberField id="currency-rate" aria-label={`Rate: 1 USD in ${s.currency.code}`} min={0.0001} max={1000000} step="0.0001" value={s.currency.rate} onCommit={(v) => save.mutate({ currency: { rate: v } })} />
             </Row>
           )}
@@ -118,7 +118,7 @@ export function GeneralSection() {
         </CardHeader>
         <CardContent className="divide-y">
           <UpdateRow status={update.data} />
-          <Row label="Channel" hint="Dev also offers the test builds made from the dev branch before they are released." htmlFor="channel">
+          <Row label="Channel" info="Stable only offers finished releases. Dev also offers pre-release test builds, so you get new features sooner but they may have rough edges. The choice applies from the next update check." hint="Dev also offers the test builds made from the dev branch before they are released." htmlFor="channel">
             <Select value={s.updates.channel} onValueChange={(v) => save.mutate({ updates: { channel: v as 'stable' | 'beta' } })}>
               <SelectTrigger id="channel" className="w-36">
                 <SelectValue />
@@ -129,7 +129,7 @@ export function GeneralSection() {
               </SelectContent>
             </Select>
           </Row>
-          <Row label="Check for updates" htmlFor="interval">
+          <Row label="Check for updates" info="How often Operant asks GitHub whether a newer version exists. It also checks a few seconds after the app starts. A found update downloads in the background. Only at startup turns off the repeat checks. The default is every 3 hours." htmlFor="interval">
             <Select value={String(s.updates.checkHours)} onValueChange={(v) => save.mutate({ updates: { checkHours: Number(v) } })}>
               <SelectTrigger id="interval" className="w-36">
                 <SelectValue />
@@ -144,7 +144,7 @@ export function GeneralSection() {
               </SelectContent>
             </Select>
           </Row>
-          <Row label="Install downloaded updates when Operant quits" htmlFor="on-quit">
+          <Row label="Install downloaded updates when Operant quits" info="When an update has finished downloading and is waiting, closing Operant installs it automatically. Off means you choose when to install it from the update row above. This is on by default and does not apply to Linux .deb installs." htmlFor="on-quit">
             <Switch
               id="on-quit"
               checked={s.updates.installOnQuit}
@@ -160,10 +160,10 @@ export function GeneralSection() {
           <CardDescription>Closing a terminal or Operant asks first when something would stop. "Don't ask again" in those dialogs turns the question off here.</CardDescription>
         </CardHeader>
         <CardContent className="divide-y">
-          <Row label="Ask before closing a terminal" htmlFor="confirm-tile">
+          <Row label="Ask before closing a terminal" info="Asks you to confirm before a terminal tile is closed, and says whether Claude is still working and will be stopped. Terminals whose process has already ended close without asking. On by default." htmlFor="confirm-tile">
             <Switch id="confirm-tile" checked={s.confirm.closeTile} onCheckedChange={(v) => save.mutate({ confirm: { closeTile: v } })} />
           </Row>
-          <Row label="Ask before closing Operant" htmlFor="confirm-app">
+          <Row label="Ask before closing Operant" info="Asks you to confirm before Operant quits, but only when Claude, OpenCode or shell terminals are running. It lists what will be stopped. With nothing running, it closes straight away. On by default." htmlFor="confirm-app">
             <Switch id="confirm-app" checked={s.confirm.closeApp} onCheckedChange={(v) => save.mutate({ confirm: { closeApp: v } })} />
           </Row>
         </CardContent>
@@ -175,10 +175,10 @@ export function GeneralSection() {
           <CardDescription>A Windows notification when Claude finishes or waits for you, shown only while you are looking at another window or tile. Clicking it opens that tile.</CardDescription>
         </CardHeader>
         <CardContent className="divide-y">
-          <Row label="Notify when Claude finishes" htmlFor="notify-finished">
+          <Row label="Notify when Claude finishes" info="Shows a system notification when Claude finishes its turn, with the tile name and the first line of its reply. It only appears when the window is not focused or you are looking at a different tile. Clicking it opens that tile." htmlFor="notify-finished">
             <Switch id="notify-finished" checked={s.notify.finished} onCheckedChange={(v) => save.mutate({ notify: { finished: v } })} />
           </Row>
-          <Row label="Notify when Claude needs me" hint="A permission request or a question." htmlFor="notify-needs">
+          <Row label="Notify when Claude needs me" info="Shows a system notification when Claude stops to ask for permission or to ask you a question, so a tile does not sit waiting unnoticed. It only appears when you are not looking at that tile. Clicking it opens the tile." hint="A permission request or a question." htmlFor="notify-needs">
             <Switch id="notify-needs" checked={s.notify.needs} onCheckedChange={(v) => save.mutate({ notify: { needs: v } })} />
           </Row>
         </CardContent>

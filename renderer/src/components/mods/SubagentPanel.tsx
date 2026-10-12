@@ -1,17 +1,20 @@
 import { useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react'
-import { Check, ChevronDown, ChevronLeft, X } from 'lucide-react'
+import { Check, ChevronDown, ChevronLeft, Square, X } from 'lucide-react'
+import { decodeIpcError } from '@shared/ipc'
 import { itemsOf, type ChatItem, type SubagentItem } from '@shared/claude-chat'
 import type { ClaudeSubagent } from '@shared/claude-mods'
 import { cn } from '@/lib/utils'
+import { bridge } from '@/lib/bridge'
+import { ConfirmDialog } from '@/components/ui/confirm-dialog'
 import { ConversationList } from '@/components/chat/ConversationList'
 import { UserBubble } from '@/components/chat/ItemViews'
 import { selectAgent, useAgentSelection } from '@/components/chat/agentSelection'
 import { ContextBar } from '@/components/chat/ItemViews'
 import { agentElapsed, agentTitle, agentList, agentRowFor, kTokens, type AgentDot, type AgentRowModel } from '@/components/chat/chatHelpers'
-import { useAgentHistory, useChatState, useNow } from '@/components/chat/useChat'
+import { chatActions, useAgentHistory, useChatState, useNow } from '@/components/chat/useChat'
 import { Critter } from './agents/Critter'
 import { RightNowCard } from './agents/RightNowCard'
-import { cardTime, critterFor, effortInfo, loadCleared, loadStatusOpen, mcpSummary, mcpTiles, metricsOf, money, progressOf, saveCleared, saveStatusOpen, sessionRows, shortModel, skillSummary, skillTiles, summarize, viewFor, type AgentView, type EffortTone, type McpTile, type McpTone } from './agents/agentView'
+import { cardTime, critterFor, effortInfo, loadCleared, loadStatusOpen, mcpSummary, mcpTiles, metricsOf, money, progressOf, saveCleared, saveStatusOpen, sessionRows, shortModel, skillSummary, skillTiles, stopPlan, summarize, viewFor, type AgentView, type EffortTone, type McpTile, type McpTone } from './agents/agentView'
 import type { ModProps } from './registry'
 
 const TONE: Record<EffortTone, { text: string; bar: string }> = {
@@ -28,7 +31,7 @@ function StatusMark({ dot }: { dot: AgentDot }) {
   return <i role="img" aria-label={dot === 'waiting' ? 'Waiting for you' : 'Running'} className={cn('size-[8px] shrink-0 rounded-full', dot === 'waiting' ? 'bg-warning' : 'bg-primary motion-safe:animate-pulse')} />
 }
 
-function AgentRow({ row, now, onOpen, onClear }: { row: AgentView; now: number; onOpen: () => void; onClear?: () => void }) {
+function AgentRow({ row, now, onOpen, onClear, onStop, stopTitle }: { row: AgentView; now: number; onOpen: () => void; onClear?: () => void; onStop?: () => void; stopTitle?: string }) {
   const ms = agentElapsed(row, now)
   const critter = critterFor(row.id)
   const eff = effortInfo(row.effort)
@@ -41,7 +44,7 @@ function AgentRow({ row, now, onOpen, onClear }: { row: AgentView; now: number; 
   const detail = [model, row.effort].filter(Boolean).join(' · ')
   return (
     <li className="border-border group/row relative border-b last:border-b-0">
-      <button type="button" onClick={onOpen} className="hover:bg-accent flex w-full items-start gap-2.5 rounded-[10px] px-2.5 py-2.5 text-left">
+      <button type="button" onClick={onOpen} className={cn('hover:bg-accent flex w-full items-start gap-2.5 rounded-[10px] px-2.5 py-2.5 text-left', onStop && 'pr-8')}>
         <Critter hat={critter.hat} tint={critter.tint} bob={open} />
         <span className="min-w-0 flex-1">
           <span className="flex items-center gap-2">
@@ -73,6 +76,17 @@ function AgentRow({ row, now, onOpen, onClear }: { row: AgentView; now: number; 
           )}
         </span>
       </button>
+      {onStop && (
+        <button
+          type="button"
+          onClick={onStop}
+          aria-label={`Stop ${row.description}`}
+          title={stopTitle ?? 'Stop this subagent'}
+          className="text-muted-foreground hover:bg-accent hover:text-destructive bg-card absolute top-1.5 right-1.5 grid size-5 place-items-center rounded-full"
+        >
+          <Square className="size-2.5 fill-current" />
+        </button>
+      )}
       {onClear && (
         <button
           type="button"
@@ -122,8 +136,10 @@ function useCleared(tileId: number) {
   return { cleared, clear }
 }
 
-function AgentList({ tileId, views, now, onOpen }: { tileId: number; views: AgentView[]; now: number; onOpen: (id: string) => void }) {
+function AgentList({ tileId, views, now, onOpen, onStop }: { tileId: number; views: AgentView[]; now: number; onOpen: (id: string) => void; onStop: (scope: 'one' | 'turn', id: string) => Promise<void> }) {
   const { cleared, clear } = useCleared(tileId)
+  const [stopError, setStopError] = useState<string | null>(null)
+  const [confirmStop, setConfirmStop] = useState<{ id: string; title: string; body: string } | null>(null)
   const [runningOpen, setRunningOpen] = useState(true)
   const [doneOpen, setDoneOpen] = useState(true)
   const visible = views.filter((v) => !cleared.has(v.id))
@@ -131,8 +147,34 @@ function AgentList({ tileId, views, now, onOpen }: { tileId: number; views: Agen
   const finished = visible.filter((v) => v.dot !== 'running' && v.dot !== 'waiting')
   const sum = summarize(visible, now)
   const allOpen = runningOpen && doneOpen
+  const runStop = (scope: 'one' | 'turn', id: string) => {
+    setStopError(null)
+    onStop(scope, id).catch((e) => setStopError(decodeIpcError(e).message))
+  }
+  const requestStop = (r: AgentView) => {
+    const plan = stopPlan(r.canStopOne, running.filter((o) => o.id !== r.id).length)
+    if (plan.confirm) setConfirmStop({ id: r.id, ...plan.confirm })
+    else runStop(plan.scope, r.id)
+  }
   return (
     <div className="p-2">
+      {stopError && (
+        <p role="alert" className="text-destructive px-2.5 pb-1 text-xs">
+          {stopError}
+        </p>
+      )}
+      <ConfirmDialog
+        open={confirmStop !== null}
+        title={confirmStop?.title ?? ''}
+        description={confirmStop?.body ?? ''}
+        confirmLabel="Stop turn"
+        danger
+        onConfirm={() => {
+          if (confirmStop) runStop('turn', confirmStop.id)
+          setConfirmStop(null)
+        }}
+        onCancel={() => setConfirmStop(null)}
+      />
       {visible.length === 0 ? (
         <p className="text-muted-foreground px-2 py-2 text-[13px]">{views.length > 0 ? 'All agents cleared.' : 'No agents in this session yet.'}</p>
       ) : (
@@ -160,7 +202,7 @@ function AgentList({ tileId, views, now, onOpen }: { tileId: number; views: Agen
           {running.length > 0 && (
             <Group label="Running" count={running.length} open={runningOpen} onToggle={() => setRunningOpen((o) => !o)}>
               {running.map((r) => (
-                <AgentRow key={r.id} row={r} now={now} onOpen={() => onOpen(r.id)} />
+                <AgentRow key={r.id} row={r} now={now} onOpen={() => onOpen(r.id)} onStop={() => requestStop(r)} stopTitle={stopPlan(r.canStopOne, 0).title} />
               ))}
             </Group>
           )}
@@ -235,7 +277,11 @@ function ChatAgents({ tileId }: { tileId: number }) {
   const open = sel.agent ? state?.items.find((i): i is SubagentItem => i.kind === 'subagent' && i.id === sel.agent) : undefined
   if (!state) return <p className="text-muted-foreground px-4 py-3 text-[13px]">Loading…</p>
   if (open) return <AgentConversation scratchId={tileId} agent={{ ...agentRowFor(open), prompt: open.prompt }} live={itemsOf(state, open.id)} onBack={() => selectAgent(tileId, null)} />
-  return <AgentList tileId={tileId} views={views} now={now} onOpen={(id) => selectAgent(tileId, id)} />
+  const stop = async (scope: 'one' | 'turn', id: string) => {
+    if (scope === 'one') await bridge().invoke('chat:stopAgent', tileId, id)
+    else chatActions.interrupt(tileId)
+  }
+  return <AgentList tileId={tileId} views={views} now={now} onOpen={(id) => selectAgent(tileId, id)} onStop={stop} />
 }
 
 const HOOK_DOT: Record<ClaudeSubagent['status'], AgentDot> = { running: 'running', completed: 'done', failed: 'failed', stopped: 'unknown', unknown: 'unknown' }
@@ -262,7 +308,11 @@ function HookAgents({ tileId, agents }: { tileId: number; agents: ClaudeSubagent
   const views = useMemo(() => rows.map((r) => viewFor(r, null, [])), [rows])
   const open = rows.find((r) => r.id === openId)
   if (open) return <AgentConversation scratchId={tileId} agent={{ ...open, prompt: '' }} live={[]} fromTranscript onBack={() => setOpenId(null)} />
-  return <AgentList tileId={tileId} views={views} now={now} onOpen={setOpenId} />
+  // A PTY running Claude has no per-agent control: Escape interrupts the whole turn, so the button says so.
+  const stop = async () => {
+    await bridge().invoke('scratch:write', tileId, '')
+  }
+  return <AgentList tileId={tileId} views={views} now={now} onOpen={setOpenId} onStop={stop} />
 }
 
 const MCP_DOT: Record<McpTone, string> = { success: 'bg-success', warning: 'bg-warning', destructive: 'bg-destructive', muted: 'bg-muted-foreground/50' }

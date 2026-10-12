@@ -145,7 +145,7 @@ function CustomEditor({ customs, onChange, currentThemeId }: { customs: CustomTh
       <CardContent className="space-y-4">
         <div className="grid gap-x-8 gap-y-1 sm:grid-cols-2">
           <div className="space-y-3">
-            <Row label="Start from" htmlFor="custom-base">
+            <Row label="Start from" info="The built-in theme whose colours your custom theme starts from. Any colour you do not change yourself keeps following this base theme. Changing the base while editing changes everything you have not overridden." htmlFor="custom-base">
               <Select value={draft.base} onValueChange={(v) => edit({ base: v })}>
                 <SelectTrigger id="custom-base" className="w-44">
                   <SelectValue />
@@ -159,7 +159,7 @@ function CustomEditor({ customs, onChange, currentThemeId }: { customs: CustomTh
                 </SelectContent>
               </Select>
             </Row>
-            <Row label="Name" htmlFor="custom-name">
+            <Row label="Name" info="The name shown for your theme in the theme list, up to 40 characters. If you leave it empty when saving, it is called My theme. Names do not have to be unique, and you can rename the theme later." htmlFor="custom-name">
               <Input id="custom-name" data-testid="custom-name" value={draft.name} maxLength={40} placeholder="My theme" onChange={(e) => edit({ name: e.target.value })} className="w-44" />
             </Row>
           </div>
@@ -349,7 +349,7 @@ export function AppearanceSection() {
           <CardDescription>A fine grain over the whole window, like Zen. Applies live.</CardDescription>
         </CardHeader>
         <CardContent>
-          <Row label="Noise" hint="0 turns the grain off." htmlFor="appearance-noise">
+          <Row label="Noise" info="Draws a fine grain over the whole window, from 0 (off) to 100 (strongest). Higher values look more textured but can make small text slightly less crisp. The default is 25. The grain never blocks clicks." hint="0 turns the grain off." htmlFor="appearance-noise">
             <div className="flex items-center gap-2">
               <input
                 id="appearance-noise"
@@ -372,7 +372,7 @@ export function AppearanceSection() {
           <CardTitle className="text-base">Terminals</CardTitle>
         </CardHeader>
         <CardContent>
-          <Row label="Terminals follow the theme" hint="The Master Terminal, the drawer and the console take the theme's colours and ANSI palette. Off keeps them dark." htmlFor="term-follows">
+          <Row label="Terminals follow the theme" info="On, the terminals use the colours of your chosen theme, including its colours for command output. Off keeps them dark whichever theme you use, which some people prefer for contrast. On by default." hint="The Master Terminal, the drawer and the console take the theme's colours and ANSI palette. Off keeps them dark." htmlFor="term-follows">
             <Switch id="term-follows" checked={a.terminalFollowsTheme} onCheckedChange={(v) => set({ terminalFollowsTheme: v })} />
           </Row>
         </CardContent>

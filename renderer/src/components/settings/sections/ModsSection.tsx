@@ -43,7 +43,7 @@ export function ModsSection() {
           </CardDescription>
         </CardHeader>
         <CardContent className="divide-y">
-          <Row label="Claude Mods" hint="Turns Claude Mods on or off for every Claude tile." htmlFor="mods-enabled">
+          <Row label="Claude Mods" hint="Turns Claude Mods on or off for every Claude tile." info="The master switch for the Claude Code mods (the Agents panel and the native mods). Off turns them all off at once, whatever their own switches say. The Chat view features below are separate and are not affected. Changes apply to tiles started from now on." htmlFor="mods-enabled">
             <Switch id="mods-enabled" checked={m.enabled} onCheckedChange={(v) => setMods({ enabled: v })} />
           </Row>
           <p className="text-muted-foreground py-3 text-xs">Operant's status line replaces your own inside Operant Claude tiles.</p>
@@ -78,6 +78,15 @@ export function ModsSection() {
                         ? "Operant's own panel. Uses Operant's hook events; no model calls."
                         : 'A native Claude Code mod (plugin/mods/' + mod.id + '). Loaded into Claude Code when a tile starts.'
                 }
+                info={
+                  mod.id === 'keepWarm'
+                    ? 'Keeps the prompt cache warm while a chat tile is idle, so your next message is cheaper and faster. Each ping uses a few tokens. Off hides /keepwarm and stops any active keep-warm. It is on by default.'
+                    : mod.id === 'commandMenu'
+                      ? "Shows the Commands button in the Chat view, listing Claude Code's slash commands. Turn it off if you want a cleaner composer. It is a Chat view feature, so it does not depend on the master Claude Mods switch."
+                      : mod.kind === 'panel'
+                        ? "Shows or hides the Agents panel beside Claude tiles. It only reads Claude Code's activity events and makes no model calls, so it costs nothing. Applies to tiles started from now on."
+                        : `Turns ${mod.title} on or off. When on, Operant loads it into Claude Code each time a Claude tile starts, so tiles already running keep their current setting. It needs the master Claude Mods switch to be on.`
+                }
                 htmlFor={`mod-${mod.id}`}
               >
                 <Switch id={`mod-${mod.id}`} checked={on} disabled={(!chat && !m.enabled) || !!unavailable} onCheckedChange={(v) => (chat ? setMods(mod.id === 'commandMenu' ? { commandMenu: v } : { keepWarm: v }) : setMods({ mods: { ...m.mods, [mod.id as ModId]: v } }))} />
@@ -93,10 +102,10 @@ export function ModsSection() {
           <CardDescription>The microphone button in the Chat composer. Speech is turned into text on this device.</CardDescription>
         </CardHeader>
         <CardContent className="divide-y">
-          <Row label="Enable dictation" hint="Off hides the microphone button and the dictation shortcut does nothing." htmlFor="dictation-enabled">
+          <Row label="Enable dictation" hint="Off hides the microphone button and the dictation shortcut does nothing." info="Shows a microphone button in the Chat composer, and turns on the dictation shortcut, so you can speak instead of typing. The speech is turned into text on this device. When off, the button is hidden and the shortcut does nothing." htmlFor="dictation-enabled">
             <Switch id="dictation-enabled" checked={s.dictation.enabled} onCheckedChange={(v) => save.mutate({ dictation: { enabled: v } })} />
           </Row>
-          <Row label="Hold to talk" hint="On: record only while the shortcut is held down, and transcribe when you let go. Off: press once to start and again to stop." htmlFor="dictation-hold">
+          <Row label="Hold to talk" hint="On: record only while the shortcut is held down, and transcribe when you let go. Off: press once to start and again to stop." info="Off, you press the dictation shortcut once to start recording and again to stop. On, you hold the shortcut down while you talk and the words are written when you let go. Holding suits short bursts. Off is the default." htmlFor="dictation-hold">
             <Switch id="dictation-hold" checked={s.dictation.mode === 'hold'} onCheckedChange={(v) => save.mutate({ dictation: { mode: v ? 'hold' : 'toggle' } })} />
           </Row>
           <Row label="Shortcut" hint="Change it in Shortcuts. A key combination or the middle, back or forward mouse button.">
@@ -138,13 +147,13 @@ export function ModsSection() {
           </CardDescription>
         </CardHeader>
         <CardContent className="divide-y">
-          <Row label="Show the info bar" htmlFor="info-bar">
+          <Row label="Show the info bar" info="Shows a thin bar at the top of each tile with the model, how full the context is, the project folder, the git branch and the cost so far. Turn it off for more room. It is on by default." htmlFor="info-bar">
             <Switch id="info-bar" checked={s.infoBar} onCheckedChange={(v) => save.mutate({ infoBar: v })} />
           </Row>
-          <Row label="Context warning" hint="The context bar turns amber from this percent (1 to 100)." htmlFor="context-warn">
+          <Row label="Context warning" hint="The context bar turns amber from this percent (1 to 100)." info="The context is the memory Claude has used in this conversation, as a percentage of its limit. From this percentage the context bar and ring turn amber as a warning to wrap up or compact. Use 1 to 100. The default is 60." htmlFor="context-warn">
             <NumberField id="context-warn" value={s.contextWarnPct} min={1} max={100} onCommit={(n) => save.mutate({ contextWarnPct: n })} />
           </Row>
-          <Row label="Context danger" hint="The context bar turns red from this percent (1 to 100)." htmlFor="context-danger">
+          <Row label="Context danger" hint="The context bar turns red from this percent (1 to 100)." info="From this percentage the context bar and ring turn red, meaning Claude is close to running out of room and may start forgetting earlier details. Use 1 to 100, and keep it above the warning level. The default is 85." htmlFor="context-danger">
             <NumberField id="context-danger" value={s.contextDangerPct} min={1} max={100} onCommit={(n) => save.mutate({ contextDangerPct: n })} />
           </Row>
         </CardContent>

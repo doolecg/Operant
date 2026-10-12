@@ -179,7 +179,10 @@ export interface LearnDeps {
   log?: (message: string, crewId: number) => void
   onChange?: () => void
   // A learn run has ended (whatever it did): the session-start memory file is rewritten from it.
-  onRunEnd?: (crewId: number) => void
+  // `info` is the finished run's record (null when the run did nothing or failed before it was recorded).
+  onRunEnd?: (crewId: number, info?: LearnRunInfo | null) => void
+  // A conversation learn run is about to work on a session.
+  onRunStart?: (crewId: number, sessionId: string | null) => void
   // The record of every automatic change (rollback, the records list). Optional for callers that keep no history.
   changes?: LearnChangesDb
 }
@@ -400,11 +403,14 @@ export class LearnService {
   private async learn(crewId: number, sessionId: string | null, transcript?: string, confirm = false): Promise<LearnRunInfo | null> {
     this.running++
     this.safe(() => this.d.log?.('Session learn started', crewId))
+    this.safe(() => this.d.onRunStart?.(crewId, sessionId))
+    let info: LearnRunInfo | null = null
     try {
-      return await this.learnRun(crewId, sessionId, transcript, confirm)
+      info = await this.learnRun(crewId, sessionId, transcript, confirm)
+      return info
     } finally {
       this.running--
-      this.safe(() => this.d.onRunEnd?.(crewId))
+      this.safe(() => this.d.onRunEnd?.(crewId, info))
     }
   }
 

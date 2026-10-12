@@ -18,6 +18,16 @@ const TASK_LABEL: Record<AuxTask, string> = {
   promptEnhance: 'Enhance prompt (Chat)',
 }
 
+const TASK_INFO: Record<AuxTask, string> = {
+  extraction: 'Reads a finished session and pulls out the lessons worth keeping, such as conventions, pitfalls and corrections. This is the main learning step.',
+  consolidation: 'Merges lessons that say nearly the same thing into one, so memory stays short and tidy.',
+  retrieval: 'Would pick which saved lessons to hand to a new session. Recall does not use a model today, so this has no effect yet.',
+  skillEval: 'Would judge whether a skill worked well. Not used by any feature yet, so this has no effect.',
+  skillImprove: 'Would rewrite a skill using what was learned. Not used by any feature yet, so this has no effect.',
+  compression: 'Would shorten long memory text to save tokens. Not used by any feature yet, so this has no effect.',
+  promptEnhance: 'Rewrites the message you type in Chat into a clearer prompt when you press Enhance.',
+}
+
 const CLI_LABEL: Record<AuxCli, string> = { learn: 'Follow learn settings', claude: 'Claude Code', opencode: 'OpenCode', local: 'Local model server' }
 
 export function AuxSection() {
@@ -46,7 +56,7 @@ export function AuxSection() {
           {AUX_TASKS.map((task) => {
             const m = s.auxModels[task]
             return (
-              <Row key={task} label={TASK_LABEL[task]} htmlFor={`aux-${task}-model`}>
+              <Row key={task} info={TASK_INFO[task]} label={TASK_LABEL[task]} htmlFor={`aux-${task}-model`}>
                 <div className="flex flex-wrap items-center justify-end gap-2">
                   <Select value={m.cli} onValueChange={(cli) => setTask(task, { cli: cli as AuxCli })}>
                     <SelectTrigger aria-label={`${TASK_LABEL[task]} CLI`} className="w-48">
@@ -90,19 +100,19 @@ export function AuxSection() {
           <CardDescription>Every auxiliary call counts against these limits, per day.</CardDescription>
         </CardHeader>
         <CardContent className="divide-y">
-          <Row label="Calls per day" hint="0 means no limit." htmlFor="aux-calls">
+          <Row label="Calls per day" info="Caps how many background AI requests Operant makes each day." hint="0 means no limit." htmlFor="aux-calls">
             <NumberField id="aux-calls" value={a.maxCallsPerDay} min={0} max={100000} onCommit={(n) => setAux({ maxCallsPerDay: n })} />
           </Row>
-          <Row label={`Spend per day (${symbol})`} hint="0 means no limit." htmlFor="aux-usd">
+          <Row info="Stops background AI requests for the day once this amount is spent." label={`Spend per day (${symbol})`} hint="0 means no limit." htmlFor="aux-usd">
             <NumberField id="aux-usd" value={toField(a.maxUsdPerDay)} min={0} max={10000000} step="0.01" onCommit={(n) => setAux({ maxUsdPerDay: fromField(n) })} />
           </Row>
-          <Row label="Retries" hint="0 to 5 retries after a failed call." htmlFor="aux-retry">
+          <Row label="Retries" info="How many times a failed background request is tried again." hint="0 to 5 retries after a failed call." htmlFor="aux-retry">
             <NumberField id="aux-retry" value={a.retryLimit} min={0} max={5} onCommit={(n) => setAux({ retryLimit: n })} />
           </Row>
-          <Row label="Backoff" hint="Wait before a retry, in ms, 0 to 60000." htmlFor="aux-backoff">
+          <Row label="Backoff" info="How long to wait before trying a failed request again." hint="Wait before a retry, in ms, 0 to 60000." htmlFor="aux-backoff">
             <NumberField id="aux-backoff" value={a.backoffMs} min={0} max={60000} onCommit={(n) => setAux({ backoffMs: n })} />
           </Row>
-          <Row label="When a limit is hit" hint="Stop refuses further calls today. Confirm stops and waits for you." htmlFor="aux-onlimit">
+          <Row label="When a limit is hit" info="Decides whether background requests stop or ask you when a limit is reached." hint="Stop refuses further calls today. Confirm stops and waits for you." htmlFor="aux-onlimit">
             <Select value={a.onLimit} onValueChange={(v) => setAux({ onLimit: v as 'stop' | 'confirm' })}>
               <SelectTrigger id="aux-onlimit" className="w-44">
                 <SelectValue />

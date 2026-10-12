@@ -21,7 +21,7 @@ import {
   useTeams,
   useUpdateTeam,
 } from '@/lib/queries'
-import { ConfirmDialog } from '../parts'
+import { ConfirmDialog, InfoTip } from '../parts'
 
 interface Form {
   name: string
@@ -64,23 +64,32 @@ export function TeamDialog({ team, onClose }: { team: Team | null; onClose: () =
         <DialogBody>
           <div className="grid gap-4">
           <div className="space-y-1.5">
-            <Label htmlFor="team-name" className="text-sm">
-              Name
-            </Label>
+            <div className="flex items-center gap-1.5">
+              <Label htmlFor="team-name" className="text-sm">
+                Name
+              </Label>
+              <InfoTip text="The name this team goes by in the Teams list and in exports. Pick something that says what the team does, such as Feature build or Bug fix. It can be up to 80 characters." label="Name" />
+            </div>
             <Input id="team-name" value={form.name} maxLength={80} onChange={(e) => set({ name: e.target.value })} />
           </div>
 
           <div className="space-y-1.5">
-            <Label htmlFor="team-description" className="text-sm">
-              Description
-            </Label>
+            <div className="flex items-center gap-1.5">
+              <Label htmlFor="team-description" className="text-sm">
+                Description
+              </Label>
+              <InfoTip text="A short summary of what this team is for, saved with the team and included when you export it. It is for you and is kept separate from the rules. It can be up to 500 characters." label="Description" />
+            </div>
             <Input id="team-description" value={form.description} maxLength={500} onChange={(e) => set({ description: e.target.value })} />
           </div>
 
           <div className="space-y-1.5">
-            <Label htmlFor="team-rules" className="text-sm">
-              Rules
-            </Label>
+            <div className="flex items-center gap-1.5">
+              <Label htmlFor="team-rules" className="text-sm">
+                Rules
+              </Label>
+              <InfoTip text="Plain text that describes how this team should work, such as which steps to take and who owns which files. Operant saves and exports it but does not send it to a tile on its own, so copy it into a prompt or brief when you want an agent to follow it." label="Rules" />
+            </div>
             <Textarea id="team-rules" className="min-h-24 text-sm" value={form.rules} onChange={(e) => set({ rules: e.target.value })} />
             <p className="text-muted-foreground text-xs">Plain text guidance for this team.</p>
           </div>

@@ -43,6 +43,7 @@ describe('browser helpers', () => {
   it('defaults have a %s search', () => {
     expect(DEFAULT_BROWSER_SETTINGS.searchUrl).toContain('%s')
     expect(DEFAULT_BROWSER_SETTINGS.aiControl).toBe(true)
+    expect(DEFAULT_BROWSER_SETTINGS.autoOpenDocs).toBe(true)
   })
 })
 

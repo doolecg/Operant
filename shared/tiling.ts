@@ -30,7 +30,18 @@ export function tileIds(tree: TileNode | null, out: string[] = []): string[] {
 
 export const hasTile = (tree: TileNode | null, tile: string): boolean => tileIds(tree).includes(tile)
 
-function rects(n: TileNode | null, r: Rect, gap: number, out: Map<string, Rect>): Map<string, Rect> {
+export interface SplitHandle {
+  // Which child to take at each step from the root to the split.
+  path: ('a' | 'b')[]
+  split: 'h' | 'v'
+  // The gap strip between the two children.
+  rect: Rect
+  // The whole rect of the split.
+  parent: Rect
+  ratio: number
+}
+
+function rects(n: TileNode | null, r: Rect, gap: number, out: Map<string, Rect>, handles?: SplitHandle[], path: ('a' | 'b')[] = []): Map<string, Rect> {
   if (!n) return out
   if (isLeaf(n)) {
     out.set(n.tile, r)
@@ -38,14 +49,41 @@ function rects(n: TileNode | null, r: Rect, gap: number, out: Map<string, Rect>)
   }
   if (n.split === 'h') {
     const w1 = (r.w - gap) * n.ratio
-    rects(n.a, { x: r.x, y: r.y, w: w1, h: r.h }, gap, out)
-    rects(n.b, { x: r.x + w1 + gap, y: r.y, w: r.w - w1 - gap, h: r.h }, gap, out)
+    handles?.push({ path, split: 'h', rect: { x: r.x + w1, y: r.y, w: gap, h: r.h }, parent: r, ratio: n.ratio })
+    rects(n.a, { x: r.x, y: r.y, w: w1, h: r.h }, gap, out, handles, [...path, 'a'])
+    rects(n.b, { x: r.x + w1 + gap, y: r.y, w: r.w - w1 - gap, h: r.h }, gap, out, handles, [...path, 'b'])
   } else {
     const h1 = (r.h - gap) * n.ratio
-    rects(n.a, { x: r.x, y: r.y, w: r.w, h: h1 }, gap, out)
-    rects(n.b, { x: r.x, y: r.y + h1 + gap, w: r.w, h: r.h - h1 - gap }, gap, out)
+    handles?.push({ path, split: 'v', rect: { x: r.x, y: r.y + h1, w: r.w, h: gap }, parent: r, ratio: n.ratio })
+    rects(n.a, { x: r.x, y: r.y, w: r.w, h: h1 }, gap, out, handles, [...path, 'a'])
+    rects(n.b, { x: r.x, y: r.y + h1 + gap, w: r.w, h: r.h - h1 - gap }, gap, out, handles, [...path, 'b'])
   }
   return out
+}
+
+// One handle per split in the tree (parents before children), for resizing by dragging the gap.
+export function splitHandles(tree: TileNode | null, area: Rect, gap: number): SplitHandle[] {
+  const handles: SplitHandle[] = []
+  rects(tree, area, gap, new Map(), handles)
+  return handles
+}
+
+const clampRatio = (ratio: number) => (Number.isFinite(ratio) ? Math.min(MAX_RATIO, Math.max(MIN_RATIO, ratio)) : 0.5)
+
+// Sets the ratio of the split at `path` (clamped to 0.1-0.9). An unknown path leaves the tree as it was.
+export function setRatioAt(tree: TileNode, path: ('a' | 'b')[], ratio: number): TileNode {
+  if (isLeaf(tree)) return tree
+  const [head, ...rest] = path
+  if (head === undefined) return { ...tree, ratio: clampRatio(ratio) }
+  return head === 'a' ? { ...tree, a: setRatioAt(tree.a, rest, ratio) } : { ...tree, b: setRatioAt(tree.b, rest, ratio) }
+}
+
+// Swaps the places of two tiles. Anything else is returned unchanged.
+export function swapTiles(tree: TileNode, a: string, b: string): TileNode {
+  if (a === b || !hasTile(tree, a) || !hasTile(tree, b)) return tree
+  const swap = (n: TileNode): TileNode =>
+    isLeaf(n) ? (n.tile === a ? { tile: b } : n.tile === b ? { tile: a } : n) : { ...n, a: swap(n.a), b: swap(n.b) }
+  return swap(tree)
 }
 
 // Rectangles per tile. 'master': the first tile in tree order takes the left pane (width mfact), the rest stack right.
@@ -103,7 +141,7 @@ export function toggleSplit(tree: TileNode, tile: string): TileNode {
 
 // Sets the share the first child of the tile's parent split takes (clamped to 0.1-0.9).
 export function setRatio(tree: TileNode, tile: string, ratio: number): TileNode {
-  const r = Number.isFinite(ratio) ? Math.min(MAX_RATIO, Math.max(MIN_RATIO, ratio)) : 0.5
+  const r = clampRatio(ratio)
   return onParent(tree, tile, (s) => ({ ...s, ratio: r }))
 }
 

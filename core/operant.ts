@@ -41,7 +41,7 @@ import { Installer, systemInstallDeps } from './install'
 import { ENHANCE_MAX_MEMORY_TOKENS, ENHANCE_MAX_SYMBOL_LINES, buildEnhancePrompt, mergeSkills, parseEnhanceReply, type EnhanceContext } from '../shared/prompt-enhance'
 import { gatherEnhanceContext } from './enhance-context'
 import { recallMemory } from './memory-recall'
-import type { LearnRunInfo } from '../shared/learn'
+import { learnOutcomeText, type LearnRunInfo } from '../shared/learn'
 import { recallFile, writeRecallFor } from './session-recall'
 import { readOpenCodeSessionText } from './opencode-session'
 import { installedSkills } from './installed-skills'
@@ -62,7 +62,7 @@ import { killAllOwn, resolveCli, runHidden } from './proc'
 import { scrubLogLine } from './agents'
 import { ChatHub, ChatSession, type ChatLaunchSpec, type ChatSpawn } from './claude-chat'
 import { listChatFiles } from './chat-files'
-import { emptyChatState, stripAnsi, type ChatState } from '../shared/claude-chat'
+import { emptyChatState, stripAnsi, type ChatOp, type ChatState } from '../shared/claude-chat'
 import { PLAYGROUND_KEPT, type Store } from './store'
 import { createNote, deleteNote, getNote, listNotes, updateNote } from './notes'
 import { isNoteColor } from '../shared/notes'
@@ -73,11 +73,15 @@ import { claudeModsConfig, type ModsPaths } from './claude-events'
 import { openCodeDbPath } from './opencode-usage'
 import { enabledMods, type CapabilityReport, type ClaudeTileState } from '../shared/claude-mods'
 import { inheritedEnv, type SessionKey, type SessionManager } from './sessions'
+import { listServers } from './servers'
+import { looksLikeServerStart, type TileRoot } from '../shared/servers'
 import { cleanFilter, queryUsage, querySeries } from './usage-query'
 import { exportView } from './usage-export'
 import { isColdTurn } from './usage'
 import { MemorySecretStore, type SecretStore } from './secrets'
 import { randomUUID } from 'node:crypto'
+import { DocsServer, resolveDocFile } from './docs-server'
+import { autoOpenPath, isDocFile, relativeInProject } from '../shared/docs'
 import { saveScreenshot } from './screenshots'
 import { EXIT, type CliRequest, type CliResult, type Identity } from './cli-server'
 
@@ -169,6 +173,8 @@ export interface OperantOptions {
   browserMcp?: () => string | null
   // Called after a project is deleted (main clears that project's browser partition).
   onCrewDeleted?: (crewId: number) => void
+  // Shows an address in the project's browser tile (opens the tile; reloads a tab already on that address).
+  openInBrowser?: (crewId: number, url: string) => Promise<void>
 }
 
 export interface FileDialogs {
@@ -307,9 +313,16 @@ export class Operant extends EventEmitter<PushEvents> {
   private readonly modsPhase = new Map<number, string>()
   // Chat view tiles: one Claude Code stream-json process each (claude-chat.ts).
   readonly chat: ChatHub
+  // Per tile: the pending 'servers:changed' after its output looked like a server starting.
+  private readonly serverHints = new Map<number, ReturnType<typeof setTimeout>>()
   private readonly chatSpawn: ChatSpawn | undefined
   private readonly browserMcp: (() => string | null) | undefined
   private readonly onCrewDeleted: ((crewId: number) => void) | undefined
+  private readonly openInBrowser: ((crewId: number, url: string) => Promise<void>) | undefined
+  // Serves project documents and presented plans to the browser tile over loopback.
+  private readonly docs: DocsServer
+  // Chat items already opened in the browser (tool or plan ids), so a later update of the item opens nothing again.
+  private readonly docsOpened = new Set<string>()
   // Tiles switching between the Chat and Terminal views (their end is not a closed session: no learning) and tiles the
   // owner closed (a chat process that ends then is the end of the session).
   private readonly switching = new Set<number>()
@@ -355,8 +368,11 @@ export class Operant extends EventEmitter<PushEvents> {
     this.chatSpawn = opts.chatSpawn
     this.browserMcp = opts.browserMcp
     this.onCrewDeleted = opts.onCrewDeleted
+    this.openInBrowser = opts.openInBrowser
+    this.docs = new DocsServer({ folderOf: (crewId) => this.store.getCrew(crewId)?.folder ?? null })
     this.chat = new ChatHub({
       push: (scratchId, ops) => {
+        this.openChatDocs(scratchId, ops)
         for (const op of ops) if (op.op === 'meta' && op.patch.turn) this.noteTurn(this.chatPhase, scratchId, op.patch.turn.phase)
         this.emit('chat:ops', { scratchId, ops })
       },
@@ -415,7 +431,11 @@ export class Operant extends EventEmitter<PushEvents> {
         settings: () => this.settings.learn,
         log: (message, crewId) => this.log('learn', message, crewId || null),
         changes: this.changes,
-        onRunEnd: (crewId) => void this.refreshRecall(crewId),
+        onRunStart: (crewId, sessionId) => this.learnRowStart(crewId, sessionId),
+        onRunEnd: (crewId, info) => {
+          this.learnRowEnd(crewId, info ?? null)
+          void this.refreshRecall(crewId)
+        },
       })
     // Lessons and skill drafts left pending by an older version or setting apply themselves now.
     if (typeof this.learn.settleAllPending === 'function') void this.learn.settleAllPending()
@@ -457,7 +477,10 @@ export class Operant extends EventEmitter<PushEvents> {
 
     sessions.on('data', (key, data) => {
       const id = this.scratchId(key)
-      if (id != null) this.emit('scratch:data', { scratchId: id, data })
+      if (id != null) {
+        this.emit('scratch:data', { scratchId: id, data })
+        this.hintServers(id, data)
+      }
     })
     sessions.on('exit', (key, exitCode) => {
       const id = this.scratchId(key)
@@ -503,6 +526,43 @@ export class Operant extends EventEmitter<PushEvents> {
     const crew = typeof crewId === 'number' ? this.store.getCrew(crewId) : null
     if (!crew) throw notFound(`Project ${String(crewId)} not found`)
     return crew
+  }
+
+  // Opens a project's .html or .md file in its browser tile. The path is checked against the project folder.
+  private async openDocument(crewId: number, path: string): Promise<void> {
+    const crew = this.requireCrew(crewId)
+    const rel = typeof path === 'string' && isDocFile(path) ? relativeInProject(crew.folder, path) : null
+    if (!rel) throw bad('Only an .html or .md file inside the project can be opened in the browser')
+    if (!resolveDocFile(crew.folder, rel.split('/'))) throw notFound(`${rel} not found in the project`)
+    if (!this.openInBrowser) throw bad('The browser is not available')
+    await this.openInBrowser(crewId, await this.docs.urlFor(crewId, rel))
+  }
+
+  // Settings > Browser > Open documents: a new doc file Claude wrote (a Write that created it in a docs, plans, specs,
+  // artifacts or design folder) and every plan it presents open in the project's browser tile, once each.
+  private openChatDocs(scratchId: number, ops: ChatOp[]): void {
+    if (!this.openInBrowser || !this.settings.browser.autoOpenDocs) return
+    for (const op of ops) {
+      if (op.op !== 'upsert' || this.docsOpened.has(op.item.id)) continue
+      const it = op.item
+      let job: ((crewId: number) => Promise<void>) | null = null
+      if (it.kind === 'plan' && it.plan.trim()) {
+        const plan = it.plan
+        job = async (crewId) => void (await this.openInBrowser?.(crewId, await this.docs.urlForMemory('Plan', plan)))
+      } else if (it.kind === 'tool' && it.name === 'Write' && it.status === 'done' && it.diff?.created && /^File created successfully/i.test(it.result?.text ?? '')) {
+        const file = it.diff.path
+        job = async (crewId) => {
+          const folder = this.store.getCrew(crewId)?.folder
+          const rel = folder ? autoOpenPath(folder, file, true) : null
+          if (rel && resolveDocFile(folder!, rel.split('/'))) await this.openInBrowser?.(crewId, await this.docs.urlFor(crewId, rel))
+        }
+      }
+      const crewId = job ? this.store.getScratch(scratchId)?.crewId : undefined
+      if (!job || crewId === undefined) continue
+      if (this.docsOpened.size > 500) this.docsOpened.clear()
+      this.docsOpened.add(it.id)
+      void job(crewId).catch(() => undefined)
+    }
   }
 
   private requireScratch(scratchId: number): ScratchTerminal {
@@ -565,7 +625,7 @@ export class Operant extends EventEmitter<PushEvents> {
     }
   }
 
-  private groupHandlers(): Group<'groups'> & Group<'ide'> & Group<'git'> {
+  private groupHandlers(): Group<'groups'> & Group<'ide'> & Group<'git'> & Group<'docs'> {
     const store = this.store
     const groups = this.groups
     const ids = (v: unknown, what: string): number[] => {
@@ -594,6 +654,7 @@ export class Operant extends EventEmitter<PushEvents> {
         return store.listCrews()
       },
       'ide:list': () => listIdes(this.settings.ide.custom),
+      'docs:open': (crewId, path) => this.openDocument(crewId, path),
       'ide:open': (crewId, ide) => openInIde(this.requireCrew(crewId).folder, ide ?? this.settings.ide.default, this.settings.ide.custom),
       'git:changes': (crewId) => gitChanges(this.requireCrew(crewId).folder),
       'git:info': (crewId) => gitInfo(this.requireCrew(crewId).folder),
@@ -1129,7 +1190,7 @@ export class Operant extends EventEmitter<PushEvents> {
     return n
   }
 
-  private moveHandlers(): Group<'import'> & Group<'data'> & Group<'providers'> {
+  private moveHandlers(): Group<'import'> & Group<'data'> & Group<'providers'> & Group<'servers'> {
     const bundleText = (): ExportText => ({
       filename: `operant-export-${new Date(this.now()).toISOString().slice(0, 10)}.json`,
       mime: 'application/json',
@@ -1147,6 +1208,12 @@ export class Operant extends EventEmitter<PushEvents> {
       'data:exportFile': async () => ({ saved: await this.saveExport(bundleText()) }),
       'providers:status': () => this.providers.status(),
       'providers:refresh': () => this.providers.refresh(true),
+      'servers:list': () =>
+        listServers(this.tileRoots(), (id) => {
+          const s = this.store.getScratch(id)
+          const crew = s ? this.store.getCrew(s.crewId) : null
+          return s && crew ? { tileTitle: s.title, crewId: crew.id, crewName: crew.name } : null
+        }),
     }
   }
 
@@ -1254,6 +1321,7 @@ export class Operant extends EventEmitter<PushEvents> {
     }
     this.stopTimers()
     await bounded(() => this.chat.stopAll())
+    await bounded(() => this.docs.close())
     await bounded(() => killAllOwn(this.shutdownStepMs))
     for (const id of this.scratchFeeds.keys()) this.cli?.revokeToken(id)
     await bounded(() => this.cli?.close())
@@ -1297,6 +1365,35 @@ export class Operant extends EventEmitter<PushEvents> {
     }
   }
 
+  // The Chat-view Claude tiles whose "Learn" row is running, by project.
+  private readonly learnRows = new Map<number, Array<{ tileId: number; itemId: string }>>()
+
+  // A learn run started: each Chat-view Claude tile of the project on that session with a live chat gets a running row.
+  private learnRowStart(crewId: number, sessionId: string | null): void {
+    const l = this.settings.learn
+    if (!sessionId || !l.enabled || l.mode === 'off') return
+    const subject = this.store.getCrew(crewId)?.name ?? 'this project'
+    const rows: Array<{ tileId: number; itemId: string }> = []
+    for (const t of this.store.listScratch(crewId)) {
+      if (t.agent !== 'claude' || t.view !== 'chat' || t.sessionId !== sessionId) continue
+      const session = this.chat.get(t.id)
+      if (!session) continue
+      const itemId = `learn:${this.now()}:${t.id}`
+      session.addLearnRow(itemId, subject)
+      rows.push({ tileId: t.id, itemId })
+    }
+    if (rows.length) this.learnRows.set(crewId, rows)
+  }
+
+  private learnRowEnd(crewId: number, info: LearnRunInfo | null): void {
+    const rows = this.learnRows.get(crewId)
+    if (!rows) return
+    this.learnRows.delete(crewId)
+    const text = learnOutcomeText(info)
+    const failed = !!info?.error && !info.error.startsWith('Skipped')
+    for (const r of rows) this.chat.get(r.tileId)?.finishLearnRow(r.itemId, text, failed)
+  }
+
   // One learn run for a tile. An OpenCode tile has no Claude transcript, so its latest session for the folder is read from
   // OpenCode's database; with nothing readable the step runs on the git diff alone.
   private learnFrom(tile: ScratchTerminal, confirm = false): Promise<LearnRunInfo | null> {
@@ -1321,6 +1418,7 @@ export class Operant extends EventEmitter<PushEvents> {
   private applySettings(): void {
     const { file, args } = this.settings.shell
     this.sessions.setShell(file ? { file, args: args.split(/\s+/).filter(Boolean) } : null)
+    this.sessions.setSoftPrompt(this.settings.terminal.softPrompt && this.claudeModsPaths ? dirname(this.claudeModsPaths.eventsDir) : null)
     setSharedBanks(this.settings.hindsight.mode !== 'local')
     if (!this.settings.claudeMods.enabled) this.claudeAgents?.dispose()
     if (!this.settings.claudeMods.keepWarm) this.chat?.stopAllKeepWarm()
@@ -1583,6 +1681,31 @@ export class Operant extends EventEmitter<PushEvents> {
     }
   }
 
+  // A tile's output that looks like a server starting: the renderer is told to read the list again, once the output
+  // has settled (1.5 s after the last such line of that tile).
+  private hintServers(scratchId: number, data: string): void {
+    if (!looksLikeServerStart(data)) return
+    clearTimeout(this.serverHints.get(scratchId))
+    const t = setTimeout(() => {
+      this.serverHints.delete(scratchId)
+      this.emit('servers:changed', {})
+    }, 1500)
+    t.unref?.()
+    this.serverHints.set(scratchId, t)
+  }
+
+  // The running process of each tile that has one: the pty shell, or the Chat view's claude process.
+  private tileRoots(): TileRoot[] {
+    const roots: TileRoot[] = []
+    for (const crew of this.store.listCrews()) {
+      for (const s of this.store.listScratch(crew.id)) {
+        const pid = this.sessions.pid(this.scratchKey(s.id)) ?? this.chat.get(s.id)?.pid
+        if (pid) roots.push({ scratchId: s.id, pid })
+      }
+    }
+    return roots
+  }
+
   private scratchId(key: SessionKey): number | null {
     const m = /^scratch:(\d+)$/.exec(key)
     return m ? Number(m[1]) : null
@@ -1593,6 +1716,7 @@ export class Operant extends EventEmitter<PushEvents> {
     this.cli?.revokeToken(scratchId)
     this.claudeAgents?.end(scratchId)
     this.emit('scratch:exit', { scratchId, exitCode, switching: this.switching.has(scratchId) })
+    this.emit('servers:changed', {})
     const scratch = this.store.getScratch(scratchId)
     if (scratch) this.log('scratch', `Tile ${scratch.title} closed${exitCode ? ` (exit ${exitCode})` : ''}`, scratch.crewId)
     // A finished Claude session not learned from yet: the owner is asked (nothing when learning is off).
@@ -1674,6 +1798,7 @@ export class Operant extends EventEmitter<PushEvents> {
     this.cli?.revokeToken(scratchId)
     this.claudeAgents?.end(scratchId)
     this.emit('scratch:exit', { scratchId, exitCode: info.code ?? 0, switching: this.switching.has(scratchId) })
+    this.emit('servers:changed', {})
     const scratch = this.store.getScratch(scratchId)
     const closing = this.closing.delete(scratchId)
     if (scratch) this.log('scratch', `Tile ${scratch.title} ${info.expected ? 'closed' : 'stopped unexpectedly'}${info.code ? ` (exit ${info.code})` : ''}`, scratch.crewId)
@@ -1773,6 +1898,10 @@ export class Operant extends EventEmitter<PushEvents> {
         live(scratchId).send(input)
       },
       'chat:interrupt': (scratchId) => live(scratchId).interrupt(),
+      'chat:stopAgent': (scratchId, toolUseId) => {
+        if (typeof toolUseId !== 'string' || !toolUseId) throw bad('A sub-agent id is needed')
+        if (!live(scratchId).stopAgent(toolUseId)) throw conflict('Claude Code has not reported a task id for this sub-agent, so it cannot be stopped on its own')
+      },
       'chat:steer': (scratchId, text) => {
         if (typeof text !== 'string' || !text.trim()) throw bad('A steer note needs text')
         live(scratchId).steer(text)

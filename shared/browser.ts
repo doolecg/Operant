@@ -153,6 +153,8 @@ export interface BrowserSettings {
   searchUrl: string
   // 'confirm': the AI asks before sensitive browser actions; 'full': it does not. The gate itself is wired elsewhere.
   autonomy: BrowserAutonomy
+  // HTML and Markdown documents Claude creates or presents open in the project's browser tile by themselves.
+  autoOpenDocs: boolean
   // Keyed by crew id.
   perCrew: Record<string, CrewBrowserOptions>
 }
@@ -162,6 +164,7 @@ export const DEFAULT_BROWSER_SETTINGS: BrowserSettings = {
   homeUrl: 'https://duckduckgo.com/',
   searchUrl: 'https://duckduckgo.com/?q=%s',
   autonomy: 'confirm',
+  autoOpenDocs: true,
   perCrew: {},
 }
 

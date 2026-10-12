@@ -27,7 +27,7 @@ export function TerminalsSection() {
           <CardDescription>The CLI new terminal tiles start with, the default Claude model and the shell. Applies to terminals started from now on.</CardDescription>
         </CardHeader>
         <CardContent className="divide-y">
-          <Row label="Main CLI" hint="New tiles start with this CLI. The top bar switches it too." htmlFor="main-cli">
+          <Row label="Main CLI" info="Picks Claude or OpenCode as the assistant that new terminal tiles start with, from the project buttons and menus. Tiles already open keep their own assistant. You can also switch it from the top bar. Default is Claude." hint="New tiles start with this CLI. The top bar switches it too." htmlFor="main-cli">
             <Select value={s.mainCli} onValueChange={(v) => save.mutate({ mainCli: v as MainCli })}>
               <SelectTrigger id="main-cli" className="w-40">
                 <SelectValue />
@@ -41,7 +41,7 @@ export function TerminalsSection() {
               </SelectContent>
             </Select>
           </Row>
-          <Row label="Default Claude model" hint="The model new Claude tiles start with. Set from the last model picked on a Claude tile." htmlFor="default-model">
+          <Row label="Default Claude model" info="The model, such as sonnet, that new Claude terminals start with, plus an optional effort level (how hard Claude thinks) beside it. It updates itself whenever you pick a different model or effort on a Claude tile." hint="The model new Claude tiles start with. Set from the last model picked on a Claude tile." htmlFor="default-model">
             <div className="flex items-center gap-2">
               <CommitInput
                 id="default-model"
@@ -65,7 +65,7 @@ export function TerminalsSection() {
               </Select>
             </div>
           </Row>
-          <Row label="Shell" hint="Leave empty for the system default. Applies to terminals started from now on." htmlFor="shell">
+          <Row label="Shell" info="The program that plain shell terminals start, for example powershell.exe on Windows or /bin/bash elsewhere. Leave it empty to use the system default. Only terminals opened after you change it are affected." hint="Leave empty for the system default. Applies to terminals started from now on." htmlFor="shell">
             <CommitInput
               id="shell"
               className="w-64 font-mono text-xs"
@@ -74,7 +74,7 @@ export function TerminalsSection() {
               onCommit={(v) => save.mutate({ shell: { file: v } })}
             />
           </Row>
-          <Row label="Shell arguments" htmlFor="shell-args">
+          <Row label="Shell arguments" info="Options added when the shell above starts, separated by spaces, for example -NoLogo for PowerShell. It is greyed out until you set a Shell, and has no effect while Shell is empty." htmlFor="shell-args">
             <CommitInput
               id="shell-args"
               className="w-64 font-mono text-xs"

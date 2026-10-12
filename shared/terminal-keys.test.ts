@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { decideTermKey, dropText, findFileLinks, imagePasteBytes, type TermKeyInput } from './terminal-keys'
 
-const base: TermKeyInput = { mac: false, ctrlKey: true, metaKey: false, altKey: false, code: 'KeyC', hasSelection: true, live: true, bound: false }
+const base: TermKeyInput = { mac: false, ctrlKey: true, metaKey: false, altKey: false, shiftKey: false, code: 'KeyC', hasSelection: true, live: true, bound: false }
 
 describe('decideTermKey', () => {
   it('copies with a selection and sends Ctrl+C to the terminal without one', () => {
@@ -20,6 +20,40 @@ describe('decideTermKey', () => {
   })
   it('lets a bound shortcut go to the app first', () => {
     expect(decideTermKey({ ...base, bound: true })).toBe('app')
+  })
+  it('copies on Ctrl+Shift+C and Ctrl+Insert, and never sends Ctrl+Shift+C to the terminal', () => {
+    expect(decideTermKey({ ...base, shiftKey: true })).toBe('copy')
+    expect(decideTermKey({ ...base, shiftKey: true, hasSelection: false })).toBe('copy')
+    expect(decideTermKey({ ...base, code: 'Insert' })).toBe('copy')
+    expect(decideTermKey({ ...base, code: 'Insert', hasSelection: false })).toBe('terminal')
+  })
+  it('pastes on Ctrl+Shift+V and Shift+Insert while live', () => {
+    const v = { ...base, shiftKey: true, code: 'KeyV' }
+    expect(decideTermKey(v)).toBe('paste')
+    expect(decideTermKey({ ...v, live: false })).toBe('terminal')
+    expect(decideTermKey({ ...base, ctrlKey: false, shiftKey: true, code: 'Insert' })).toBe('paste')
+  })
+  it('selects all on Ctrl+Shift+A but sends plain Ctrl+A to the terminal', () => {
+    expect(decideTermKey({ ...base, shiftKey: true, code: 'KeyA' })).toBe('selectAll')
+    expect(decideTermKey({ ...base, code: 'KeyA' })).toBe('terminal')
+  })
+  it('scrolls on Shift+PageUp, PageDown, Home and End only', () => {
+    const s = { ...base, ctrlKey: false, shiftKey: true }
+    expect(decideTermKey({ ...s, code: 'PageUp' })).toBe('scrollPageUp')
+    expect(decideTermKey({ ...s, code: 'PageDown' })).toBe('scrollPageDown')
+    expect(decideTermKey({ ...s, code: 'Home' })).toBe('scrollTop')
+    expect(decideTermKey({ ...s, code: 'End' })).toBe('scrollBottom')
+    expect(decideTermKey({ ...s, shiftKey: false, code: 'PageUp' })).toBe('terminal')
+    expect(decideTermKey({ ...s, ctrlKey: true, code: 'PageUp' })).toBe('terminal')
+  })
+  it('passes readline and word-motion chords through', () => {
+    for (const code of ['KeyE', 'KeyL', 'KeyR', 'KeyW', 'KeyU', 'ArrowLeft']) {
+      expect(decideTermKey({ ...base, code })).toBe('terminal')
+    }
+    expect(decideTermKey({ ...base, ctrlKey: false, altKey: true, code: 'ArrowLeft' })).toBe('terminal')
+  })
+  it('keeps the macOS Ctrl+Shift chords for the terminal', () => {
+    expect(decideTermKey({ ...base, mac: true, shiftKey: true })).toBe('terminal')
   })
   it('leaves Alt chords alone', () => {
     expect(decideTermKey({ ...base, altKey: true })).toBe('terminal')

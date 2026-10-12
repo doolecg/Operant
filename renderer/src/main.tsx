@@ -3,8 +3,10 @@ import { createRoot } from 'react-dom/client'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { App } from './App'
 import { BrowserPopoutPage } from './components/browser/BrowserPopout'
+import { TilePopoutPage } from './components/terminal/TilePopout'
 import { TooltipProvider } from './components/ui/tooltip'
 import { call } from './lib/queries'
+import { parseTilePopoutQuery } from '@shared/tile-popout'
 import './index.css'
 import { ThemeApplier, applyStoredTheme } from './lib/theme'
 
@@ -16,6 +18,8 @@ const queryClient = new QueryClient({
 
 // A browser pop-out window loads this page with ?browserPopout=<crewId> and shows only that project's browser.
 const popoutCrew = Number(new URLSearchParams(location.search).get('browserPopout'))
+// A terminal pop-out window loads this page with ?tilePopout=<scratchId> and shows only that tile.
+const popoutTile = parseTilePopoutQuery(location.search)
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
@@ -24,6 +28,10 @@ createRoot(document.getElementById('root')!).render(
       {popoutCrew ? (
         <TooltipProvider>
           <BrowserPopoutPage crewId={popoutCrew} onPopIn={() => void call('browser:popIn', popoutCrew)} />
+        </TooltipProvider>
+      ) : popoutTile ? (
+        <TooltipProvider>
+          <TilePopoutPage req={popoutTile} />
         </TooltipProvider>
       ) : (
         <App />

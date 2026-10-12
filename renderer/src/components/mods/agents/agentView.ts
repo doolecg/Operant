@@ -164,6 +164,29 @@ export interface AgentView extends AgentRowModel {
   todos: { done: number; total: number } | null
   tokens: number | null
   cost: number | null
+  // Claude Code reported a task id, so this one sub-agent can be stopped on its own (Chat view only).
+  canStopOne: boolean
+}
+
+export interface StopPlan {
+  scope: 'one' | 'turn'
+  title: string
+  // Asked first when stopping the turn would also stop other running sub-agents.
+  confirm: { title: string; body: string } | null
+}
+
+// What a sub-agent's Stop button does. Only a known task id stops one agent; otherwise the whole turn is interrupted,
+// which also stops every other running sub-agent, so the title says so and other running work needs a confirmation.
+export function stopPlan(canStopOne: boolean, othersRunning: number): StopPlan {
+  if (canStopOne) return { scope: 'one', title: 'Stop this subagent', confirm: null }
+  return {
+    scope: 'turn',
+    title: 'Stop the current turn (stops all subagents)',
+    confirm:
+      othersRunning > 0
+        ? { title: 'Stop the current turn?', body: `This subagent cannot be stopped on its own. Stopping the turn also stops the other ${othersRunning === 1 ? 'running subagent' : `${othersRunning} running subagents`}.` }
+        : null,
+  }
 }
 
 // done/total of the newest TodoWrite the agent made, null when it made none.
@@ -198,6 +221,7 @@ export function viewFor(row: AgentRowModel, item: SubagentItem | null, items: Ch
     todos: item ? todoProgress(items, item.id) : null,
     tokens: item ? agentTokens(item) : null,
     cost: item ? agentCost(item) : null,
+    canStopOne: !!item?.taskId,
   }
 }
 

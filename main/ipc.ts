@@ -6,9 +6,11 @@ import { CORE_CHANNELS, encodeIpcError, type IpcApi, type IpcEventName, type Ipc
 import type { BrowserHub } from '../core/browser/hub'
 import type { BrowserPanels } from './browser'
 import type { BrowserPopout } from './browser-popout'
+import { sanitizeTilePopout } from '../shared/tile-popout'
 import { isTrustedSender, type AppOrigin } from './guard'
 import { createMedia } from './media'
 import { isRunnable, resolveAllowedPath } from './openpath'
+import type { TilePopout } from './tile-popout'
 import type { createUpdater } from './updater'
 
 type MainHandlers = { [C in MainChannel]: (...a: Parameters<IpcApi[C]>) => ReturnType<IpcApi[C]> | Promise<ReturnType<IpcApi[C]>> }
@@ -18,13 +20,16 @@ export function registerIpc(
   updater: ReturnType<typeof createUpdater>,
   getWindow: () => BrowserWindow | null,
   origin: AppOrigin,
-  hooks: { answerClose: (action: 'shown' | 'quit' | 'stay') => void; turnBusy: (scratchId: number) => boolean; setVisible: (scratchId: number | null) => void; browser: { panels: BrowserPanels; hub: BrowserHub; popout: BrowserPopout } },
+  hooks: { answerClose: (action: 'shown' | 'quit' | 'stay') => void; turnBusy: (scratchId: number) => boolean; setVisible: (scratchId: number | null) => void; browser: { panels: BrowserPanels; hub: BrowserHub; popout: BrowserPopout }; tiles: TilePopout },
 ): void {
   // Only the main window showing the app may call; anything else (a dropped file, a navigated page) is refused.
   // The browser pop-out windows show the same app, so they may call too.
   const { panels, hub, popout } = hooks.browser
+  const tiles = hooks.tiles
   const trusted = (e: IpcMainInvokeEvent) =>
-    isTrustedSender(e, getWindow()?.webContents.id, origin) || popout.webContentsIds().some((id) => isTrustedSender(e, id, origin))
+    isTrustedSender(e, getWindow()?.webContents.id, origin) ||
+    popout.webContentsIds().some((id) => isTrustedSender(e, id, origin)) ||
+    tiles.webContentsIds().some((id) => isTrustedSender(e, id, origin))
   const refuse = () => new Error(encodeIpcError('FORBIDDEN', 'Not allowed from this page'))
   for (const channel of CORE_CHANNELS) {
     const handler = operant.handlers[channel] as (...a: unknown[]) => unknown
@@ -32,7 +37,10 @@ export function registerIpc(
     ipcMain.handle(channel, async (e, ...args: unknown[]) => {
       if (!trusted(e)) throw refuse()
       try {
-        return await handler(...args)
+        const result = await handler(...args)
+        // A deleted terminal takes its own window with it.
+        if (channel === 'scratch:delete' && typeof args[0] === 'number') tiles.close(args[0])
+        return result
       } catch (err) {
         const { code, message } = ipcErrorOf(err)
         throw new Error(encodeIpcError(code, message))
@@ -142,6 +150,13 @@ export function registerIpc(
     'browser:historyClear': (crewId) => hub.clearHistory(crewId),
     'browser:popOut': (crewId) => panels.popOut(crewId),
     'browser:popIn': (crewId) => panels.popIn(crewId),
+    'tile:popOut': (req) => {
+      const clean = sanitizeTilePopout(req)
+      if (!clean) throw new Error(encodeIpcError('BAD_ARGS', 'Not a terminal tile'))
+      tiles.open(clean)
+    },
+    'tile:popIn': (scratchId) => tiles.close(scratchId),
+    'tile:popouts': () => tiles.ids(),
   }
   for (const [channel, handler] of Object.entries(mainHandlers)) {
     ipcMain.handle(channel, (e, ...args: unknown[]) => {
@@ -153,11 +168,21 @@ export function registerIpc(
     })
   }
 
+  // A popped-out terminal tile's window shows a live session, so the core's events reach it as well.
+  const pushTiles = <E extends IpcEventName>(name: E, payload: IpcEvents[E]) => {
+    push(getWindow(), name, payload)
+    for (const w of tiles.windows()) push(w, name, payload)
+  }
   const forward = <E extends IpcEventName>(name: E) =>
-    operant.on(name as Exclude<E, 'update'>, ((payload: IpcEvents[E]) => push(getWindow(), name, payload)) as never)
+    operant.on(name as Exclude<E, 'update'>, ((payload: IpcEvents[E]) => pushTiles(name, payload)) as never)
+  // A popped-out terminal that ended (not a Chat/Terminal switch) closes its window.
+  operant.on('scratch:exit', (e) => {
+    if (!e.switching) tiles.close(e.scratchId)
+  })
   forward('event')
   forward('scratch:data')
   forward('scratch:exit')
+  forward('servers:changed')
   forward('chat:ops')
   forward('learn:askOnClose')
   forward('index:status')

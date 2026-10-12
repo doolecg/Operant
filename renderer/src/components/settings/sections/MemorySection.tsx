@@ -139,13 +139,13 @@ export function MemorySection() {
         </CardHeader>
         <CardContent className="space-y-6">
           <div id="settings-hindsight" className="scroll-mt-6 space-y-3">
-            <Row label="Use Hindsight" hint="Lessons are kept in Hindsight and recalled when a session starts. Starts the local server with the app." htmlFor="mem-use-hindsight">
+            <Row label="Use Hindsight" info="Turns on Hindsight, a memory server that stores lessons so later Claude sessions can recall them. When on and installed, Operant starts the local server with the app and gives each session access to it. It is off by default." hint="Lessons are kept in Hindsight and recalled when a session starts. Starts the local server with the app." htmlFor="mem-use-hindsight">
               <Switch id="mem-use-hindsight" checked={s.learn.hindsight} onCheckedChange={(v) => save.mutate({ learn: { hindsight: v } }, { onError: fail })} />
             </Row>
             <HindsightSection />
           </div>
           <div id="settings-codegraph" className="scroll-mt-6 space-y-3 border-t pt-6">
-            <Row label="Use CodeGraph" hint="Adds the CodeGraph MCP server to each session." htmlFor="mem-use-codegraph">
+            <Row label="Use CodeGraph" info="Turns on CodeGraph, which builds a searchable index of your project's files and functions. When on and installed, each Claude session can look things up in it instead of reading many files, which saves time and tokens. It is off by default." hint="Adds the CodeGraph MCP server to each session." htmlFor="mem-use-codegraph">
               <Switch id="mem-use-codegraph" checked={s.learn.codegraph} onCheckedChange={(v) => save.mutate({ learn: { codegraph: v } }, { onError: fail })} />
             </Row>
             <CodegraphSection />
@@ -173,7 +173,7 @@ export function MemorySection() {
         <details className="group">
           <summary className="cursor-pointer px-6 text-base font-semibold select-none">Advanced recall</summary>
           <CardContent className="divide-y pt-4">
-          <Row label="Recall mode" hint={RECALL_HINT[m.recallMode]} htmlFor="mem-recall">
+          <Row label="Recall mode" info="Chooses whether saved lessons are added to a session. Session start adds the ones that match the task when a session begins. Off adds nothing, so Claude starts without your past lessons. The default is Session start." hint={RECALL_HINT[m.recallMode]} htmlFor="mem-recall">
             <Select value={m.recallMode} onValueChange={(v) => setMem({ recallMode: v as RecallMode })}>
               <SelectTrigger id="mem-recall" className="w-44">
                 <SelectValue />
@@ -187,13 +187,13 @@ export function MemorySection() {
               </SelectContent>
             </Select>
           </Row>
-          <Row label="Entries per recall" hint="1 to 50." htmlFor="mem-topk">
+          <Row label="Entries per recall" info="The most lessons added to a session per recall, from 1 to 50. More gives Claude more background but also more to read, and it must still fit the token limit below. The default is 5." hint="1 to 50." htmlFor="mem-topk">
             <NumberField id="mem-topk" value={m.topK} min={1} max={50} onCommit={(n) => setMem({ topK: n })} />
           </Row>
-          <Row label="Token limit" hint="100 to 20000 tokens per recall." htmlFor="mem-tokens">
+          <Row label="Token limit" info="Caps the total size of recalled lessons, counted in tokens (small chunks of words), from 100 to 20000. Lessons that do not fit are left out. Lower saves space in the session. The default is 1500." hint="100 to 20000 tokens per recall." htmlFor="mem-tokens">
             <NumberField id="mem-tokens" value={m.maxTokens} min={100} max={20000} onCommit={(n) => setMem({ maxTokens: n })} />
           </Row>
-          <Row label="Include the Soul Bank" hint="Facts about you, shared across projects." htmlFor="mem-soul">
+          <Row label="Include the Soul Bank" info="When on, recall also searches the Soul Bank, which holds facts about you and your preferences that are shared across all projects, alongside the current project's lessons. Off recalls project lessons only. It is on by default." hint="Facts about you, shared across projects." htmlFor="mem-soul">
             <Switch id="mem-soul" checked={m.includeSoul} onCheckedChange={(v) => setMem({ includeSoul: v })} />
           </Row>
           </CardContent>

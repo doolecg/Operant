@@ -227,6 +227,11 @@ export class ChatSession {
     return this.child !== null
   }
 
+  // The process id of the running claude process.
+  get pid(): number | undefined {
+    return this.child?.pid
+  }
+
   get state(): ChatState {
     return this.mapper.state
   }
@@ -239,6 +244,15 @@ export class ChatSession {
 
   addNotice(n: Omit<NoticeItem, 'kind' | 'id' | 'parent' | 'at'>): void {
     this.push(this.mapper.noteNotice(n))
+  }
+
+  // The "Learn" tool row (see ChatMapper.noteLearnStart).
+  addLearnRow(id: string, subject: string): void {
+    this.push(this.mapper.noteLearnStart(id, subject))
+  }
+
+  finishLearnRow(id: string, text: string, failed: boolean): void {
+    this.push(this.mapper.noteLearnEnd(id, text, failed))
   }
 
   private push(ops: ChatOp[]): void {
@@ -577,6 +591,18 @@ export class ChatSession {
       this.push(this.mapper.noteInterruptForced())
       killTree(child as never)
     }, INTERRUPT_GRACE_MS)
+  }
+
+  // Stops one sub-agent: stop_task with the task id Claude Code reported for its Agent call. False when that id is not known.
+  stopAgent(toolUseId: string): boolean {
+    if (!this.child) return false
+    const item = this.mapper.items.find((i) => i.kind === 'subagent' && i.id === toolUseId)
+    const taskId = item?.kind === 'subagent' ? item.taskId : undefined
+    if (!taskId) return false
+    const id = `stop-${this.nextId++}`
+    this.mapper.expect(id, 'other')
+    this.write({ type: 'control_request', request_id: id, request: { subtype: 'stop_task', task_id: taskId } })
+    return true
   }
 
   // Answers a pending prompt. Returns false for an unknown or already answered request.

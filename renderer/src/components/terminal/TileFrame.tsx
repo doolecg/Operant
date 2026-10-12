@@ -1,5 +1,5 @@
-import { useEffect, useRef, type ReactNode } from 'react'
-import { Code2, Globe, Maximize2, Minimize2, Sparkle, SquareTerminal, X } from 'lucide-react'
+import { useEffect, useRef, type HTMLAttributes, type ReactNode } from 'react'
+import { Code2, Globe, GripVertical, Maximize2, Minimize2, PictureInPicture2, Sparkle, SquareTerminal, X } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
 interface Props {
@@ -19,6 +19,15 @@ interface Props {
   onClose?: () => void
   onFocus: () => void
   onFullscreen: () => void
+  // Opens the tile in its own window; no button while it is already out.
+  onPopOut?: () => void
+  // Pointer handlers for the move handle in the header (drag onto another tile to swap places).
+  moveProps?: Pick<HTMLAttributes<HTMLButtonElement>, 'onPointerDown' | 'onPointerMove' | 'onPointerUp' | 'onPointerCancel'>
+  // A gap is being resized: the frame follows the pointer without easing.
+  dragging?: boolean
+  // This tile is being moved (shown faded) or is where the moved tile would land (ringed).
+  moving?: boolean
+  dropTarget?: boolean
   // 'hide' = no header, 'compact' = a thin one.
   strip?: 'compact' | 'normal' | 'hide'
   // A thin row under the header (the info bar).
@@ -50,7 +59,7 @@ export function TileIcon({ kind, compact }: { kind: string; compact?: boolean })
   )
 }
 
-export function TileFrame({ id, title, badge, icon, heading, subtitle, status, focused, fullscreen, style, hidden, onClose, onFocus, onFullscreen, strip = 'normal', info, children }: Props) {
+export function TileFrame({ id, title, badge, icon, heading, subtitle, status, focused, fullscreen, style, hidden, onClose, onFocus, onFullscreen, onPopOut, moveProps, dragging, moving, dropTarget, strip = 'normal', info, children }: Props) {
   const root = useRef<HTMLElement>(null)
   useEffect(() => {
     if (focused) root.current?.querySelector<HTMLElement>('textarea.xterm-helper-textarea, textarea[data-chat-composer]')?.focus()
@@ -62,10 +71,14 @@ export function TileFrame({ id, title, badge, icon, heading, subtitle, status, f
       data-tile={id}
       data-focused={focused}
       data-fullscreen={fullscreen}
+      data-drop-target={dropTarget || undefined}
       onPointerDown={onFocus}
       style={style}
       className={cn(
-        'bg-card absolute flex flex-col overflow-hidden rounded-2xl border shadow-xs transition-[left,top,width,height,border-color] duration-150 dark:shadow-none',
+        'bg-card absolute flex flex-col overflow-hidden rounded-2xl border shadow-xs dark:shadow-none',
+        dragging ? 'transition-[border-color]' : 'transition-[left,top,width,height,border-color,opacity] duration-150',
+        moving && 'opacity-60',
+        dropTarget && 'ring-primary ring-2',
         focused && 'border-primary/60',
         hidden && 'invisible',
       )}
@@ -74,6 +87,17 @@ export function TileFrame({ id, title, badge, icon, heading, subtitle, status, f
         // A narrow tile wraps the controls onto a second row instead of clipping them.
         <div className={cn('flex shrink-0 flex-wrap items-center text-xs', strip === 'compact' ? 'min-h-7 gap-x-1.5 gap-y-0.5 pr-1.5 pl-2' : 'min-h-10 gap-x-2 gap-y-1 py-1.5 pr-2 pl-3')}>
           <div className={cn('flex min-w-0 items-center', strip === 'compact' ? 'gap-1.5' : 'gap-2')}>
+            {moveProps && !fullscreen && (
+              <button
+                type="button"
+                aria-label={`Move ${title}`}
+                title="Drag to swap with another tile"
+                {...moveProps}
+                className="text-muted-foreground hover:bg-accent hover:text-foreground -ml-1.5 grid h-7 w-5 shrink-0 cursor-grab touch-none place-items-center rounded-md active:cursor-grabbing"
+              >
+                <GripVertical className="size-3.5" />
+              </button>
+            )}
             {icon}
             <h2 title={title} className="min-w-0 truncate text-[13px] font-semibold">
               {heading ?? title}
@@ -91,6 +115,17 @@ export function TileFrame({ id, title, badge, icon, heading, subtitle, status, f
             >
               {fullscreen ? <Minimize2 className="size-3.5" /> : <Maximize2 className="size-3.5" />}
             </button>
+            {onPopOut && (
+              <button
+                type="button"
+                aria-label={`Pop out ${title}`}
+                title="Open this tile in its own window"
+                onClick={onPopOut}
+                className="text-muted-foreground hover:bg-accent hover:text-foreground grid size-7 shrink-0 place-items-center rounded-full"
+              >
+                <PictureInPicture2 className="size-3.5" />
+              </button>
+            )}
             {onClose && (
               <button
                 type="button"

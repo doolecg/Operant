@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import type { ChatItem } from '@shared/claude-chat'
 import { buildRows } from '@shared/claude-chat'
-import { CUTE_NAMES, SCREEN_NAMES, agentName, nameRef, HATS, TINTS, critterFor, cuteName, effortInfo, mcpRows, mcpSummary, mcpTiles, metricsOf, progressOf, sessionRows, shortModel, skillSummary, skillTiles, summarize, todoProgress } from './agentView'
+import { CUTE_NAMES, SCREEN_NAMES, agentName, nameRef, HATS, TINTS, critterFor, cuteName, effortInfo, mcpRows, mcpSummary, mcpTiles, metricsOf, progressOf, sessionRows, shortModel, skillSummary, skillTiles, stopPlan, summarize, todoProgress } from './agentView'
 
 const notice = (over: Record<string, unknown>): ChatItem => ({ kind: 'notice', id: 'n1', parent: null, source: 'info', tone: 'info', text: 'x', at: 0, ...over }) as ChatItem
 
@@ -135,5 +135,19 @@ describe('status section', () => {
     expect(tiles[1]).toMatchObject({ prefix: 'superpowers', short: 'brainstorming', state: 'Failed', tone: 'destructive', attention: true, reason: 'Skill not found' })
     expect(skillSummary(tiles)).toBe('Skills · 0 loaded')
     expect(skillSummary(skillTiles([skill('t5', 'hindsight-coding-agent', 'done')]))).toBe('Skills · 1 loaded')
+  })
+})
+
+describe('stopPlan', () => {
+  it('stops one agent when its task id is known, with no confirmation', () => {
+    expect(stopPlan(true, 3)).toEqual({ scope: 'one', title: 'Stop this subagent', confirm: null })
+  })
+  it('falls back to the turn, says so, and confirms only when other agents run', () => {
+    const alone = stopPlan(false, 0)
+    expect(alone.scope).toBe('turn')
+    expect(alone.title).toContain('stops all subagents')
+    expect(alone.confirm).toBeNull()
+    expect(stopPlan(false, 1).confirm?.body).toContain('the other running subagent')
+    expect(stopPlan(false, 2).confirm?.body).toContain('2 running subagents')
   })
 })
