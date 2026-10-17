@@ -6,7 +6,7 @@ import { keyReleases, matches, matchesMouseEvent, mouseButtonOfAccel } from '@/l
 import { useQueryClient } from '@tanstack/react-query'
 import { ArrowUp, Check, ChevronDown, Command, CornerDownLeft, Loader2, Plus, Sparkles, Square, StickyNote, Undo2, X } from 'lucide-react'
 import type { ChatState } from '@shared/claude-chat'
-import { describeEnhanceContext } from '@shared/prompt-enhance'
+import { describeEnhanceContext, enhanceRecallsText } from '@shared/prompt-enhance'
 import { bridge } from '@/lib/bridge'
 import { useInstallStatus, useSaveSettings, useSettings } from '@/lib/queries'
 import { toast } from '@/lib/toast'
@@ -100,10 +100,12 @@ export function Composer({ scratchId, state, launchEffort, tileModel, disabled, 
   const [menuPick, setMenuPick] = useState<string | null>(null)
   const [enhancing, setEnhancing] = useState(false)
   const [undo, setUndo] = useState<string | null>(null)
-  const [phase, setPhase] = useState<'context' | 'rewrite'>('context')
-  const [usedNote, setUsedNote] = useState('')
+  // The last rewrite, when the box changed while it ran: it waits for "Use rewrite" or "Discard".
+  const [held, setHeld] = useState<string | null>(null)
+  const [lastRun, setLastRun] = useState<{ recalls: string; note: string } | null>(null)
   const enhanceRun = useRef(0)
-  const undoTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const textNow = useRef(text)
+  textNow.current = text
   const area = useRef<HTMLTextAreaElement>(null)
   const picker = useRef<HTMLInputElement>(null)
   const running = state.turn.phase === 'working' || state.turn.phase === 'waiting'
@@ -187,30 +189,32 @@ export function Composer({ scratchId, state, launchEffort, tileModel, disabled, 
     void addFiles([...e.dataTransfer.files])
   }
 
-  useEffect(() => () => void (undoTimer.current && clearTimeout(undoTimer.current)), [])
-
-  // Rewrites the box with a cheap one-shot model call made by Operant. The result replaces the text (editable, never sent).
+  // Rewrites the box with a cheap one-shot model call made by Operant. The result replaces the text (editable, never sent);
+  // Undo stays until the next message is sent. If the box changed while it ran, the rewrite waits for "Use rewrite".
   const enhance = async () => {
     const original = text
     if (!original.trim() || running || enhancing) return
     const run = ++enhanceRun.current
     setEnhancing(true)
-    setPhase('context')
+    setHeld(null)
     setActivity(scratchId, { phase: 'context' })
     try {
       const commands = state.commands.map((c) => ({ name: c.name, description: c.description }))
       const context = await bridge().invoke('aux:enhanceContext', original, scratchId).catch(() => undefined)
       if (run !== enhanceRun.current) return
-      setPhase('rewrite')
       setActivity(scratchId, { phase: 'rewrite', context: context ?? null })
       const out = await bridge().invoke('aux:enhancePrompt', original, commands, context)
       if (run !== enhanceRun.current) return
-      setUsedNote(describeEnhanceContext(context))
-      setText(out)
+      setLastRun({ recalls: enhanceRecallsText(context), note: describeEnhanceContext(context) })
       lastEnhanced.set(scratchId, out)
+      if (textNow.current.trim() !== original.trim()) {
+        setHeld(out)
+        setUndo(null)
+        toast('You changed the prompt while it was being enhanced, so your text was kept. Use rewrite puts the rewrite in the box.')
+        return
+      }
+      setText(out)
       setUndo(original)
-      if (undoTimer.current) clearTimeout(undoTimer.current)
-      undoTimer.current = setTimeout(() => setUndo(null), 15_000)
       area.current?.focus()
     } catch (e) {
       if (run === enhanceRun.current) toast(`Could not enhance the prompt: ${e instanceof Error ? e.message.replace(/^Error invoking remote method '[^']*': (Error: )?/, '') : String(e)}`, true)
@@ -226,6 +230,14 @@ export function Composer({ scratchId, state, launchEffort, tileModel, disabled, 
   const undoEnhance = () => {
     if (undo !== null) setText(undo)
     setUndo(null)
+  }
+  const useHeld = () => {
+    if (held === null) return
+    // Undo puts back what the box held just before the rewrite, which may be newer than the text that was enhanced.
+    setUndo(textNow.current)
+    setText(held)
+    setHeld(null)
+    area.current?.focus()
   }
 
   const submit = async () => {
@@ -245,6 +257,9 @@ export function Composer({ scratchId, state, launchEffort, tileModel, disabled, 
     setText('')
     setImages([])
     setRecall(-1)
+    setUndo(null)
+    setHeld(null)
+    setLastRun(null)
     onSent()
   }
 
@@ -349,9 +364,14 @@ export function Composer({ scratchId, state, launchEffort, tileModel, disabled, 
       <div className="mx-auto mb-1.5 flex max-w-[720px] flex-wrap items-center gap-x-2 gap-y-1 px-1">
         <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
         {enhancing ? (
-          <button type="button" onClick={cancelEnhance} title="Cancel" aria-label="Cancel enhancing" className="bg-accent text-foreground inline-flex h-[26px] items-center gap-1.5 rounded-full px-3 text-[13px]">
-            <Loader2 className="size-3.5 animate-spin" aria-hidden /> {phase === 'context' ? 'Gathering context…' : 'Enhancing…'}
-          </button>
+          <>
+            <span role="status" className="bg-accent text-foreground inline-flex h-[26px] items-center gap-1.5 rounded-full px-3 text-[13px]">
+              <Loader2 className="size-3.5 animate-spin" aria-hidden /> Enhancing…
+            </span>
+            <button type="button" onClick={cancelEnhance} title="Cancel" aria-label="Cancel enhancing" className="text-muted-foreground hover:text-foreground inline-flex items-center gap-1 text-[13px] underline-offset-2 hover:underline">
+              <X className="size-3.5" aria-hidden /> Cancel
+            </button>
+          </>
         ) : (
           <ContextMenu>
             <ContextMenuTrigger asChild>
@@ -359,7 +379,7 @@ export function Composer({ scratchId, state, launchEffort, tileModel, disabled, 
                 type="button"
                 onClick={() => void enhance()}
                 disabled={!text.trim() || running}
-                title={running ? 'Wait for Claude to finish' : !text.trim() ? 'Write a prompt first, then enhance it' : 'Rewrite this prompt with the skills to load, what to ask first and when it is done. Right-click to recover the last enhanced prompt'}
+                title={running ? 'Wait for Claude to finish' : !text.trim() ? 'Write a prompt first, then enhance it' : 'Rewrite this prompt with the files to change, context, skills to load, what to ask first and when it is done. Right-click to recover the last enhanced prompt'}
                 className="bg-accent/60 text-muted-foreground hover:bg-accent hover:text-foreground inline-flex h-[26px] items-center gap-1.5 rounded-full px-3 text-[13px] disabled:opacity-50 disabled:hover:bg-accent/60"
               >
                 <Sparkles className="size-3.5" aria-hidden /> Enhance prompt
@@ -372,17 +392,28 @@ export function Composer({ scratchId, state, launchEffort, tileModel, disabled, 
             </ContextMenuContent>
           </ContextMenu>
         )}
-        {undo !== null && !enhancing && (
-          <button type="button" onClick={undoEnhance} className="text-muted-foreground hover:text-foreground inline-flex items-center gap-1 text-[13px] underline-offset-2 hover:underline">
+        {!enhancing && lastRun && <span className="text-muted-foreground text-[13px]">{lastRun.recalls}</span>}
+        {!enhancing && held !== null && (
+          <>
+            <button type="button" onClick={useHeld} title="Put the rewrite in the box" aria-label="Use the enhanced rewrite" className="text-muted-foreground hover:text-foreground inline-flex items-center gap-1 text-[13px] underline-offset-2 hover:underline">
+              <Check className="size-3.5" aria-hidden /> Use rewrite
+            </button>
+            <button type="button" onClick={() => setHeld(null)} title="Throw the rewrite away" aria-label="Discard the enhanced rewrite" className="text-muted-foreground hover:text-foreground inline-flex items-center gap-1 text-[13px] underline-offset-2 hover:underline">
+              <X className="size-3.5" aria-hidden /> Discard
+            </button>
+          </>
+        )}
+        {!enhancing && held === null && undo !== null && (
+          <button type="button" onClick={undoEnhance} title="Put your text back" aria-label="Undo the enhanced rewrite" className="text-muted-foreground hover:text-foreground inline-flex items-center gap-1 text-[13px] underline-offset-2 hover:underline">
             <Undo2 className="size-3.5" aria-hidden /> Undo
           </button>
         )}
-        {undo !== null && !enhancing && usedNote && <span className="text-muted-foreground/70 text-[11px]">{usedNote}</span>}
+        {!enhancing && lastRun?.note && <span className="text-muted-foreground/70 text-[11px]">{lastRun.note}</span>}
         </div>
         <div className="ml-auto flex max-w-full flex-wrap items-center justify-end gap-x-2 gap-y-1">
           <KeepWarmLine state={state} />
           <LearnPill scratchId={scratchId} />
-          <SteerPill scratchId={scratchId} running={running} />
+          <SteerPill scratchId={scratchId} running={running} queued={state.items.filter((i) => i.kind === 'user' && i.queued && !i.seen && !i.steer).length} />
         </div>
       </div>
       <div className="relative mx-auto max-w-[720px]">

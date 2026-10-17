@@ -43,11 +43,31 @@ export function LearnPill({ scratchId }: { scratchId: number }) {
   )
 }
 
-// Sends a short note to Claude while a turn is running, without stopping it.
-export function SteerPill({ scratchId, running }: { scratchId: number; running: boolean }) {
+// Sends a short note to Claude while a turn is running, without stopping it. With queued messages Claude has not read
+// yet, one click makes Claude read them now instead.
+export function SteerPill({ scratchId, running, queued }: { scratchId: number; running: boolean; queued: number }) {
   const [open, setOpen] = useState(false)
   const [text, setText] = useState('')
   const [sending, setSending] = useState(false)
+  const pushQueued = async () => {
+    if (sending) return
+    setSending(true)
+    try {
+      await bridge().invoke('chat:steerQueued', scratchId)
+    } catch (e) {
+      toast(`Could not steer Claude: ${ipcMessage(e)}`, true)
+    } finally {
+      setSending(false)
+    }
+  }
+  if (running && queued > 0) {
+    const label = `Read ${queued === 1 ? 'the queued message' : `the ${queued} queued messages`} now`
+    return (
+      <button type="button" onClick={() => void pushQueued()} disabled={sending} aria-label={`Steer Claude: ${label.toLowerCase()}`} title={`${label}. Claude stops its current step, reads them, then carries on.`} className={pillClass}>
+        {sending ? <Loader2 className="size-3.5 animate-spin" aria-hidden /> : <Navigation className="size-3.5" aria-hidden />} Steer ({queued} queued)
+      </button>
+    )
+  }
   const send = async () => {
     const body = text.trim()
     if (!body || sending) return

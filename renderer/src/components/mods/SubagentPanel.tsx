@@ -6,6 +6,7 @@ import type { ClaudeSubagent } from '@shared/claude-mods'
 import { cn } from '@/lib/utils'
 import { bridge } from '@/lib/bridge'
 import { ConfirmDialog } from '@/components/ui/confirm-dialog'
+import { PixelBar, meterTone } from '@/components/ui/pixel-bar'
 import { ConversationList } from '@/components/chat/ConversationList'
 import { UserBubble } from '@/components/chat/ItemViews'
 import { selectAgent, useAgentSelection } from '@/components/chat/agentSelection'
@@ -17,11 +18,11 @@ import { RightNowCard } from './agents/RightNowCard'
 import { cardTime, critterFor, effortInfo, loadCleared, loadStatusOpen, mcpSummary, mcpTiles, metricsOf, money, progressOf, saveCleared, saveStatusOpen, sessionRows, shortModel, skillSummary, skillTiles, stopPlan, summarize, viewFor, type AgentView, type EffortTone, type McpTile, type McpTone } from './agents/agentView'
 import type { ModProps } from './registry'
 
-const TONE: Record<EffortTone, { text: string; bar: string }> = {
-  success: { text: 'text-success', bar: 'bg-success' },
-  info: { text: 'text-info', bar: 'bg-info' },
-  warning: { text: 'text-warning', bar: 'bg-warning' },
-  destructive: { text: 'text-destructive', bar: 'bg-destructive' },
+const TONE: Record<EffortTone, { text: string }> = {
+  success: { text: 'text-success' },
+  info: { text: 'text-info' },
+  warning: { text: 'text-warning' },
+  destructive: { text: 'text-destructive' },
 }
 
 function StatusMark({ dot }: { dot: AgentDot }) {
@@ -42,6 +43,24 @@ function AgentRow({ row, now, onOpen, onClear, onStop, stopTitle }: { row: Agent
   const metrics = metricsOf(row, ms)
   const kind = row.agentType && row.agentType !== row.description ? row.agentType : null
   const detail = [model, row.effort].filter(Boolean).join(' · ')
+  const frac = prog.pct === null ? 0 : Math.min(100, prog.pct) / 100
+  const busy = row.dot === 'waiting' ? 'warning' : 'primary'
+  const barClass = 'mt-1'
+  let bar: ReactNode = null
+  if (open) {
+    bar =
+      prog.label && prog.pct !== null ? (
+        <PixelBar className={barClass} fraction={frac} animate tone={busy} label={`Progress ${prog.label}`} />
+      ) : (
+        <PixelBar className={barClass} sweep tone={busy} label={row.dot === 'waiting' ? 'Waiting for you' : 'Running'} />
+      )
+  } else if (row.dot === 'done') {
+    bar = <PixelBar className={barClass} solid tone="success" label="Done" />
+  } else if (row.dot === 'failed') {
+    bar = <PixelBar className={barClass} solid tone="destructive" label="Failed" />
+  } else if (prog.pct !== null) {
+    bar = <PixelBar className={barClass} fraction={frac} tone={meterTone(prog.pct, 75, 90)} label={prog.label ? `Progress ${prog.label}` : `Context ${Math.round(prog.pct)}% used`} />
+  }
   return (
     <li className="border-border group/row relative border-b last:border-b-0">
       <button type="button" onClick={onOpen} className={cn('hover:bg-accent flex w-full items-start gap-2.5 rounded-[10px] px-2.5 py-2.5 text-left', onStop && 'pr-8')}>
@@ -69,11 +88,7 @@ function AgentRow({ row, now, onOpen, onClear, onStop, stopTitle }: { row: Agent
               <span className="shrink-0 tabular-nums">{metrics}</span>
             </span>
           )}
-          {prog.pct !== null && (
-            <span className="bg-muted mt-1 block h-[3px] w-full overflow-hidden rounded-full" role="img" aria-label={prog.label ? `Progress ${prog.label}` : `Context ${Math.round(prog.pct)}% used`}>
-              <span className={cn('block h-full rounded-full', eff ? tone.bar : 'bg-primary')} style={{ width: `${Math.max(2, Math.min(100, prog.pct))}%` }} />
-            </span>
-          )}
+          {bar}
         </span>
       </button>
       {onStop && (

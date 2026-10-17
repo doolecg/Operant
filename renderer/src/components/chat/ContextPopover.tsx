@@ -5,6 +5,7 @@ import { useMoney } from '@/lib/useMoney'
 import { useSettings } from '@/lib/queries'
 import { cn } from '@/lib/utils'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
+import { PixelBar, type PixelBarTone } from '@/components/ui/pixel-bar'
 import { contextHeadline, contextTone, kTokens, type ContextTone } from './chatHelpers'
 import { useChatState } from './useChat'
 
@@ -31,7 +32,7 @@ const LEGEND: Record<ContextRowId, string> = {
   free: 'free',
 }
 const PILL: Record<ContextTone, string> = { ok: 'bg-success/15 text-success', warn: 'bg-warning/15 text-warning', danger: 'bg-destructive/15 text-destructive' }
-const RING: Record<ContextTone, string> = { ok: 'var(--muted-foreground)', warn: 'var(--warning)', danger: 'var(--destructive)' }
+const METER_TONE: Record<ContextTone, PixelBarTone> = { ok: 'success', warn: 'warning', danger: 'destructive' }
 
 function pctOf(state: ChatState | null, usage: ContextUsage | null): number | null {
   const p = usage?.percentage ?? state?.context?.percentage ?? null
@@ -95,7 +96,7 @@ export function ContextCard({ state, usage, warn, danger }: { state: ChatState; 
   )
 }
 
-// The small ring + percent in the tile header; opens the card (asking Claude Code for a fresh report).
+// The small pixel meter + percent in the tile header; opens the card (asking Claude Code for a fresh report).
 export function ContextButton({ scratchId }: { scratchId: number }) {
   const state = useChatState(scratchId)
   const settings = useSettings().data
@@ -118,22 +119,13 @@ export function ContextButton({ scratchId }: { scratchId: number }) {
   const usage = fresh && (!state.contextUsage || fresh.updatedAt >= state.contextUsage.updatedAt) ? fresh : state.contextUsage
   const pct = pctOf(state, usage)
   const tone = contextTone(pct ?? 0, warn, danger)
-  const deg = Math.min(100, pct ?? 0)
   return (
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger
         aria-label={`Context window${pct === null ? '' : `, ${pct}% used`}`}
         className={cn('text-muted-foreground hover:bg-accent hover:text-foreground inline-flex items-center gap-1.5 rounded-lg px-2 py-[3px] text-[13px]', open && 'bg-accent text-foreground')}
       >
-        <span
-          aria-hidden
-          className="size-3.5 rounded-full"
-          style={{
-            background: `conic-gradient(${RING[tone]} 0 ${deg}%, var(--input) ${deg}% 100%)`,
-            WebkitMask: 'radial-gradient(circle, transparent 4px, #000 4.5px)',
-            mask: 'radial-gradient(circle, transparent 4px, #000 4.5px)',
-          }}
-        />
+        <PixelBar fraction={Math.min(100, pct ?? 0) / 100} tone={METER_TONE[tone]} width={42} className="shrink-0" />
         {pct === null ? '—' : `${pct}%`}
       </PopoverTrigger>
       <PopoverContent align="end" className="w-[410px]">

@@ -30,6 +30,7 @@ describe('parseDocPath', () => {
   it('accepts the token and decodes segments', () => {
     expect(parseDocPath(`/d/${t}/4/docs/a%20b.md`, t)).toEqual({ kind: 'file', crewId: 4, segments: ['docs', 'a b.md'] })
     expect(parseDocPath(`/p/${t}/7`, t)).toEqual({ kind: 'memory', id: '7' })
+    expect(parseDocPath(`/x/${t}/3/page.html`, t)).toEqual({ kind: 'loose', id: '3', segments: ['page.html'] })
   })
   it('refuses a wrong token, traversal, separators and NUL', () => {
     expect(parseDocPath('/d/nope/4/docs/a.md', t)).toBeNull()
@@ -77,6 +78,22 @@ describe('DocsServer', () => {
       expect((await fetch(url, { method: 'POST' })).status).toBe(405)
       const plan = await fetch(await s.urlForMemory('Plan', '# Plan'))
       expect(await plan.text()).toContain('<h1>Plan</h1>')
+    } finally {
+      await s.close()
+    }
+  })
+  it('serves a document outside any project from its own folder only', async () => {
+    const s = new DocsServer({ folderOf: () => null })
+    try {
+      writeFileSync(join(outside, 'page.html'), '<h1>page</h1>')
+      writeFileSync(join(outside, 'style.css'), 'h1{}')
+      const url = await s.urlForLooseFile(join(outside, 'page.html'))
+      expect(url).toMatch(/\/x\//)
+      expect(await (await fetch(url!)).text()).toBe('<h1>page</h1>')
+      expect((await fetch(url!.replace('page.html', 'style.css'))).status).toBe(200)
+      expect((await fetch(url!.replace('page.html', '..%2Fproj%2Fdocs%2Fa.html'))).status).toBe(404)
+      expect(await s.urlForLooseFile(join(outside, 'none.html'))).toBeNull()
+      expect(await s.urlForLooseFile(join(root, 'docs', 'secret.env'))).toBeNull()
     } finally {
       await s.close()
     }

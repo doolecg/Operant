@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto'
 import { existsSync, mkdirSync, readdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import {
@@ -33,6 +34,8 @@ const CRASH_LIMIT = 3
 const STDERR_LINES = 20
 const IN_USE_RETRIES = 8
 const IN_USE_RETRY_MS = 1000
+// Steer with queued messages waiting: the note Claude reads first, just before those messages.
+const STEER_QUEUED_NOTE = 'I sent more messages while you were working. They come right after this one: read them before you go on.'
 
 // ---------------------------------------------------------------- spawning
 
@@ -548,17 +551,21 @@ export class ChatSession {
     if (!this.ensureRunning()) return
     // A message sent while a plan waits is the comment on it: the plan is denied with that text, which Claude reads first.
     const planRequest = images.length ? null : this.mapper.pendingPlanRequest()
+    // The uuid comes back in Claude Code's replay of the message when it reads it (the bubble then shows Seen).
+    const uuid = randomUUID()
     this.push(
       this.mapper.noteUserMessage(
         text,
         images.map((i) => ({ mediaType: i.mediaType, dataUrl: `data:${i.mediaType};base64,${i.base64}` })),
         planRequest !== null,
+        false,
+        uuid,
       ),
     )
     if (planRequest && this.answer(planRequest, { kind: 'plan', approve: 'keep', message: text })) return
     const content: unknown[] = [...images.map((i) => ({ type: 'image', source: { type: 'base64', media_type: i.mediaType, data: i.base64 } }))]
     if (text) content.push({ type: 'text', text })
-    this.write({ type: 'user', message: { role: 'user', content }, parent_tool_use_id: null, session_id: this.deps.sessionId })
+    this.write({ type: 'user', uuid, message: { role: 'user', content }, parent_tool_use_id: null, session_id: this.deps.sessionId })
   }
 
   // A note into the running turn: written to stdin like any message (Claude Code takes it at its next step), shown as a steer bubble.
@@ -566,8 +573,18 @@ export class ChatSession {
     const t = (text ?? '').trim()
     if (!t) return
     if (!this.ensureRunning()) return
-    this.push(this.mapper.noteUserMessage(t, [], false, true))
-    this.write({ type: 'user', message: { role: 'user', content: [{ type: 'text', text: t }] }, parent_tool_use_id: null, session_id: this.deps.sessionId })
+    const uuid = randomUUID()
+    this.push(this.mapper.noteUserMessage(t, [], false, true, uuid))
+    this.write({ type: 'user', uuid, message: { role: 'user', content: [{ type: 'text', text: t }] }, parent_tool_use_id: null, session_id: this.deps.sessionId })
+  }
+
+  // Queued messages Claude has not read yet: a note at priority 'now' stops the current step (Claude Code takes it
+  // before anything else queued), then Claude reads the queued messages and carries on. False when none are waiting.
+  steerQueued(): boolean {
+    if (!this.child || !this.mapper.unseenQueued()) return false
+    const uuid = randomUUID()
+    this.push(this.mapper.noteUserMessage(STEER_QUEUED_NOTE, [], false, true, uuid))
+    return this.write({ type: 'user', uuid, priority: 'now', message: { role: 'user', content: [{ type: 'text', text: STEER_QUEUED_NOTE }] }, parent_tool_use_id: null, session_id: this.deps.sessionId })
   }
 
   // Keep-warm's message, through the same process and session as the owner's messages (so the same cache is read).

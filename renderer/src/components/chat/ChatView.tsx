@@ -5,7 +5,9 @@ import { useCapabilities } from '@/lib/queries'
 import { cn } from '@/lib/utils'
 import { Composer } from './Composer'
 import { ConversationList } from './ConversationList'
+import { InfoRow } from './InfoRow'
 import { StatusLine } from './StatusLine'
+import { TaskList } from './TaskList'
 import { capItems, mainThread } from './chatHelpers'
 import { selectAgent } from './agentSelection'
 import { chatActions, useChatState } from './useChat'
@@ -141,6 +143,8 @@ export function ChatView({ scratchId, launchEffort, tileModel, onTerminal }: Pro
         )}
       </div>
       <StatusLine state={state} />
+      <TaskList state={state} />
+      <InfoRow state={state} />
       <Composer scratchId={scratchId} state={state} launchEffort={launchEffort} tileModel={tileModel} onSent={jump} />
     </div>
   )

@@ -13,6 +13,7 @@ import {
   type UserItem,
 } from '@shared/claude-chat'
 import { Markdown, CopyTextButton } from '@/components/ui/markdown'
+import { PixelBar, meterTone } from '@/components/ui/pixel-bar'
 import { cn } from '@/lib/utils'
 import { agentContext, agentRowFor, agentTitle, agentTldr, firstLines, formatDuration, isToolRunning, kTokens, noticeChipIcon, toolIconKey, tokensSuffix, toolRowParts, type ChipIcon, type ToolIconKey } from './chatHelpers'
 import { ImageModal } from './ImageModal'
@@ -118,7 +119,7 @@ export const UserBubble = memo(function UserBubble({ item, small }: { item: User
         {item.text}
       </div>
       <div className="text-muted-foreground flex h-4 items-center gap-2 text-xs">
-        {item.queued && <span>Queued</span>}
+        {item.queued ? <span>Queued</span> : item.seen && <span>Seen</span>}
         <CopyTextButton text={item.text} label="Copy" ariaLabel="Copy message" className="opacity-0 group-focus-within/user:opacity-100 group-hover/user:opacity-100" />
       </div>
     </div>
@@ -292,12 +293,16 @@ export const SubagentRow = memo(function SubagentRow({ item, onOpen, small }: { 
   )
 })
 
-// A thin bar of how much of the model's context window the agent uses.
+// A pixel meter of how much of the model's context window the agent uses.
 export function ContextBar({ ctx }: { ctx: { pct: number; used: number; window: number } }) {
   return (
-    <span className="bg-muted mt-1 mb-0.5 block h-[3px] w-full overflow-hidden rounded-full" role="img" aria-label={`Context ${Math.round(ctx.pct)}% used`} title={`${kTokens(ctx.used)} of ${kTokens(ctx.window)} tokens`}>
-      <span className={cn('block h-full rounded-full', ctx.pct >= 90 ? 'bg-destructive' : ctx.pct >= 75 ? 'bg-warning' : 'bg-muted-foreground/60')} style={{ width: `${Math.max(2, ctx.pct)}%` }} />
-    </span>
+    <PixelBar
+      className="mt-1 mb-0.5"
+      fraction={Math.min(100, ctx.pct) / 100}
+      tone={meterTone(ctx.pct, 75, 90)}
+      label={`Context ${Math.round(ctx.pct)}% used`}
+      title={`${kTokens(ctx.used)} of ${kTokens(ctx.window)} tokens`}
+    />
   )
 }
 

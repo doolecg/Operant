@@ -1,16 +1,64 @@
-import { ENHANCE_MAX_MEMORY_TOKENS, ENHANCE_MAX_SYMBOL_LINES, ENHANCE_MAX_SYMBOL_TOKENS, capLines, type EnhanceContext } from '../shared/prompt-enhance'
+import {
+  ENHANCE_MAX_ABOUT_LINES,
+  ENHANCE_MAX_ABOUT_TOKENS,
+  ENHANCE_MAX_MEMORY_LINES,
+  ENHANCE_MAX_MEMORY_TOKENS,
+  ENHANCE_MAX_SESSION_LINES,
+  ENHANCE_MAX_SESSION_TOKENS,
+  ENHANCE_MAX_SYMBOL_LINES,
+  ENHANCE_MAX_SYMBOL_TOKENS,
+  capLines,
+  conversationLines,
+  emptyEnhanceContext,
+  gitLines,
+  soulLines,
+  type EnhanceContext,
+  type RecentMessage,
+} from '../shared/prompt-enhance'
+
+import type { ChatItem } from '../shared/claude-chat'
 
 export const ENHANCE_LOOKUP_MS = 8000
+export const ENHANCE_GIT_MS = 5000
+// The conversation lines kept for the Session block.
+export const ENHANCE_CONVERSATION_MESSAGES = 8
 
 export interface EnhanceContextDeps {
-  // Plain memory recall (no model call). `error` says why nothing came back.
-  recall(query: string): Promise<{ items: Array<{ text: string }>; error: string }>
+  // Plain memory recall (no model call). `error` says why nothing came back. `bank` tells the person's own
+  // facts (the Soul Bank) from the project's memories; items without one are the project's.
+  recall(query: string): Promise<{ items: Array<{ text: string; bank?: 'soul' | 'project' }>; error: string }>
   // Compact symbol lines of the project's CodeGraph index, or null when it has none.
   symbols(query: string): Promise<string[] | null>
+  // The text of soul.md in the Claude config folder, or null when there is none.
+  soul?: () => Promise<string | null> | string | null
+  // `git status --porcelain=v1 --branch` of the project folder, or null when it is not a repo or git failed.
+  git?: () => Promise<string | null>
+  // The tile's recent main-thread messages, oldest first.
+  messages?: () => RecentMessage[]
+  // The project folder, named in the Session block.
+  folder?: string | null
   timeoutMs?: number
 }
 
-const timed = <T>(p: Promise<T>, ms: number): Promise<T | 'timeout'> =>
+// The main thread's messages as the Session block reads them: what the person wrote, and what Claude wrote and used
+// between two of those (one entry per stretch). Sub-agent work is left out.
+export function recentMessages(items: readonly ChatItem[]): RecentMessage[] {
+  const out: RecentMessage[] = []
+  for (const item of items) {
+    if (item.kind !== 'user' && item.kind !== 'text' && item.kind !== 'tool') continue
+    if (item.parent !== null) continue
+    if (item.kind === 'user') out.push({ role: 'user', text: item.text })
+    else {
+      let last = out.at(-1)
+      if (last?.role !== 'assistant') out.push((last = { role: 'assistant', text: '', tools: [] }))
+      if (item.kind === 'text') last.text = last.text ? `${last.text} ${item.md}` : item.md
+      else last.tools = [...(last.tools ?? []), item.name]
+    }
+  }
+  return out
+}
+
+const timed =<T>(p: Promise<T>, ms: number): Promise<T | 'timeout'> =>
   new Promise((resolve, reject) => {
     const t = setTimeout(() => resolve('timeout'), ms)
     p.then(
@@ -19,17 +67,23 @@ const timed = <T>(p: Promise<T>, ms: number): Promise<T | 'timeout'> =>
     )
   })
 
-// Both lookups run at once, each with its own timeout; a failure of one only drops that part.
+// Every lookup runs at once, each with its own timeout; a failure of one only drops that part. None is a model call.
 export async function gatherEnhanceContext(query: string, deps: EnhanceContextDeps): Promise<EnhanceContext> {
   const ms = deps.timeoutMs ?? ENHANCE_LOOKUP_MS
   const q = query.trim().slice(0, 1000)
-  const out: EnhanceContext = { memories: [], symbols: [], memoryNote: '', codeNote: '' }
+  const out = emptyEnhanceContext()
+  let recalled = 0
+  let facts: string[] = []
   await Promise.all([
     (async () => {
       try {
         const r = await timed(deps.recall(q), ms)
         if (r === 'timeout') return void (out.memoryNote = 'memory unavailable')
-        out.memories = capLines(r.items.map((i) => i.text), 12, ENHANCE_MAX_MEMORY_TOKENS, 600)
+        const mine = r.items.filter((i) => i.bank !== 'soul')
+        const about = r.items.filter((i) => i.bank === 'soul')
+        recalled += r.items.length
+        out.memories = capLines(mine.map((i) => i.text), ENHANCE_MAX_MEMORY_LINES, ENHANCE_MAX_MEMORY_TOKENS, 600)
+        facts = about.map((i) => i.text)
         if (!out.memories.length) out.memoryNote = r.error ? 'memory unavailable' : 'no matching memories'
       } catch {
         out.memoryNote = 'memory unavailable'
@@ -40,12 +94,45 @@ export async function gatherEnhanceContext(query: string, deps: EnhanceContextDe
         const r = await timed(deps.symbols(q), ms)
         if (r === 'timeout') return void (out.codeNote = 'CodeGraph timed out')
         if (r === null) return void (out.codeNote = 'no CodeGraph index')
+        recalled += r.length
         out.symbols = capLines(r, ENHANCE_MAX_SYMBOL_LINES, ENHANCE_MAX_SYMBOL_TOKENS)
         if (!out.symbols.length) out.codeNote = 'no matching code symbols'
       } catch {
         out.codeNote = 'CodeGraph unavailable'
       }
     })(),
+    (async () => {
+      const lines: string[] = []
+      let note = ''
+      if (deps.folder) lines.push(`Folder: ${deps.folder}`)
+      if (deps.git) {
+        try {
+          const status = await timed(deps.git(), ENHANCE_GIT_MS)
+          if (status === 'timeout') note = 'git timed out'
+          else if (status !== null) lines.push(...gitLines(status))
+        } catch {
+          note = 'git unavailable'
+        }
+      }
+      try {
+        const talk = conversationLines(deps.messages?.() ?? [], ENHANCE_CONVERSATION_MESSAGES)
+        if (talk.length) lines.push('Recent conversation:', ...talk)
+      } catch {
+        note = note || 'conversation unavailable'
+      }
+      out.session = capLines(lines, ENHANCE_MAX_SESSION_LINES, ENHANCE_MAX_SESSION_TOKENS, 320)
+      if (!out.session.length) out.sessionNote = note || 'no session context'
+    })(),
   ])
+  // The person's own facts: soul.md first, then the Soul Bank's memories.
+  let file: string[] = []
+  try {
+    file = soulLines((await deps.soul?.()) ?? '')
+  } catch {
+    out.aboutNote = 'soul.md unreadable'
+  }
+  out.about = capLines([...file, ...facts], ENHANCE_MAX_ABOUT_LINES, ENHANCE_MAX_ABOUT_TOKENS, 300)
+  if (!out.about.length && !out.aboutNote) out.aboutNote = 'nothing about you'
+  out.recalls = recalled
   return out
 }

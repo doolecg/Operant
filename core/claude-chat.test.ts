@@ -145,6 +145,7 @@ describe('ChatSession: process and protocol', () => {
     h.session.send({ text: ' look at this ', images: [{ mediaType: 'image/png', base64: 'AAAA' }, { mediaType: 'text/html', base64: 'x' }] })
     expect(c.last()).toEqual({
       type: 'user',
+      uuid: expect.stringMatching(/^[0-9a-f-]{36}$/),
       message: { role: 'user', content: [{ type: 'image', source: { type: 'base64', media_type: 'image/png', data: 'AAAA' } }, { type: 'text', text: 'look at this' }] },
       parent_tool_use_id: null,
       session_id: 's1',
@@ -155,6 +156,27 @@ describe('ChatSession: process and protocol', () => {
     h.session.send({ text: '   ' })
     expect(c.withType('user')).toHaveLength(2)
     expect(h.session.state.turn.phase).toBe('working')
+  })
+
+  it('marks a message seen when Claude Code replays it, and Steer makes Claude read unseen queued messages now', () => {
+    const h = harness()
+    h.session.start()
+    const c = h.children[0]!
+    h.session.send({ text: 'first' })
+    h.session.send({ text: 'second' })
+    const [first, second] = c.withType('user') as { uuid: string }[]
+    const users = () => h.session.state.items.flatMap((i) => (i.kind === 'user' ? [[i.text, i.queued, i.seen ?? false]] : []))
+    c.out({ type: 'user', isReplay: true, uuid: first!.uuid, message: { role: 'user', content: [{ type: 'text', text: 'first' }] }, parent_tool_use_id: null })
+    expect(users()).toEqual([['first', false, true], ['second', true, false]])
+    expect(h.session.steerQueued()).toBe(true)
+    expect(c.last()).toMatchObject({ type: 'user', priority: 'now', message: { content: [{ type: 'text', text: expect.stringContaining('read them') }] } })
+    c.out({ type: 'user', isReplay: true, uuid: second!.uuid, message: { role: 'user', content: [{ type: 'text', text: 'second' }] }, parent_tool_use_id: null })
+    expect(users().slice(0, 2)).toEqual([['first', false, true], ['second', false, true]])
+    // A replay with no known uuid (a keep-warm ping) adds nothing.
+    c.out({ type: 'user', isReplay: true, uuid: 'x', message: { role: 'user', content: [{ type: 'text', text: 'ping' }] }, parent_tool_use_id: null })
+    expect(users()).toHaveLength(3)
+    // Nothing unseen is waiting (the steer note itself does not count): Steer has nothing to push.
+    expect(h.session.steerQueued()).toBe(false)
   })
 
   it('answers a permission prompt with the control_response Claude Code expects', () => {

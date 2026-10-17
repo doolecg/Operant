@@ -51,6 +51,7 @@ export const CLAUDE_FLAGS = [
   '--input-format',
   '--output-format',
   '--include-partial-messages',
+  '--replay-user-messages',
   '--include-hook-events',
   '--forward-subagent-text',
   '--verbose',
@@ -466,6 +467,8 @@ export function buildChatLaunch(scratch: ScratchTerminal, ctx: LaunchContext, op
   add('--output-format', 'stream-json')
   add('--verbose')
   add('--include-partial-messages')
+  // Claude Code echoes each message when it reads it: the bubble's Queued tag turns into Seen.
+  add('--replay-user-messages')
   add('--include-hook-events')
   add('--forward-subagent-text')
   if (!supported || supported.has('--permission-prompt-tool') || supported.has('--permission-prompts')) stream.push('--permission-prompt-tool', 'stdio')

@@ -1,16 +1,18 @@
 // A read-only loopback server for documents the browser tile shows. The browser refuses file: addresses, so an HTML or
 // Markdown file of a project is served here instead: http://127.0.0.1:<port>/d/<token>/<crewId>/<path>, and a document
-// held in memory (a presented plan) at /p/<token>/<id>. The token is random per run; paths are confined to the
-// project folder. Markdown is rendered to HTML here.
+// held in memory (a presented plan) at /p/<token>/<id>. A document Claude wrote outside the project (the person opens it
+// from the artifacts list) gets its own folder served at /x/<token>/<id>/<path>. The token is random per run; paths are
+// confined to the project folder, or to that document's folder. Markdown is rendered to HTML here.
 import { randomBytes, timingSafeEqual } from 'node:crypto'
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from 'node:http'
 import type { AddressInfo } from 'node:net'
 import { readFileSync, realpathSync, statSync } from 'node:fs'
-import { extname, sep } from 'node:path'
+import { basename, dirname, extname, sep } from 'node:path'
 import { MARKDOWN_CSP, renderMarkdownPage } from './docs-render'
 
 export const DOC_MAX_BYTES = 10 * 1024 * 1024
 const MEMORY_MAX = 50
+const LOOSE_MAX = 50
 
 // Documents plus the static files an HTML artifact needs. Nothing else is ever served.
 const TYPES: Readonly<Record<string, string>> = {
@@ -35,7 +37,7 @@ const TYPES: Readonly<Record<string, string>> = {
 
 export const docContentType = (path: string): string | null => TYPES[extname(path).toLowerCase()] ?? null
 
-export type DocRoute = { kind: 'file'; crewId: number; segments: string[] } | { kind: 'memory'; id: string }
+export type DocRoute = { kind: 'file'; crewId: number; segments: string[] } | { kind: 'memory'; id: string } | { kind: 'loose'; id: string; segments: string[] }
 
 const sameToken = (a: string, b: string): boolean => a.length === b.length && timingSafeEqual(Buffer.from(a), Buffer.from(b))
 
@@ -60,6 +62,7 @@ export function parseDocPath(rawPath: string, token: string): DocRoute | null {
     segments.push(s)
   }
   if (kind === 'p' && segments.length === 1) return { kind: 'memory', id: segments[0]! }
+  if (kind === 'x' && segments.length >= 2 && /^\d{1,9}$/.test(segments[0]!)) return { kind: 'loose', id: segments[0]!, segments: segments.slice(1) }
   if (kind === 'd' && segments.length >= 2 && /^\d{1,9}$/.test(segments[0]!)) return { kind: 'file', crewId: Number(segments[0]), segments: segments.slice(1) }
   return null
 }
@@ -100,6 +103,8 @@ export class DocsServer {
   private server: Server | null = null
   private starting: Promise<number> | null = null
   private readonly memory = new Map<string, { title: string; md: string }>()
+  // Folders of documents opened from outside a project, by id (the oldest are dropped past a cap).
+  private readonly loose = new Map<string, string>()
   private nextId = 1
 
   constructor(private readonly o: DocsServerOptions) {}
@@ -136,6 +141,21 @@ export class DocsServer {
     return `http://127.0.0.1:${String(port)}/p/${this.token}/${id}`
   }
 
+  // The address of a document outside any project; its folder is served from then on so the files it links to load.
+  // Null when it is not a servable document.
+  async urlForLooseFile(file: string): Promise<string | null> {
+    const folder = dirname(file)
+    if (!resolveDocFile(folder, [basename(file)], this.o.maxBytes)) return null
+    const port = await this.port()
+    let id = [...this.loose].find(([, f]) => f === folder)?.[0]
+    if (!id) {
+      id = String(this.nextId++)
+      this.loose.set(id, folder)
+      if (this.loose.size > LOOSE_MAX) this.loose.delete(this.loose.keys().next().value as string)
+    }
+    return `http://127.0.0.1:${String(port)}/x/${this.token}/${id}/${encodeURIComponent(basename(file))}`
+  }
+
   async close(): Promise<void> {
     const s = this.server
     this.server = null
@@ -169,7 +189,7 @@ export class DocsServer {
       const doc = this.memory.get(route.id)
       return doc ? this.send(res, 200, 'text/html; charset=utf-8', renderMarkdownPage(doc.title, doc.md), head, MARKDOWN_CSP) : notFound()
     }
-    const root = this.o.folderOf(route.crewId)
+    const root = route.kind === 'loose' ? (this.loose.get(route.id) ?? null) : this.o.folderOf(route.crewId)
     const found = root ? resolveDocFile(root, route.segments, this.o.maxBytes) : null
     if (!found) return notFound()
     try {

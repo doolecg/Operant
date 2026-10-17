@@ -60,7 +60,7 @@ import type { MediaState, MediaTimeline } from './media'
 import type { CapabilityReport, ClaudeTileState } from './claude-mods'
 import type { RunningCounts } from './notify'
 import type { TilePopoutRequest } from './tile-popout'
-import { CHAT_CHANNELS, type ChatApi, type ChatEvents } from './claude-chat'
+import { CHAT_CHANNELS, type ChatApi, type ChatEvents, type ChatImage } from './claude-chat'
 
 // Request/response calls: renderer -> main via ipcRenderer.invoke. Every one is validated in core; a
 // refusal rejects with an `IpcError` (code + message the dashboard can show).
@@ -105,6 +105,8 @@ export interface IpcApi extends ChatApi {
   'git:lastMessage': (crewId: number) => string
   // Opens an .html or .md file of the project in its browser tile; the path is checked against the project folder.
   'docs:open': (crewId: number, path: string) => void
+  // Reads an image file of the project (png, jpg, gif, webp, svg; at most 8 MB) as a data URL for the image viewer.
+  'docs:readImage': (crewId: number, path: string) => ChatImage
   'git:log': (crewId: number, limit?: number, skip?: number) => GitCommit[]
   'git:commitDetails': (crewId: number, hash: string) => GitCommitDetails
   'git:branches': (crewId: number) => GitBranches
@@ -573,6 +575,7 @@ export const CORE_CHANNELS: CoreChannel[] = [
   'git:commit',
   'git:lastMessage',
   'docs:open',
+  'docs:readImage',
   'git:log',
   'git:commitDetails',
   'git:branches',

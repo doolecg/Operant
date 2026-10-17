@@ -1,3 +1,27 @@
+# Operant 3.3.0
+
+**Install:** download the file for your system from the assets below. Operant keeps itself up to date from these releases.
+
+## New
+- **Messages show when Claude has read them.** A message you send while Claude works says "Queued", then "Seen" the moment Claude reads it.
+- **Steer reads your queued messages now.** While messages are waiting, the Steer pill reads "Steer (2 queued)". One click makes Claude stop its current step, read them, and carry on.
+- **To-do list above the prompt.** When Claude keeps a to-do list, a card above the prompt shows "To-do" with one bar for the whole list and a line with its own bar for each task. Done tasks are solid green. It is built from Claude's own list, so it uses no tokens.
+- **Info row above the prompt.** The context window as a pixel meter with the tokens used, your 5-hour and 7-day usage, and how many agents are running.
+- **Artifacts under Right Now.** Everything Claude made in the session is listed: pages, images, documents and links. Click to open images in Operant, pages and links in Operant's browser, and anything else in its usual app. The "..." menu has the other choices.
+- **Pixel bars.** A moving pixel bar shows Claude is working, the context meter in the tile header is a pixel meter, and each agent in the Agents panel has a bar: moving while it runs, solid green when done, red when it failed.
+
+---
+
+## Changed
+- **A better Enhance prompt.** The rewrite now lists the files to change, the context, what to keep in mind, the skills to load, what to ask you first and when it is done. It also reads the branch and changed files, the last few messages and your soul.md. It shows how many memories and code matches it used, has a Cancel button while it works, and Undo stays until you send. If you type while it works, your text is kept and you choose "Use rewrite" or "Discard".
+
+---
+
+## Fixed
+- **Pages Claude saves outside the project open in the browser.** An HTML or Markdown file written to another folder used to be refused; it now opens in Operant's browser.
+
+---
+
 # Operant 3.2.2
 
 **Install:** download the file for your system from the assets below. Operant keeps itself up to date from these releases.

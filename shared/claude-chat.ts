@@ -56,8 +56,10 @@ export interface UserItem {
   parent: string | null
   text: string
   images: ChatImage[]
-  // Sent while a turn was running: shows a "Queued" tag until the next turn starts.
+  // Sent while a turn was running: shows a "Queued" tag until Claude reads it (or, without replays, the next turn starts).
   queued: boolean
+  // Claude Code read it (its --replay-user-messages echo arrived): shows a "Seen" tag. Live messages only.
+  seen?: boolean
   at: number
   // A short note sent into a running turn to change Claude's course (chat:steer).
   steer?: boolean
@@ -523,6 +525,9 @@ export interface ChatApi {
   // A short note into the running turn: Claude Code reads it at its next step and changes course without the turn
   // stopping. The user item carries steer: true. With no turn running it is an ordinary message.
   'chat:steer': (scratchId: number, text: string) => void
+  // Makes Claude read the queued messages it has not seen yet now: a short note at priority 'now', which stops the
+  // current step; Claude reads the queued messages right after it and carries on. False when nothing is waiting.
+  'chat:steerQueued': (scratchId: number) => boolean
   'chat:permission': (scratchId: number, requestId: string, decision: ChatDecision) => void
   // set_permission_mode; state.permissionMode updates when Claude Code confirms.
   'chat:setMode': (scratchId: number, mode: string) => void
@@ -550,6 +555,7 @@ export const CHAT_CHANNELS = [
   'chat:interrupt',
   'chat:stopAgent',
   'chat:steer',
+  'chat:steerQueued',
   'chat:permission',
   'chat:setMode',
   'chat:setModel',

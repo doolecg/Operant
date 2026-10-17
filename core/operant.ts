@@ -1,7 +1,7 @@
 import { EventEmitter } from 'node:events'
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
-import { dirname, join } from 'node:path'
+import { dirname, isAbsolute, join } from 'node:path'
 import type { CoreChannel, IpcApi, IpcEvents } from '../shared/ipc'
 import { mergeSettings, sanitizeSettings, type Settings, type SettingsPatch } from '../shared/settings'
 import type {
@@ -38,8 +38,8 @@ import { LearnChangesDb } from './learn-changes'
 import { Ops } from './ops'
 import { claudeDir as claudeDirOf } from './paths'
 import { Installer, systemInstallDeps } from './install'
-import { ENHANCE_MAX_MEMORY_TOKENS, ENHANCE_MAX_SYMBOL_LINES, buildEnhancePrompt, mergeSkills, parseEnhanceReply, type EnhanceContext } from '../shared/prompt-enhance'
-import { gatherEnhanceContext } from './enhance-context'
+import { ENHANCE_MAX_MEMORY_TOKENS, ENHANCE_MAX_SYMBOL_LINES, buildEnhancePrompt, mergeSkills, normalizeEnhanceContext, parseEnhanceReply, type EnhanceContext } from '../shared/prompt-enhance'
+import { gatherEnhanceContext, recentMessages } from './enhance-context'
 import { recallMemory } from './memory-recall'
 import { learnOutcomeText, type LearnRunInfo } from '../shared/learn'
 import { recallFile, writeRecallFor } from './session-recall'
@@ -81,6 +81,7 @@ import { isColdTurn } from './usage'
 import { MemorySecretStore, type SecretStore } from './secrets'
 import { randomUUID } from 'node:crypto'
 import { DocsServer, resolveDocFile } from './docs-server'
+import { readProjectImage } from './image-file'
 import { autoOpenPath, isDocFile, relativeInProject } from '../shared/docs'
 import { saveScreenshot } from './screenshots'
 import { EXIT, type CliRequest, type CliResult, type Identity } from './cli-server'
@@ -532,7 +533,14 @@ export class Operant extends EventEmitter<PushEvents> {
   private async openDocument(crewId: number, path: string): Promise<void> {
     const crew = this.requireCrew(crewId)
     const rel = typeof path === 'string' && isDocFile(path) ? relativeInProject(crew.folder, path) : null
-    if (!rel) throw bad('Only an .html or .md file inside the project can be opened in the browser')
+    if (!rel && typeof path === 'string' && isDocFile(path) && isAbsolute(path)) {
+      // A document Claude wrote outside the project (another folder it was told to use).
+      if (!this.openInBrowser) throw bad('The browser is not available')
+      const url = await this.docs.urlForLooseFile(path)
+      if (!url) throw notFound(`${path} was not found`)
+      return void (await this.openInBrowser(crewId, url))
+    }
+    if (!rel) throw bad('Only an .html or .md file can be opened in the browser')
     if (!resolveDocFile(crew.folder, rel.split('/'))) throw notFound(`${rel} not found in the project`)
     if (!this.openInBrowser) throw bad('The browser is not available')
     await this.openInBrowser(crewId, await this.docs.urlFor(crewId, rel))
@@ -655,6 +663,13 @@ export class Operant extends EventEmitter<PushEvents> {
       },
       'ide:list': () => listIdes(this.settings.ide.custom),
       'docs:open': (crewId, path) => this.openDocument(crewId, path),
+      'docs:readImage': (crewId, path) => {
+        try {
+          return readProjectImage(this.requireCrew(crewId).folder, String(path))
+        } catch (err) {
+          throw err instanceof OperantError ? err : bad(err instanceof Error ? err.message : 'Could not read the image')
+        }
+      },
       'ide:open': (crewId, ide) => openInIde(this.requireCrew(crewId).folder, ide ?? this.settings.ide.default, this.settings.ide.custom),
       'git:changes': (crewId) => gitChanges(this.requireCrew(crewId).folder),
       'git:info': (crewId) => gitInfo(this.requireCrew(crewId).folder),
@@ -1509,13 +1524,27 @@ export class Operant extends EventEmitter<PushEvents> {
 
   // Chat view "Enhance prompt": one counted, capped, retried call to the promptEnhance aux model.
   private readonly enhanceModel: LearnModel
-  // The recall and CodeGraph lookups for a tile's project: not model calls, so they are not counted.
+  // The lookups for a tile's project: memories, soul.md, CodeGraph symbols, git and the recent conversation. Not model calls, so they are not counted.
   private async enhanceContext(text: string, scratchId: number): Promise<EnhanceContext> {
     const folder = this.store.getCrew(this.requireScratch(scratchId).crewId)?.folder ?? null
     const memory = this.settings.memory
     return gatherEnhanceContext(String(text ?? ''), {
       recall: (q) => recallMemory(this.hindsight, folder, q, { ...memory, maxTokens: Math.min(memory.maxTokens, ENHANCE_MAX_MEMORY_TOKENS) }, this.learn.lessonLookup()),
       symbols: async (q) => (folder ? this.indexes.symbols(folder, q, ENHANCE_MAX_SYMBOL_LINES) : null),
+      soul: () => {
+        try {
+          return readFileSync(join(claudeDirOf(), 'soul.md'), 'utf8')
+        } catch {
+          return null
+        }
+      },
+      git: async () => {
+        if (!folder) return null
+        const r = await runHidden('git', ['status', '--porcelain=v1', '--branch'], { cwd: folder, timeoutMs: 5000, source: 'git', quiet: true }).catch(() => null)
+        return r && r.code === 0 ? r.stdout : null
+      },
+      messages: () => recentMessages(this.chat.get(scratchId)?.snapshot().items ?? []),
+      folder,
     })
   }
 
@@ -1525,11 +1554,11 @@ export class Operant extends EventEmitter<PushEvents> {
     const bad = await this.learnAiProblem('promptEnhance')
     if (bad) throw new Error(bad)
     const model = this.enhanceModel
-    const skills = mergeSkills(installedSkills(claudeDirOf()), commands.filter((c) => c && typeof c.name === 'string').map((c) => ({ name: c.name, description: String(c.description ?? '') })))
-    const prompt = buildEnhancePrompt(rough, skills, context && Array.isArray(context.memories) && Array.isArray(context.symbols) ? context : null)
+    const skills = mergeSkills(rough, installedSkills(claudeDirOf()), commands.filter((c) => c && typeof c.name === 'string').map((c) => ({ name: c.name, description: String(c.description ?? '') })))
+    const prompt = buildEnhancePrompt(rough, skills, normalizeEnhanceContext(context))
     const r = await this.aux.call('promptEnhance', async () => ({ text: await model(prompt) }))
     const out = parseEnhanceReply(r.text)
-    if (!out) throw new Error('The model returned no text')
+    if (!out) throw new Error('The model returned no text, or only an answer instead of a rewrite')
     return out
   }
 
@@ -1928,6 +1957,7 @@ export class Operant extends EventEmitter<PushEvents> {
         if (typeof text !== 'string' || !text.trim()) throw bad('A steer note needs text')
         live(scratchId).steer(text)
       },
+      'chat:steerQueued': (scratchId) => live(scratchId).steerQueued(),
       'chat:permission': (scratchId, requestId, decision) => {
         if (typeof requestId !== 'string' || !decision || typeof decision.kind !== 'string') throw bad('Not a valid answer')
         if (!live(scratchId).answer(requestId, decision)) throw conflict('That prompt is no longer waiting')

@@ -7,7 +7,8 @@ import { learnOutcomeText, type LearnStatus } from '@shared/learn'
 import { cn } from '@/lib/utils'
 import { useChatState } from '@/components/chat/useChat'
 import { call, useGitInfo, useLearnStatus, useRepoStatus } from '@/lib/queries'
-import { legendFiles, rightNowHeadline, touchedFiles, type TouchedFile } from './rightNow'
+import { ArtifactsList } from './ArtifactsList'
+import { legendFiles,rightNowHeadline, touchedFiles, type TouchedFile } from './rightNow'
 
 // The dot colours of the legend and the file list: purple read, orange edited, yellow not committed in git.
 const READ_DOT = 'bg-chart-4'
@@ -137,6 +138,7 @@ export function RightNowCard({ tileId, crewId, chat }: { tileId: number; crewId:
               {legend.more > 0 && <li className="text-muted-foreground text-[11px]">+{legend.more} more</li>}
             </ul>
           )}
+          <ArtifactsList items={items} crewId={crewId} />
         </>
       )}
     </section>

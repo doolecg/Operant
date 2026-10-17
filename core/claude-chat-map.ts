@@ -97,6 +97,8 @@ export class ChatMapper {
   private compacting = false
   private firstAssistant = false
   private queuedAwaitTurn = false
+  // Live user items by the uuid written with them, until Claude Code replays them (read).
+  private readonly byUuid = new Map<string, string>()
   private commandName = ''
   private lastPane = ''
   private costBase = 0
@@ -223,15 +225,32 @@ export class ChatMapper {
 
   // The owner sent a message: shows the bubble at once (queued when a turn is running).
   // `read`: Claude reads it right away (a plan denial's comment), so it never shows the Queued tag.
-  noteUserMessage(text: string, images: ChatImage[], read = false, steer = false): ChatOp[] {
+  // `uuid`: written with the message; Claude Code's replay of it marks the bubble seen.
+  noteUserMessage(text: string, images: ChatImage[], read = false, steer = false, uuid?: string): ChatOp[] {
     const queued = this.turnActive && !read
     const id = `u:${this.now()}:${this.seq++}`
-    this.addItem({ kind: 'user', id, parent: null, text, images, queued, at: this.now(), ...(steer ? { steer: true } : {}) })
+    this.addItem({ kind: 'user', id, parent: null, text, images, queued, at: this.now(), ...(steer ? { steer: true } : {}), ...(read ? { seen: true } : {}) })
+    if (uuid && !read) this.byUuid.set(uuid, id)
     if (queued) this.queuedAwaitTurn = false
     this.commandName = text.startsWith('/') ? text.split(/\s+/)[0]! : ''
     this.beginTurn()
     this.refreshTurn()
     return this.drain()
+  }
+
+  // How many queued messages Claude has not read yet (steer notes left out).
+  unseenQueued(): number {
+    return this.state.items.filter((i) => i.kind === 'user' && i.queued && !i.seen && !i.steer).length
+  }
+
+  // Claude Code read a message written on stdin (its --replay-user-messages echo): the bubble shows Seen.
+  private onReplay(o: Rec): void {
+    const uuid = str(o.uuid)
+    const id = this.byUuid.get(uuid)
+    if (!id) return
+    this.byUuid.delete(uuid)
+    const item = this.byId.get(id)
+    if (item?.kind === 'user') this.patch(item, { queued: false, seen: true })
   }
 
   private beginTurn(): void {
@@ -1027,6 +1046,10 @@ export class ChatMapper {
   }
 
   private onUser(o: Rec): void {
+    if (o.isReplay === true) {
+      if (!this.history) this.onReplay(o)
+      return
+    }
     const parent = this.parentOf(o)
     const m = rec(o.message)
     const at = Date.parse(str(o.timestamp)) || this.now()

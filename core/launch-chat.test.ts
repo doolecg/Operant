@@ -29,7 +29,7 @@ const tile = (over: Partial<ScratchTerminal> = {}): ScratchTerminal => ({
   ...over,
 })
 
-const STREAM = ['-p', '--input-format', 'stream-json', '--output-format', 'stream-json', '--verbose', '--include-partial-messages', '--include-hook-events', '--forward-subagent-text', '--permission-prompt-tool', 'stdio']
+const STREAM = ['-p', '--input-format', 'stream-json', '--output-format', 'stream-json', '--verbose', '--include-partial-messages', '--replay-user-messages', '--include-hook-events', '--forward-subagent-text', '--permission-prompt-tool', 'stdio']
 
 describe('buildChatLaunch', () => {
   it('gives a chat tile the browser MCP config too', () => {
