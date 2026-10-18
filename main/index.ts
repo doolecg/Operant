@@ -17,6 +17,7 @@ import { Operant } from '../core/operant'
 import { appDataDir } from '../core/paths'
 import { SessionManager } from '../core/sessions'
 import { Store } from '../core/store'
+import { refreshUserPath } from '../core/userpath'
 import { DEFAULT_CREW_BROWSER, sanitizeCrewBrowser } from '../shared/browser-compat'
 import { DEFAULT_APPEARANCE, windowBackground } from '../shared/themes'
 import { tilePopoutQuery } from '../shared/tile-popout'
@@ -35,6 +36,8 @@ import { attachWindowSync } from './windowSync'
 // A .env file sets variables the real environment lacks: the repo root in dev, the app data folder when installed.
 const envDir = app.isPackaged ? appDataDir() : app.getAppPath()
 loadEnv({ dir: envDir, log: (line) => console.log(line) })
+// Started by the installer after an update, the app gets the system PATH only; add the user's entries back.
+refreshUserPath()
 
 // Keep data apart from Operant 1, which owns the plain "Operant" folder.
 app.setPath('userData', appDataDir())

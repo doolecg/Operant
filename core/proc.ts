@@ -1,4 +1,4 @@
-import { spawn, type ChildProcess, type SpawnOptions } from 'node:child_process'
+import { spawn, spawnSync, type ChildProcess, type SpawnOptions } from 'node:child_process'
 import { existsSync } from 'node:fs'
 import { delimiter, join } from 'node:path'
 import type { ConsoleSource } from '../shared/console'
@@ -109,6 +109,17 @@ export function runHidden(
       resolve({ code: null, stdout: '', stderr: e instanceof Error ? e.message : String(e) })
     }
   })
+}
+
+// A short blocking helper (a registry read at startup), not logged or tracked. Null when it fails or exits non-zero.
+export function runHiddenSync(cmd: string, args: string[], opts: { timeoutMs?: number } = {}): string | null {
+  const rest = { encoding: 'utf8' as const, timeout: opts.timeoutMs }
+  try {
+    const r = spawnSync(cmd, args, { ...rest, windowsHide: true })
+    return r.status === 0 ? r.stdout : null
+  } catch {
+    return null
+  }
 }
 
 // Where a command on PATH runs from: a native executable is started directly, a .cmd or .bat (an npm install, a test

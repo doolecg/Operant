@@ -1,3 +1,13 @@
+# Operant 3.4.1
+
+**Install:** download the file for your system from the assets below. Operant keeps itself up to date from these releases.
+
+## Fixed
+- **Claude Code and OpenCode found again after an update.** When the installer reopened Operant after an update, Settings > CLI capabilities said both were "not on PATH", even though they were installed. Operant now adds your own PATH folders back when it starts.
+- **Retry looks again properly.** The Retry button under CLI capabilities now reads your PATH again first, so a CLI you just installed shows up without restarting Operant.
+
+---
+
 # Operant 3.4.0
 
 **Install:** download the file for your system from the assets below. Operant keeps itself up to date from these releases.

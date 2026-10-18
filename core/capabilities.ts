@@ -1,6 +1,7 @@
 import { existsSync } from 'node:fs'
 import type { CapabilityReport, CapabilityTerminal, TerminalCapabilities, UsageSource } from '../shared/claude-mods'
 import { runHidden, type RunResult } from './proc'
+import { refreshUserPath } from './userpath'
 
 export const PROBE_TIMEOUT_MS = 5000
 
@@ -11,6 +12,8 @@ export interface ProbeDeps {
   openCodeDbExists: () => boolean
   now: () => number
   platform: NodeJS.Platform
+  // Re-reads the user's PATH before each probe, so Retry finds a CLI installed (or a PATH fixed) since the app started.
+  refreshPath?: () => void
 }
 
 const COMMANDS: Record<CapabilityTerminal, string> = { claude: 'claude', opencode: 'opencode' }
@@ -94,6 +97,11 @@ export class CapabilityProber {
   }
 
   private async runAll(): Promise<CapabilityReport> {
+    try {
+      this.deps.refreshPath?.()
+    } catch {
+      /* keep the PATH the app has */
+    }
     const [claude, opencode] = await Promise.all([
       probe(this.deps, 'claude', 'transcript'),
       probe(this.deps, 'opencode', this.deps.openCodeDbExists() ? 'opencode-db' : 'none'),
@@ -109,5 +117,6 @@ export function systemProbeDeps(openCodeDb: string, platform: NodeJS.Platform = 
     openCodeDbExists: () => existsSync(openCodeDb),
     now: Date.now,
     platform,
+    refreshPath: () => refreshUserPath(process.env, platform),
   }
 }
