@@ -29,7 +29,7 @@ import { attachCloseGuard, type CloseGuard } from './closeGuard'
 import { push, registerIpc } from './ipc'
 import { watchClaudeTurns, type TurnWatch } from './notify'
 import { TilePopout } from './tile-popout'
-import { createUpdater } from './updater'
+import { createUpdater, updateInstalling } from './updater'
 import { attachWindowSync } from './windowSync'
 
 // A .env file sets variables the real environment lacks: the repo root in dev, the app data folder when installed.
@@ -281,6 +281,12 @@ function createWindow(): void {
 }
 
 app.whenReady().then(() => {
+  // Started while an update installs (the old copy quit for it): holding its files would make the install fail.
+  if (process.platform === 'win32' && app.isPackaged && updateInstalling()) {
+    dialog.showMessageBoxSync({ type: 'info', title: 'Operant 3', message: 'Operant 3 is installing an update', detail: 'It opens again by itself when the update is done.' })
+    app.quit()
+    return
+  }
   store = new Store(join(app.getPath('userData'), 'operant.db'), undefined, join(app.getPath('userData'), 'backups'))
   const playground = store.ensurePlayground(join(app.getPath('userData'), 'Playground'))
   mkdirSync(playground.folder, { recursive: true })

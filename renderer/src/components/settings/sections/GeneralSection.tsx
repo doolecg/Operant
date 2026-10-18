@@ -41,6 +41,7 @@ function UpdateRow({ status }: { status?: UpdateStatus }) {
     <div className="flex items-center justify-between gap-6 py-3">
       <div className="min-w-0">
         <div className={cn('text-sm', s?.state === 'error' && 'text-destructive')}>{line}</div>
+        {s?.state === 'ready' && s.message && <p className="text-destructive mt-0.5 text-xs">{s.message}</p>}
         <p className="text-muted-foreground mt-0.5 text-xs">
           You have {s?.currentVersion ?? '…'}
           {s?.checkedAt ? ` · checked ${timeAgo(s.checkedAt)}` : ''}

@@ -1,3 +1,25 @@
+# Operant 3.4.0
+
+**Install:** download the file for your system from the assets below. Operant keeps itself up to date from these releases.
+
+## New
+- **Import cookies from your browser.** Settings > Browser has a button that copies the cookies from your default browser into Operant's browser, so sites you are signed in to stay signed in. It asks once first. Firefox and Chromium browsers (Chrome, Edge, Brave) are supported. Cookies that Chrome locks to itself are skipped, and Operant says how many. If the browser is open and holding its cookie file, Operant asks you to close it and try again.
+
+---
+
+## Changed
+- **The Implement role runs on Opus.** It used to run on Sonnet. If you picked a different model for it yourself, that is kept.
+- **Enhance prompt sizes the helpers.** When it suggests splitting work into subagents, it now says which model fits each part: Haiku for very small jobs, Sonnet for small edits, Opus for a feature or a normal fix.
+
+---
+
+## Fixed
+- **Updates on Windows install properly.** Opening Operant while an update was installing made the update fail and roll back, so you stayed on the old version. Operant now says "Operant 3 is installing an update" and closes again, and the update reopens it when done.
+- **One admin prompt per update.** An update that had to wait for another install could ask for admin rights again and again. It now asks once.
+- **Failed updates say why.** If an update does not go in, Settings shows the reason next to "Restart to update" the next time Operant starts.
+
+---
+
 # Operant 3.3.0
 
 **Install:** download the file for your system from the assets below. Operant keeps itself up to date from these releases.

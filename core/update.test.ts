@@ -15,6 +15,8 @@ import {
   pickAsset,
   pickRelease,
   shQuote,
+  updateFailureMessage,
+  updateRunning,
   verifyDigest,
   type ReleaseAsset,
 } from './update'
@@ -142,6 +144,9 @@ describe('update', () => {
       msi: "C:\\Temp\\O'2.msi",
       log: 'C:\\Temp\\l.log',
       relaunch: true,
+      version: '3.4.0',
+      lock: 'C:\\Temp\\Operant3-update.lock',
+      result: 'C:\\Temp\\r.txt',
     })
     expect(msi).toContain('Wait-Process -Id 9')
     expect(msi).toContain(`/i "C:\\Temp\\O''2.msi" /passive`)
@@ -152,9 +157,16 @@ describe('update', () => {
     expect(msi).toContain('1223')
     expect(msi).toContain('if ($code -ne 1618) { break }')
     expect(msi.match(/1618/g)).toHaveLength(1)
-    expect(msi.indexOf('$code -eq 1223')).toBeLessThan(msi.indexOf('REINSTALL=ALL'))
-    expect(msi).toContain(`Start-Process -FilePath 'C:\\Program Files\\Operant 2\\Operant 2.exe'`)
-    expect(msi).not.toContain('Remove-Item')
+    // One UAC prompt: only the elevated script starts with RunAs, and msiexec (install and repair) runs inside it.
+    expect(msi.match(/-Verb RunAs/g)).toHaveLength(1)
+    expect(msi.indexOf('REINSTALL=ALL')).toBeLessThan(msi.indexOf("\n'@"))
+    expect(msi.indexOf('-Verb RunAs')).toBeGreaterThan(msi.indexOf("\n'@"))
+    expect(msi).toContain(`Set-Content -LiteralPath 'C:\\Temp\\r.txt' -Value "3.4.0 $code"`)
+    // The lock is written first and removed before the relaunch, or the relaunched copy would close again.
+    expect(msi.startsWith(`$lock = 'C:\\Temp\\Operant3-update.lock'`)).toBe(true)
+    const relaunch = msi.indexOf(`Start-Process -FilePath 'C:\\Program Files\\Operant 2\\Operant 2.exe'`)
+    expect(relaunch).toBeGreaterThan(msi.indexOf('Remove-Item -LiteralPath $lock'))
+    expect(msi).not.toContain('Remove-Item -LiteralPath $old')
 
     const moved = msiWorkerScript({
       pid: 9,
@@ -163,6 +175,9 @@ describe('update', () => {
       msi: 'C:\\Temp\\o.msi',
       log: 'C:\\Temp\\l.log',
       relaunch: false,
+      version: '3.4.0',
+      lock: 'C:\\Temp\\k.lock',
+      result: 'C:\\Temp\\r.txt',
       oldDir: 'C:\\Users\\me\\AppData\\Local\\Programs\\Operant 3',
     })
     expect(moved).toContain(`$old = 'C:\\Users\\me\\AppData\\Local\\Programs\\Operant 3'`)
@@ -171,8 +186,29 @@ describe('update', () => {
     expect(moved).toContain('Test-Path -LiteralPath $oldExe')
     expect(moved).toContain('Remove-Item -LiteralPath $old -Recurse -Force')
     // Only the program folder is removed, never anything under the app data folders.
-    expect(moved.match(/Remove-Item/g)).toHaveLength(1)
+    expect(moved.match(/Remove-Item -LiteralPath \$old /g)).toHaveLength(1)
     expect(moved).not.toMatch(/Roaming|\$env:/i)
-    expect(moved.indexOf('Remove-Item')).toBeGreaterThan(moved.indexOf('REINSTALL=ALL'))
+    expect(moved.indexOf('Remove-Item -LiteralPath $old ')).toBeGreaterThan(moved.indexOf('-Verb RunAs'))
+    expect(moved).not.toContain('Start-Process -FilePath')
+  })
+
+  it('tells a running install from a stale lock', () => {
+    const now = 10_000_000
+    const alive = (pid: number) => pid === 42
+    expect(updateRunning(null, alive, now)).toBe(false)
+    expect(updateRunning({ text: '42\r\n', mtimeMs: now - 60_000 }, alive, now)).toBe(true)
+    expect(updateRunning({ text: '43', mtimeMs: now - 60_000 }, alive, now)).toBe(false)
+    expect(updateRunning({ text: '42', mtimeMs: now - 46 * 60_000 }, alive, now)).toBe(false)
+    expect(updateRunning({ text: 'junk', mtimeMs: now }, alive, now)).toBe(false)
+  })
+
+  it('says why the last update did not install', () => {
+    expect(updateFailureMessage('3.4.0 0', '3.3.0', 'l.log')).toBeNull()
+    expect(updateFailureMessage('3.4.0 3010', '3.3.0', 'l.log')).toBeNull()
+    expect(updateFailureMessage('3.4.0 1603', '3.4.0', 'l.log')).toBeNull()
+    expect(updateFailureMessage('', '3.3.0', 'l.log')).toBeNull()
+    expect(updateFailureMessage('3.4.0 1603\r\n', '3.3.0', 'l.log')).toBe('The update to 3.4.0 did not install (Windows Installer code 1603). Details: l.log')
+    expect(updateFailureMessage('3.4.0 1223', '3.3.0', 'l.log')).toContain('cancelled')
+    expect(updateFailureMessage('3.4.0 -2', '3.3.0', 'l.log')).toContain('still running')
   })
 })

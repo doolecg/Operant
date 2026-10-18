@@ -176,10 +176,22 @@ describe('upgrade to the stage set', () => {
   })
 
   it('resets the stages to the shipped text and launch settings', () => {
-    expect(store.getPresetByBuiltin('implement')).toMatchObject({ name: 'Implement', model: 'claude-sonnet-5-5', permissionMode: 'acceptEdits' })
+    expect(store.getPresetByBuiltin('implement')).toMatchObject({ name: 'Implement', model: 'claude-opus-5-5', permissionMode: 'acceptEdits' })
     expect(store.getPresetByBuiltin('implement')!.roleText).toBe(PRESET_TEXT.implement)
     expect(store.getPresetByBuiltin('plan-opencode')).toMatchObject({ name: 'Plan (OpenCode)', model: '', agent: 'opencode' })
     expect(store.getPresetByBuiltin('learn')).toMatchObject({ model: 'claude-haiku-5-5', name: 'Learn' })
+  })
+
+  it('moves an Implement still on the old Sonnet to Opus once, and keeps a model the user picked', () => {
+    const impl = store.getPresetByBuiltin('implement')!
+    store.updatePreset(impl.id, { model: 'claude-sonnet-5-5' })
+    store.setJson('presets.implementOpus', false)
+    store.seedBuiltinPresets()
+    expect(store.getPresetByBuiltin('implement')!.model).toBe('claude-opus-5-5')
+    store.updatePreset(impl.id, { model: 'claude-haiku-5-5' })
+    store.setJson('presets.implementOpus', false)
+    store.seedBuiltinPresets()
+    expect(store.getPresetByBuiltin('implement')!.model).toBe('claude-haiku-5-5')
   })
 
   it('keeps a preset the user made from scratch, untouched', () => {

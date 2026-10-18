@@ -5,7 +5,7 @@ import type { ConsolidateResult, DraftStatus, LearnAi, LearnChange, LearnChangeS
 import type { InstallId, InstallResult, InstallStatusItem } from './install'
 import type { AuxStatus, BackupEntry, BackupPartName, MemoryDiagnostics, MemoryExport, PresetImportItem, RecallOutput, ResetResult, SuperpowersStatus } from './ops'
 import type { BrowserAction, BrowserCapture, BrowserConfirm, BrowserConfirmEnd, BrowserDevTools, BrowserFound, BrowserHistoryEntry, BrowserNav, BrowserRect, BrowserState, BrowserZoom } from './browser'
-import type { Bookmark, ClearResult, CookieDraft, CookieInfo, CookieKey, Emulation, InspectLogs, InspectLogsChanged } from './browser-inspect'
+import type { Bookmark, ClearResult, CookieDraft, CookieImportPreview, CookieImportResult, CookieInfo, CookieKey, Emulation, InspectLogs, InspectLogsChanged } from './browser-inspect'
 import type { BrowserPromptAnswer, BrowserPromptsState } from './browser-prompts'
 import type { EnhanceContext } from './prompt-enhance'
 import type { ServersResult } from './servers'
@@ -398,6 +398,10 @@ export interface IpcApi extends ChatApi {
   'browser:cookieRemove': (crewId: number, key: CookieKey) => void
   'browser:clearSite': (crewId: number, origin: string) => ClearResult
   'browser:clearAll': (crewId: number) => ClearResult
+  // Reads the OS default browser's cookies and returns counts only (never a value or name), for the confirm dialog.
+  'browser:importCookiesPreview': () => CookieImportPreview
+  // Imports every readable cookie from the OS default browser into every project's browser. Counts only come back.
+  'browser:importCookies': () => CookieImportResult
   'browser:bookmarks': (crewId: number) => Bookmark[]
   'browser:bookmarkAdd': (crewId: number, url: string, title: string) => Bookmark[]
   'browser:bookmarkEdit': (crewId: number, id: string, patch: { url?: string; title?: string }) => Bookmark[]
@@ -473,6 +477,8 @@ export type MainChannel =
   | 'browser:cookieRemove'
   | 'browser:clearSite'
   | 'browser:clearAll'
+  | 'browser:importCookiesPreview'
+  | 'browser:importCookies'
   | 'browser:bookmarks'
   | 'browser:bookmarkAdd'
   | 'browser:bookmarkEdit'
@@ -768,6 +774,8 @@ export const MAIN_CHANNELS: MainChannel[] = [
   'browser:cookieRemove',
   'browser:clearSite',
   'browser:clearAll',
+  'browser:importCookiesPreview',
+  'browser:importCookies',
   'browser:bookmarks',
   'browser:bookmarkAdd',
   'browser:bookmarkEdit',

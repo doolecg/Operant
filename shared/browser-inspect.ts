@@ -294,6 +294,33 @@ export interface CookieDraft {
   expires?: number | null
 }
 
+// Importing cookies from the user's own default browser. These carry counts only — never a cookie value or name —
+// so they are safe to cross IPC to the renderer.
+export interface CookieImportPreview {
+  // False when the default browser is unknown or unsupported; `reason` then explains.
+  supported: boolean
+  // The detected browser's display name ('Firefox', 'Google Chrome', …), or ''.
+  browser: string
+  // The profile folder's own name, safe to show.
+  profile: string
+  // Readable cookies that would be imported.
+  found: number
+  // Cookies that cannot be read (app-bound encryption needs elevation).
+  locked: number
+  // The browser is open and its store could not be copied; it should be closed first.
+  needsClose: boolean
+  reason?: string
+}
+
+export interface CookieImportResult {
+  browser: string
+  // Source cookies accepted into at least one project's browser.
+  imported: number
+  // Source cookies every project rejected.
+  rejected: number
+  locked: number
+}
+
 export const MASKED_VALUE = '••••••••'
 
 // The value is hidden unless the user asked to see it. The mask has a fixed length so it does not hint at the size.

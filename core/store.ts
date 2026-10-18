@@ -622,7 +622,7 @@ const CLAUDE_PRESETS: BuiltinPreset[] = [
   seat({ builtin: 'research', name: 'Research', model: 'claude-haiku-5-5', effort: '', permissionMode: 'dontAsk', tools: READ_WEB_TOOLS, allow: [...READ_ALLOW, 'WebFetch'], deny: READ_DENY, cacheTtl: '5m', contextCap: 100_000 }),
   seat({ builtin: 'plan', name: 'Plan', model: 'claude-sonnet-5-5', effort: 'medium', permissionMode: 'dontAsk', tools: READ_TOOLS, allow: READ_ALLOW, deny: READ_DENY, cacheTtl: '1h', contextCap: 150_000 }),
   seat({ builtin: 'design', name: 'Design', model: 'claude-opus-5-5', effort: 'high', permissionMode: 'dontAsk', tools: READ_WEB_TOOLS, allow: [...READ_ALLOW, 'WebFetch'], deny: READ_DENY, cacheTtl: '1h', contextCap: 300_000 }),
-  seat({ builtin: 'implement', name: 'Implement', model: 'claude-sonnet-5-5', effort: 'medium', permissionMode: 'acceptEdits', tools: EDIT_TOOLS, allow: EDIT_ALLOW, deny: EDIT_DENY, cacheTtl: 'auto', contextCap: 200_000 }),
+  seat({ builtin: 'implement', name: 'Implement', model: 'claude-opus-5-5', effort: 'medium', permissionMode: 'acceptEdits', tools: EDIT_TOOLS, allow: EDIT_ALLOW, deny: EDIT_DENY, cacheTtl: 'auto', contextCap: 200_000 }),
   seat({
     builtin: 'test',
     name: 'Test',
@@ -981,6 +981,7 @@ export class Store {
   // `restoreBuiltins`. A bumped SEED_VERSION re-runs restoreBuiltins once on existing databases.
   seedBuiltinPresets(): void {
     this.addOptionalMcpOnce()
+    this.implementOnOpusOnce()
     if (this.getJson('presets.seededVersion') === SEED_VERSION) return
     this.tx(() => {
       this.migrateBuiltins()
@@ -994,6 +995,17 @@ export class Store {
   }
 
   // Existing built-in stages gain their optional servers once. A stage whose server list the user changed keeps it.
+  // Medium work (a feature, a normal fix) runs on Opus: the Implement built-ins still on the old shipped Sonnet move
+  // to Opus once. A model the user picked stays.
+  private implementOnOpusOnce(): void {
+    if (this.getJson('presets.implementOpus') === true) return
+    this.tx(() => {
+      const p = this.getPresetByBuiltin('implement')
+      if (p && p.model === 'claude-sonnet-5-5') this.updatePreset(p.id, { model: 'claude-opus-5-5' })
+      this.setJson('presets.implementOpus', true)
+    })
+  }
+
   private addOptionalMcpOnce(): void {
     if (this.getJson('presets.optionalMcp') === true) return
     this.tx(() => {

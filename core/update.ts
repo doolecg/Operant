@@ -195,8 +195,39 @@ export function debInstallScript(o: { pid: number; deb: string; exe: string; log
   ].join('\n')
 }
 
-// Windows: a hidden PowerShell worker waits for the app to close, runs msiexec (retrying while another
-// install holds the lock, 1618), then optionally relaunches.
+// Windows: while an install runs, the worker's pid sits in this file in the temp folder, so a copy of the app
+// started meanwhile (from the Start menu) closes again instead of holding files the installer is replacing.
+export const UPDATE_LOCK = 'Operant3-update.lock'
+// The worker writes "<version> <exit code>" here, so the next start can say why an update did not install.
+export const UPDATE_RESULT = 'Operant3-update-result.txt'
+// Longer than the worker can take (two 60 s waits, 40 tries 15 s apart, the install itself).
+const LOCK_MAX_AGE_MS = 45 * 60_000
+
+// Is an install running? A lock whose worker is gone, or that is older than any install, is stale.
+export function updateRunning(lock: { text: string; mtimeMs: number } | null, alive: (pid: number) => boolean, now = Date.now()): boolean {
+  if (!lock || now - lock.mtimeMs > LOCK_MAX_AGE_MS) return false
+  const pid = Number.parseInt(lock.text.trim(), 10)
+  return Number.isInteger(pid) && pid > 0 && alive(pid)
+}
+
+const MSI_OK = new Set([0, 1641, 3010])
+
+// What the next start says about the last install, or null when it worked or this copy is already that version.
+export function updateFailureMessage(text: string, currentVersion: string, log: string): string | null {
+  const m = /^(\S+)\s+(-?\d+)/.exec(text.trim())
+  if (!m) return null
+  const [, version = '', raw = ''] = m
+  const code = Number(raw)
+  if (MSI_OK.has(code) || !newer(version, currentVersion)) return null
+  if (code === 1223) return `The update to ${version} was cancelled at the Windows admin prompt`
+  if (code === -2) return `The update to ${version} did not install because Operant 3 was still running`
+  if (code === 1618) return `The update to ${version} did not install because another install was running`
+  return `The update to ${version} did not install (Windows Installer code ${String(code)}). Details: ${log}`
+}
+
+// Windows: a hidden PowerShell worker waits for the app to close and runs one elevated script (one UAC prompt)
+// that installs the MSI, retrying while another install holds the lock (1618). It then records the result,
+// clears the lock and optionally relaunches.
 export function msiWorkerScript(o: {
   pid: number
   exe: string
@@ -204,10 +235,17 @@ export function msiWorkerScript(o: {
   msi: string
   log: string
   relaunch: boolean
+  version: string
+  lock: string
+  result: string
   oldDir?: string
 }): string {
   const q = (s: string) => s.replace(/'/g, "''")
   return [
+    `$lock = '${q(o.lock)}'`,
+    `Set-Content -LiteralPath $lock -Value $PID`,
+    `$code = -2`,
+    `try {`,
     `Wait-Process -Id ${Number(o.pid)} -Timeout 60 -ErrorAction SilentlyContinue`,
     // Electron helpers and node-pty's console hosts can outlive the main process briefly.
     `$dir = '${q(o.installDir)}\\'`,
@@ -215,33 +253,44 @@ export function msiWorkerScript(o: {
     // so if anything from it is still running, skip this time (the next quit retries).
     `$ours = { Get-Process | Where-Object { try { $_.Path -and $_.Path.StartsWith($dir, 'OrdinalIgnoreCase') } catch { $false } } }`,
     `& $ours | Wait-Process -Timeout 60 -ErrorAction SilentlyContinue`,
-    // The install is per-machine, so msiexec runs elevated (UAC prompt). /passive because /qn cannot be used
-    // from a non-elevated worker; the elevated child shows only a progress bar. Cancelling UAC throws error 1223.
-    `function Run-Msi($a) { try { (Start-Process msiexec.exe -ArgumentList $a -Verb RunAs -Wait -PassThru -ErrorAction Stop).ExitCode } catch { if ($_.Exception.NativeErrorCode -eq 1223 -or $_.Exception.Message -match 'canceled by the user') { 1223 } else { throw } } }`,
+    // The elevated part, written to a file so it runs under a single UAC prompt. /passive shows only a progress bar.
+    `$inner = '${q(o.log)}.ps1'`,
+    `Set-Content -LiteralPath $inner -Encoding UTF8 -Value @'`,
     `$code = 0`,
-    `if (-not (& $ours)) { for ($i = 0; $i -lt 40; $i++) {`,
-    `  $code = Run-Msi '/i "${q(o.msi)}" /passive /norestart /l*v "${q(o.log)}"'`,
+    `for ($i = 0; $i -lt 40; $i++) {`,
+    `  $code = (Start-Process msiexec.exe -ArgumentList '/i "${q(o.msi)}" /passive /norestart /l*v "${q(o.log)}"' -Wait -PassThru).ExitCode`,
     `  if ($code -ne 1618) { break }`,
     `  Start-Sleep -Seconds 15`,
-    `} }`,
-    // UAC cancelled: keep the old version running, retry nothing, delete nothing.
-    `if ($code -eq 1223) { Add-Content -LiteralPath '${q(o.log)}' -Value 'update cancelled at the UAC prompt (1223); keeping the current version'; exit }`,
+    `}`,
     // The new package can skip the main exe when the old one is still there at costing time, and the old package's
     // removal then deletes it, so reinstall every file if it is gone.
     `if (-not (Test-Path -LiteralPath '${q(o.exe)}')) {`,
-    `  $null = Run-Msi '/i "${q(o.msi)}" REINSTALL=ALL REINSTALLMODE=vomus /passive /norestart /l*v "${q(o.log)}.repair.log"'`,
+    `  $null = (Start-Process msiexec.exe -ArgumentList '/i "${q(o.msi)}" REINSTALL=ALL REINSTALLMODE=vomus /passive /norestart /l*v "${q(o.log)}.repair.log"' -Wait -PassThru).ExitCode`,
     `}`,
+    `exit $code`,
+    `'@`,
+    // Cancelling UAC throws error 1223.
+    `if (-not (& $ours)) {`,
+    `  try { $code = (Start-Process powershell.exe -ArgumentList '-NoProfile','-NonInteractive','-ExecutionPolicy','Bypass','-WindowStyle','Hidden','-File',('"' + $inner + '"') -Verb RunAs -Wait -PassThru -ErrorAction Stop).ExitCode }`,
+    `  catch { if ($_.Exception.NativeErrorCode -eq 1223 -or $_.Exception.Message -match 'canceled by the user') { $code = 1223 } else { $code = -1; Add-Content -LiteralPath '${q(o.log)}' -Value "$_" } }`,
+    `}`,
+    `Remove-Item -LiteralPath $inner -ErrorAction SilentlyContinue`,
+    `Set-Content -LiteralPath '${q(o.result)}' -Value "${q(o.version)} $code"`,
+    // UAC cancelled: keep the old version, delete nothing.
+    `if ($code -eq 1223) { Add-Content -LiteralPath '${q(o.log)}' -Value 'update cancelled at the UAC prompt (1223); keeping the current version' }`,
     // The install moved (for example per-user to Program Files): once the new exe exists, delete only the old
     // program folder, and only if it really holds the app exe. User data lives elsewhere and is never touched.
     ...(o.oldDir
       ? [
           `$old = '${q(o.oldDir)}'`,
           `$oldExe = Join-Path $old '${q(o.exe.split(/[\\/]/).pop() ?? '')}'`,
-          `if ((Test-Path -LiteralPath '${q(o.exe)}') -and ($old.TrimEnd('\\') -ine '${q(o.installDir.replace(/[\\/]+$/, ''))}') -and (Test-Path -LiteralPath $oldExe)) {`,
+          `if (($code -ne 1223) -and (Test-Path -LiteralPath '${q(o.exe)}') -and ($old.TrimEnd('\\') -ine '${q(o.installDir.replace(/[\\/]+$/, ''))}') -and (Test-Path -LiteralPath $oldExe)) {`,
           `  try { Remove-Item -LiteralPath $old -Recurse -Force -ErrorAction Stop } catch { }`,
           `}`,
         ]
       : []),
+    `} finally { Remove-Item -LiteralPath $lock -ErrorAction SilentlyContinue }`,
+    // After the lock is gone, or the relaunched copy would see the install still running and close.
     o.relaunch ? `Start-Process -FilePath '${q(o.exe)}'` : '',
   ].join('\n')
 }

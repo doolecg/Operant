@@ -1,6 +1,8 @@
 import { app, clipboard, dialog, ipcMain, shell, type BrowserWindow, type IpcMainInvokeEvent } from 'electron'
 import { consoleLog, isConsoleSource } from '../core/console'
 import { stopOwnProcess } from '../core/proc'
+import { previewOf, readDefaultBrowserCookies } from '../core/browser-cookies'
+import { importCookiesToCrews } from './browser-cookies-import'
 import { ipcErrorOf, type Operant } from '../core/operant'
 import { CORE_CHANNELS, encodeIpcError, type IpcApi, type IpcEventName, type IpcEvents, type MainChannel } from '../shared/ipc'
 import type { BrowserHub } from '../core/browser/hub'
@@ -143,6 +145,15 @@ export function registerIpc(
     'browser:cookieRemove': (crewId, key) => panels.inspect.removeCookie(crewId, key),
     'browser:clearSite': (crewId, origin) => panels.inspect.clearSite(crewId, String(origin)),
     'browser:clearAll': (crewId) => panels.inspect.clearAll(crewId),
+    'browser:importCookiesPreview': async () => previewOf(await readDefaultBrowserCookies()),
+    'browser:importCookies': async () => {
+      const result = await readDefaultBrowserCookies()
+      if (!result.supported) throw new Error(encodeIpcError('BAD_ARGS', result.reason ?? 'Importing from your default browser is not supported.'))
+      if (result.needsClose) throw new Error(encodeIpcError('BAD_ARGS', result.reason ?? 'Close your browser and try again.'))
+      const crewIds = (await operant.handlers['crews:list']()).filter((c) => c.kind !== 'playground').map((c) => c.id)
+      const { imported, rejected } = await importCookiesToCrews(result.cookies, crewIds)
+      return { browser: result.browser, imported, rejected, locked: result.locked }
+    },
     'browser:bookmarks': (crewId) => panels.inspect.bookmarks(crewId),
     'browser:bookmarkAdd': (crewId, url, title) => panels.inspect.addBookmark(crewId, String(url), String(title ?? '')),
     'browser:bookmarkEdit': (crewId, id, patch) => panels.inspect.editBookmark(crewId, String(id), patch ?? {}),

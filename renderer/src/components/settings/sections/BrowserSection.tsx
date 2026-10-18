@@ -6,6 +6,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Switch } from '@/components/ui/switch'
 import { Textarea } from '@/components/ui/textarea'
 import { DEFAULT_CREW_BROWSER, sanitizeCrewBrowser, type CertMode, type CrewBrowserOptions } from '@shared/browser-compat'
+import type { CookieImportPreview } from '@shared/browser-inspect'
 import { call, useCrews, useSaveSettings, useSettings } from '@/lib/queries'
 import { toast } from '@/lib/toast'
 import { CommitInput, ConfirmDialog, Row } from '../parts'
@@ -46,6 +47,9 @@ export function BrowserSection() {
   const [confirming, setConfirming] = useState(false)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [preview, setPreview] = useState<CookieImportPreview | null>(null)
+  const [importBusy, setImportBusy] = useState(false)
+  const [importError, setImportError] = useState<string | null>(null)
   const b = settings?.browser
   if (!b) return null
   const crew = crews.find((c) => String(c.id) === crewId)
@@ -68,6 +72,50 @@ export function BrowserSection() {
       setError(decodeIpcError(e).message)
     } finally {
       setBusy(false)
+    }
+  }
+
+  // Look at the default browser (counts only, no values) and open the confirm dialog, or report why nothing can be imported.
+  const startImport = async () => {
+    setImportBusy(true)
+    setImportError(null)
+    try {
+      const p = await call('browser:importCookiesPreview')
+      if (!p.supported) {
+        setImportError(p.reason ?? 'Importing from your default browser is not supported.')
+        return
+      }
+      if (p.needsClose) {
+        setImportError(p.reason ?? 'Close your browser and try again.')
+        return
+      }
+      if (p.found === 0) {
+        setImportError(p.locked > 0 ? (p.reason ?? `${p.browser} locks all of its cookies.`) : `No cookies were found in ${p.browser}.`)
+        return
+      }
+      setPreview(p)
+    } catch (e) {
+      setImportError(decodeIpcError(e).message)
+    } finally {
+      setImportBusy(false)
+    }
+  }
+
+  const runImport = async () => {
+    setImportBusy(true)
+    setImportError(null)
+    try {
+      const r = await call('browser:importCookies')
+      const parts = [`Imported ${r.imported} ${r.imported === 1 ? 'cookie' : 'cookies'} from ${r.browser}`]
+      const notes: string[] = []
+      if (r.rejected > 0) notes.push(`${r.rejected} skipped`)
+      if (r.locked > 0) notes.push(`${r.locked} locked by ${r.browser}`)
+      toast(`${parts[0]}${notes.length ? ` (${notes.join(', ')})` : ''}.`)
+      setPreview(null)
+    } catch (e) {
+      setImportError(decodeIpcError(e).message)
+    } finally {
+      setImportBusy(false)
     }
   }
 
@@ -181,6 +229,18 @@ export function BrowserSection() {
               </Button>
             </div>
           </Row>
+          <Row label="Import cookies from your browser" hint="Copies the logins from your computer's default browser into every project's browser." info="Reads the cookies from your computer's default web browser (its main profile) and copies them into every project's built-in browser, so you start out signed in to the same sites. Nothing is read until you click, and nothing is copied until you confirm the count. Some browsers lock their cookies so only they can read them; those are left out and counted. On macOS your system may ask permission to read the browser's keychain entry.">
+            <div className="flex flex-col items-end gap-1">
+              <Button variant="outline" size="sm" disabled={importBusy} onClick={() => void startImport()}>
+                Import cookies from your browser
+              </Button>
+              {importError && (
+                <p role="alert" className="text-destructive text-sm">
+                  {importError}
+                </p>
+              )}
+            </div>
+          </Row>
         </CardContent>
       </Card>
 
@@ -197,6 +257,25 @@ export function BrowserSection() {
         }}
       >
         <p>Every cookie, login and saved site data of this project's browser goes, and its cache. Open tabs stay open but are signed out. The count of cookies removed is shown when it is done.</p>
+      </ConfirmDialog>
+
+      <ConfirmDialog
+        open={preview !== null}
+        title={preview ? `Import cookies from ${preview.browser}?` : 'Import cookies'}
+        confirmLabel="Import"
+        destructive={false}
+        busy={importBusy}
+        error={importError}
+        onConfirm={() => void runImport()}
+        onClose={() => {
+          setPreview(null)
+          setImportError(null)
+        }}
+      >
+        <p>
+          {preview?.found} {preview?.found === 1 ? 'cookie' : 'cookies'} from {preview?.browser} (profile {preview?.profile}) will be copied into every project's browser, so you start signed in to the same sites.
+          {preview && preview.locked > 0 ? ` ${preview.locked} ${preview.locked === 1 ? 'cookie is' : 'cookies are'} locked by ${preview.browser} and cannot be imported.` : ''}
+        </p>
       </ConfirmDialog>
     </>
   )

@@ -1,7 +1,7 @@
 // Auto-update from GitHub releases: check at startup and every few hours, download the installer for
 // this system in the background, then install on click (with relaunch) or when the app quits.
 import { spawn, spawnSync } from 'node:child_process'
-import { accessSync, constants, createWriteStream, existsSync, renameSync, statfsSync, statSync, unlinkSync } from 'node:fs'
+import { accessSync, constants, createWriteStream, existsSync, readFileSync, renameSync, statfsSync, statSync, unlinkSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { basename, dirname, join, resolve } from 'node:path'
 import { Readable } from 'node:stream'
@@ -21,7 +21,11 @@ import {
   newer,
   pickAsset,
   pickRelease,
+  UPDATE_LOCK,
   UPDATE_REPO,
+  UPDATE_RESULT,
+  updateFailureMessage,
+  updateRunning,
   verifyDigest,
   type InstallKind,
   type Release,
@@ -40,6 +44,40 @@ interface Ready {
 
 const HEADERS = { 'User-Agent': 'operant2', Accept: 'application/vnd.github+json' }
 
+const lockFile = () => join(tmpdir(), UPDATE_LOCK)
+const resultFile = () => join(tmpdir(), UPDATE_RESULT)
+const installLog = (version: string) => join(tmpdir(), `Operant3-${version}-install.log`)
+
+// True while an update worker is installing (Windows), so a second copy must not start or install.
+export function updateInstalling(): boolean {
+  let lock: { text: string; mtimeMs: number } | null = null
+  try {
+    lock = { text: readFileSync(lockFile(), 'utf8'), mtimeMs: statSync(lockFile()).mtimeMs }
+  } catch {
+    return false
+  }
+  return updateRunning(lock, (pid) => {
+    try {
+      process.kill(pid, 0)
+      return true
+    } catch (err) {
+      return (err as NodeJS.ErrnoException).code === 'EPERM'
+    }
+  })
+}
+
+// The last install's result, read once and removed: a message when it did not install.
+function lastFailure(currentVersion: string): string | undefined {
+  try {
+    const text = readFileSync(resultFile(), 'utf8')
+    unlinkSync(resultFile())
+    const version = /^(\S+)/.exec(text.trim())?.[1] ?? ''
+    return updateFailureMessage(text, currentVersion, installLog(version)) ?? undefined
+  } catch {
+    return undefined
+  }
+}
+
 export function createUpdater({
   send,
   getSettings,
@@ -57,6 +95,8 @@ export function createUpdater({
   let installing = false
   let timer: NodeJS.Timeout | null = null
   let info: Pick<UpdateStatus, 'checkedAt' | 'latest'> = {}
+  // Why the last install did not go in, shown with the ready update until the next install starts.
+  let failure = enabled ? lastFailure(currentVersion) : undefined
   let status: UpdateStatus = enabled
     ? { state: 'idle', currentVersion }
     : { state: 'unsupported', currentVersion, message: 'Updates run in installed builds only' }
@@ -141,7 +181,7 @@ export function createUpdater({
       }
       // Keep checking once one is downloaded: a stale ready update must not be installed over a newer release.
       if (ready && !newer(version, ready.version) && existsSync(ready.file)) {
-        report({ state: 'ready', version: ready.version, notes: ready.notes, url: ready.url })
+        report({ state: 'ready', version: ready.version, notes: ready.notes, url: ready.url, message: failure })
         return
       }
       const asset = pickAsset(rel.assets, { platform: process.platform, arch: process.arch, kind })
@@ -152,7 +192,7 @@ export function createUpdater({
       const notes = rel.body ?? ''
       const file = await fetchAsset(asset, version, kind, () => report({ state: 'downloading', version, notes }))
       ready = { version, file, notes, url: rel.html_url, kind }
-      report({ state: 'ready', version, notes, url: rel.html_url })
+      report({ state: 'ready', version, notes, url: rel.html_url, message: failure })
     } catch (err) {
       report({ state: 'error', message: err instanceof Error ? err.message : String(err) })
     } finally {
@@ -171,7 +211,7 @@ export function createUpdater({
 
   // Starts a worker that outlives the app, waits for it to exit, installs, and optionally relaunches.
   function startWorker(r: Ready, relaunch: boolean): boolean {
-    const log = join(tmpdir(), `Operant3-${r.version}-install.log`)
+    const log = installLog(r.version)
     const fail = (message: string) => {
       report({ state: 'error', version: r.version, message })
       return false
@@ -181,7 +221,18 @@ export function createUpdater({
       const exe = process.execPath
       // Old per-user install folder, removed by the worker once the new copy is in place (no-op if it is the same folder).
       const oldDir = process.env.LOCALAPPDATA ? join(process.env.LOCALAPPDATA, 'Programs', 'Operant 3') : undefined
-      const worker = msiWorkerScript({ pid: process.pid, exe, installDir: dirname(exe), msi: r.file, log, relaunch, oldDir })
+      const worker = msiWorkerScript({
+        pid: process.pid,
+        exe,
+        installDir: dirname(exe),
+        msi: r.file,
+        log,
+        relaunch,
+        version: r.version,
+        lock: lockFile(),
+        result: resultFile(),
+        oldDir,
+      })
       const encoded = Buffer.from(worker, 'utf16le').toString('base64')
       // Node can't start a detached PowerShell that survives us, so a short-lived launcher starts it via Start-Process.
       const res = spawnSync(
@@ -223,6 +274,11 @@ export function createUpdater({
 
   function install(relaunch: boolean): boolean {
     if (!ready || installing) return false
+    if (updateInstalling()) {
+      report({ state: 'error', version: ready.version, message: 'An update is already installing; Operant 3 reopens when it is done' })
+      return false
+    }
+    failure = undefined
     try {
       beforeInstall?.(ready.version)
     } catch (err) {
