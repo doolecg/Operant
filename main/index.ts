@@ -12,6 +12,7 @@ import { assessCall, confirmSummary } from '../core/browser/risk'
 import { CliServer, type CliTarget } from '../core/cli-server'
 import { CrewIndexes, globalCodegraph } from '../core/codegraph'
 import { consoleLog } from '../core/console'
+import { syncPack } from '../core/engineering'
 import { FileSecretStore } from '../core/secrets'
 import { Operant } from '../core/operant'
 import { appDataDir } from '../core/paths'
@@ -294,6 +295,13 @@ app.whenReady().then(() => {
   const playground = store.ensurePlayground(join(app.getPath('userData'), 'Playground'))
   mkdirSync(playground.folder, { recursive: true })
   consoleLog.setScrubber(scrubLogLine)
+  // The Engineering and Factory skill packs: an editable copy in <userData>/engineering (edited files are kept on update).
+  const engineeringDir = join(app.getPath('userData'), 'engineering')
+  try {
+    syncPack(pluginDir, engineeringDir)
+  } catch (err) {
+    console.error('Engineering skill pack sync failed:', err instanceof Error ? err.message : String(err))
+  }
   sessions = new SessionManager((file, args, opts) => spawnPty(file, args, { name: 'xterm-256color', ...opts }))
   const indexes = new CrewIndexes(app.isPackaged ? globalCodegraph() : undefined)
   const core = new Operant({
@@ -303,6 +311,7 @@ app.whenReady().then(() => {
     pluginDir,
     // The native mods (plugin/mods/<id>), dev and packaged alike.
     modPluginsDir: join(pluginDir, 'mods'),
+    engineeringDir,
     backupDir: join(app.getPath('userData'), 'backups'),
     launch: {
       launchDir: join(app.getPath('userData'), 'launch'),

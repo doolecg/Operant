@@ -70,6 +70,8 @@ import { JsonlTail, parseLine, transcriptPath } from './transcripts'
 import { CapabilityProber, systemProbeDeps, type ProbeDeps } from './capabilities'
 import { ClaudeAgents } from './claude-agents'
 import { hooksConfig, type ModsPaths } from './claude-events'
+import { packStatus, resetPack } from './engineering'
+import { buildPreamble } from '../shared/engineering'
 import { openCodeDbPath } from './opencode-usage'
 import { enabledMods, type CapabilityReport, type ClaudeTileState } from '../shared/mods'
 import { inheritedEnv, type SessionKey, type SessionManager } from './sessions'
@@ -147,6 +149,8 @@ export interface OperantOptions {
   hooks?: ModsPaths
   // plugin/mods in the repo (dev) or in resources (packaged): one folder per native mod.
   modPluginsDir?: string
+  // <userData>/engineering: the editable copy of the Engineering and Factory skill packs (core/engineering.ts); absent turns both modes off.
+  engineeringDir?: string
   // The CLI probe (tests pass a fake); the real one runs `claude --version` and `opencode --version`.
   capabilityProbe?: ProbeDeps
   now?: () => number
@@ -300,6 +304,7 @@ export class Operant extends EventEmitter<PushEvents> {
   private readonly hookPaths: ModsPaths | null
   private readonly claudeAgents: ClaudeAgents | null
   private readonly modPluginsDir: string | null
+  private readonly engineeringDir: string | null
   private readonly prober: CapabilityProber
   private readonly installer = new Installer(systemInstallDeps(claudeDirOf()))
   private readonly cli: CliAccess | null
@@ -350,6 +355,7 @@ export class Operant extends EventEmitter<PushEvents> {
     this.launch = opts.launch ?? {}
     this.hookPaths = opts.hooks ?? null
     this.modPluginsDir = opts.modPluginsDir ?? null
+    this.engineeringDir = opts.engineeringDir ?? null
     this.claudeAgents = opts.hooks
       ? new ClaudeAgents({
           eventsDir: opts.hooks.eventsDir,
@@ -505,6 +511,7 @@ export class Operant extends EventEmitter<PushEvents> {
       ...this.miscHandlers(),
       ...this.mcpHandlers(),
       ...this.capabilityHandlers(),
+      ...this.engineeringHandlers(),
       ...this.opsHandlers(),
       ...this.installHandlers(),
     }
@@ -607,6 +614,12 @@ export class Operant extends EventEmitter<PushEvents> {
             throw conflict('Stop the project’s tiles before changing its folder')
           }
           next.folder = patch.folder.trim()
+        }
+        for (const key of ['engineering', 'factory'] as const) {
+          const on = patch[key]
+          if (on === undefined) continue
+          if (typeof on !== 'boolean') throw bad(`The ${key} setting must be on or off`)
+          next[key] = on
         }
         const updated = store.updateCrew(crewId, next)
         this.log('crew', `Project ${updated.name} updated`, crewId)
@@ -997,6 +1010,31 @@ export class Operant extends EventEmitter<PushEvents> {
       'capabilities:refresh': (): Promise<CapabilityReport> => this.prober.refresh(),
       'claude:doctor': () => this.claudeDoctor(),
       'claudeTile:get': (tileId): ClaudeTileState | null => this.claudeAgents?.get(tileId) ?? null,
+    }
+  }
+
+  private engineeringHandlers(): Group<'engineering'> {
+    const status = () => ({ edited: this.engineeringDir ? packStatus(this.engineeringDir).edited : [], folder: this.engineeringDir ?? '' })
+    return {
+      'engineering:status': status,
+      'engineering:reset': () => {
+        if (this.engineeringDir) resetPack(this.pluginDir, this.engineeringDir, this.now())
+        return status()
+      },
+    }
+  }
+
+  // A crew's modes as launch.ts takes them: the preamble for the appended system prompt, the pack folders to load
+  // with --plugin-dir, and whether Factory is on (it sets OPERANT_FACTORY for the cap hook).
+  private projectModes(crewId: number): Pick<LaunchContext, 'modePreamble' | 'packPlugins' | 'factory'> {
+    const crew = this.engineeringDir ? this.store.getCrew(crewId) : null
+    if (!this.engineeringDir || !crew || (!crew.engineering && !crew.factory)) return {}
+    const engineeringDir = join(this.engineeringDir, 'engineering')
+    const factoryDir = join(this.engineeringDir, 'factory')
+    return {
+      modePreamble: buildPreamble(crew, { engineeringDir, factoryDir }),
+      packPlugins: [...(crew.engineering ? [engineeringDir] : []), ...(crew.factory ? [factoryDir] : [])],
+      factory: crew.factory,
     }
   }
 
@@ -1490,10 +1528,11 @@ export class Operant extends EventEmitter<PushEvents> {
     await this.refreshRecall()
   }
 
-  // The hooks and status line for Claude tiles, or undefined when mods are off.
-  private hooksConfig(): Record<string, unknown> | undefined {
+  // The hooks and status line for Claude tiles, or undefined when mods are off. Factory Mode adds its subagent cap hook
+  // even then.
+  private hooksConfig(factory = false): Record<string, unknown> | undefined {
     if (!this.hookPaths) return undefined
-    return hooksConfig(this.hookPaths, this.settings.mods, this.sessionRecallOn()) ?? undefined
+    return hooksConfig(this.hookPaths, this.settings.mods, this.sessionRecallOn(), factory) ?? undefined
   }
 
   // The learn AI for one aux task: the learn settings, with the task's own CLI and model where it has them.
@@ -1632,6 +1671,7 @@ export class Operant extends EventEmitter<PushEvents> {
     const platform = this.launch.platform ?? process.platform
     const cliDir = this.launch.cliDir
     const browserUrl = this.settings.browser.aiControl ? (this.browserMcp?.() ?? null) : null
+    const modes = this.projectModes(crewId)
     return {
       platform,
       shell: shellKind(this.settings.shell.file, platform),
@@ -1647,8 +1687,9 @@ export class Operant extends EventEmitter<PushEvents> {
       defaultCacheTtl: this.settings.tokens.defaultCacheTtl,
       subagentCacheTtl: this.settings.tokens.subagentCacheTtl,
       pinClaudeVersion: this.settings.tokens.pinClaudeVersion,
-      mods: this.hooksConfig(),
+      mods: this.hooksConfig(modes.factory),
       modPlugins: this.settings.mods.enabled ? this.modPluginDirs() : [],
+      ...modes,
       browserMcp: browserUrl ? { url: browserUrl } : undefined,
       codegraphMcp: this.settings.learn.codegraph && onPath('codegraph', this.launch.baseEnv ?? process.env, process.platform),
       recallFile: this.recallFileFor(crewFolder),

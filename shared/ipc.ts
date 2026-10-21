@@ -58,6 +58,7 @@ import type { GitBranches, GitCommit, GitCommitDetails, GitCommitResult, GitDiff
 import type { Settings, SettingsPatch } from './settings'
 import type { MediaState, MediaTimeline } from './media'
 import type { CapabilityReport, ClaudeTileState } from './mods'
+import type { EngineeringStatus } from './engineering'
 import type { RunningCounts } from './notify'
 import type { TilePopoutRequest } from './tile-popout'
 import { CHAT_CHANNELS, type ChatApi, type ChatEvents, type ChatImage } from './claude-chat'
@@ -304,6 +305,11 @@ export interface IpcApi extends ChatApi {
   'capabilities:refresh': () => Promise<CapabilityReport>
   // `claude doctor` as plain text: the Chat view's /doctor.
   'claude:doctor': () => Promise<string>
+  // Engineering Mode and Subagent Factory skill packs: which files the owner edited, and reset (backs those up first).
+  'engineering:status': () => EngineeringStatus
+  'engineering:reset': () => EngineeringStatus
+  // Handled by main: opens <userData>/engineering in the file manager.
+  'engineering:openFolder': () => void
   // A Claude Code tile's sub-agents, status line and events state (null when the tile has none yet).
   'claudeTile:get': (tileId: number) => ClaudeTileState | null
   'settings:get': () => Settings
@@ -427,6 +433,7 @@ export type MainChannel =
   | 'app:info'
   | 'app:openExternal'
   | 'app:openLicenses'
+  | 'engineering:openFolder'
   | 'update:status'
   | 'update:check'
   | 'update:install'
@@ -718,6 +725,8 @@ export const CORE_CHANNELS: CoreChannel[] = [
   'capabilities:get',
   'capabilities:refresh',
   'claude:doctor',
+  'engineering:status',
+  'engineering:reset',
   'claudeTile:get',
   ...CHAT_CHANNELS,
   'settings:get',
@@ -733,6 +742,7 @@ export const MAIN_CHANNELS: MainChannel[] = [
   'app:info',
   'app:openExternal',
   'app:openLicenses',
+  'engineering:openFolder',
   'update:status',
   'update:check',
   'update:install',

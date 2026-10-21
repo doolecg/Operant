@@ -6,6 +6,9 @@
 //   node op-event.mjs recall <eventsDir>  SessionStart only: prints the project's memory file (<eventsDir>/../recall/<key>.txt,
 //                                         written by the app) as hookSpecificOutput.additionalContext; nothing when it is missing
 //
+// With OPERANT_FACTORY=1 (Subagent Factory Mode), `hook` also prints a PreToolUse deny for the Agent/Task tool while 3
+// helpers are running (SubagentStart minus SubagentStop in the session's events file).
+//
 // Only tiles Operant launched (OPERANT_SOURCE=operant) write anything. It always exits 0, so a failed write never
 // blocks Claude Code.
 import { createHash } from 'node:crypto'
@@ -64,6 +67,38 @@ function recall(eventsDir, payload) {
 `)
 }
 
+const FACTORY_CAP = 3
+
+// Subagent Factory Mode: the helpers running in this session, from its events file (SubagentStart minus SubagentStop).
+function runningHelpers(file) {
+  let n = 0
+  for (const line of readFileSync(file, 'utf8').split('\n')) {
+    if (!line) continue
+    try {
+      const name = JSON.parse(line).hook_event_name
+      if (name === 'SubagentStart') n++
+      else if (name === 'SubagentStop') n--
+    } catch {
+      /* a torn line counts for nothing */
+    }
+  }
+  return Math.max(0, n)
+}
+
+// With OPERANT_FACTORY=1, a PreToolUse for the Agent/Task tool is denied while FACTORY_CAP helpers are running. Any read or
+// parse problem allows the call (prints nothing).
+function factoryCap(file, payload) {
+  if (process.env.OPERANT_FACTORY !== '1' || payload.hook_event_name !== 'PreToolUse') return
+  if (payload.tool_name !== 'Agent' && payload.tool_name !== 'Task') return
+  try {
+    if (runningHelpers(file) < FACTORY_CAP) return
+  } catch {
+    return
+  }
+  const reason = `Subagent Factory Mode: ${FACTORY_CAP} helpers are already running. Wait for one to finish.`
+  process.stdout.write(`${JSON.stringify({ hookSpecificOutput: { hookEventName: 'PreToolUse', permissionDecision: 'deny', permissionDecisionReason: reason } })}\n`)
+}
+
 async function main() {
   const [mode, eventsDir] = process.argv.slice(2)
   if (process.env.OPERANT_SOURCE !== 'operant' || !eventsDir || (mode !== 'hook' && mode !== 'status' && mode !== 'recall')) return
@@ -80,7 +115,9 @@ async function main() {
   mkdirSync(eventsDir, { recursive: true })
   const tile = process.env.OPERANT_TILE_ID ?? null
   if (mode === 'hook') {
-    appendFileSync(join(eventsDir, `${sessionId}.jsonl`), `${JSON.stringify({ ts: Date.now(), tile, ...shrink(payload) })}\n`)
+    const file = join(eventsDir, `${sessionId}.jsonl`)
+    appendFileSync(file, `${JSON.stringify({ ts: Date.now(), tile, ...shrink(payload) })}\n`)
+    factoryCap(file, payload)
     return
   }
   const file = join(eventsDir, `status-${sessionId}.json`)

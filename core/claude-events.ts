@@ -40,23 +40,34 @@ export function modsCommand(paths: ModsPaths, mode: 'hook' | 'status' | 'recall'
 
 // The hooks Operant's sub-agent panel reads: the session phase events and the sub-agent events. Registered only while
 // the subagents mod is on. The status line is set while mods are on (the info bar and context card read it).
-// Null when mods are off or a path cannot be quoted safely: the tile then starts without them.
-export function hooksConfig(paths: ModsPaths, settings: ModsSettings, recall = false): { hooks: Record<string, unknown[]>; statusLine: { type: 'command'; command: string } } | null {
-  if (!settings.enabled) return null
+// Subagent Factory Mode (`factory`) adds the sub-agent start/stop events and the PreToolUse hook that caps running helpers at 3
+// (op-event.mjs, armed by OPERANT_FACTORY=1), whether or not mods are on; with mods off it sets no status line.
+// Null when neither applies or a path cannot be quoted safely: the tile then starts without them.
+export function hooksConfig(
+  paths: ModsPaths,
+  settings: ModsSettings,
+  recall = false,
+  factory = false,
+): { hooks: Record<string, unknown[]>; statusLine?: { type: 'command'; command: string } } | null {
+  if (!settings.enabled && !factory) return null
   const hook = modsCommand(paths, 'hook')
   const status = modsCommand(paths, 'status')
   if (!hook || !status) return null
   const entry = (matcher?: string) => ({ ...(matcher ? { matcher } : {}), hooks: [{ type: 'command', command: hook }] })
   const hooks: Record<string, unknown[]> = {}
-  if (settings.mods.subagents) {
+  if (settings.enabled && settings.mods.subagents) {
     for (const event of ['SessionStart', 'UserPromptSubmit', 'Notification', 'Stop', 'SessionEnd', 'SubagentStart', 'SubagentStop']) hooks[event] = [entry()]
     hooks.PreToolUse = [entry('Agent')]
     hooks.PostToolUse = [entry('Agent')]
   }
+  if (factory) {
+    for (const event of ['SubagentStart', 'SubagentStop']) hooks[event] = [entry()]
+    hooks.PreToolUse = [entry('Agent|Task')]
+  }
   // Session-start memory: a second SessionStart hook that hands the project's recall file to Claude as context.
-  const recallCmd = recall ? modsCommand(paths, 'recall') : null
+  const recallCmd = settings.enabled && recall ? modsCommand(paths, 'recall') : null
   if (recallCmd) hooks.SessionStart = [...(hooks.SessionStart ?? []), { hooks: [{ type: 'command', command: recallCmd }] }]
-  return { hooks, statusLine: { type: 'command', command: status } }
+  return { hooks, ...(settings.enabled ? { statusLine: { type: 'command' as const, command: status } } : {}) }
 }
 
 // One events-file line; null when it is not a hook event Operant can use.

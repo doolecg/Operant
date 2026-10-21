@@ -483,6 +483,9 @@ export const MIGRATIONS: string[] = [
   LESSON_LINKS_MIGRATION,
   // Learn runs keep their token use and the session turns they read.
   LEARN_USAGE_MIGRATION,
+  // Engineering Mode and Subagent Factory Mode, per project, off for existing projects.
+  `ALTER TABLE crews ADD COLUMN engineering INTEGER NOT NULL DEFAULT 0;
+   ALTER TABLE crews ADD COLUMN factory INTEGER NOT NULL DEFAULT 0;`,
 ]
 
 export const PLAYGROUND_KEPT = 'The Playground cannot be deleted; you can rename it or change its folder'
@@ -498,6 +501,8 @@ const toCrew = (r: Row): Crew => ({
   sortOrder: Number(r.sort_order),
   groupId: r.group_id == null ? null : Number(r.group_id),
   kind: r.kind === 'playground' ? 'playground' : 'project',
+  engineering: Number(r.engineering) === 1,
+  factory: Number(r.factory) === 1,
 })
 const parseList = (v: unknown): string[] => {
   try {
@@ -871,10 +876,12 @@ export class Store {
     return row ? toCrew(row) : null
   }
 
-  updateCrew(id: number, patch: { name?: string; folder?: string }): Crew {
+  updateCrew(id: number, patch: { name?: string; folder?: string; engineering?: boolean; factory?: boolean }): Crew {
     const cur = this.getCrew(id)
     if (!cur) throw new Error(`Project ${id} not found`)
-    const row = this.db.prepare('UPDATE crews SET name = ?, folder = ? WHERE id = ? RETURNING *').get(patch.name ?? cur.name, patch.folder ?? cur.folder, id) as Row
+    const row = this.db
+      .prepare('UPDATE crews SET name = ?, folder = ?, engineering = ?, factory = ? WHERE id = ? RETURNING *')
+      .get(patch.name ?? cur.name, patch.folder ?? cur.folder, (patch.engineering ?? cur.engineering) ? 1 : 0, (patch.factory ?? cur.factory) ? 1 : 0, id) as Row
     return toCrew(row)
   }
 

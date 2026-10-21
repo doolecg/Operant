@@ -91,6 +91,7 @@ describe('Operant: Chat view tiles', () => {
       sessions: new SessionManager(spawn),
       indexes,
       pluginDir: '/plugin',
+      engineeringDir: '/data/engineering',
       transcriptFile: (_cwd, id) => join(bin, `${id}.jsonl`),
       cliServer: (t) => ((target = t), cli),
       scheduler,
@@ -144,6 +145,27 @@ describe('Operant: Chat view tiles', () => {
     } finally {
       rmSync(folder, { recursive: true, force: true })
     }
+  })
+
+  it('a project with Engineering and Factory on starts its Chat tile with the preamble, both pack folders and OPERANT_FACTORY; a plain project does not', () => {
+    const plain = store.createCrew('plain', '/code/plain')
+    const t0 = op.handlers['scratch:create']({ crewId: plain.id, title: 'a', agent: 'claude', model: 'claude-sonnet-5-5' }) as { id: number }
+    op.startScratch(t0.id)
+    const off = lastChild().spawn
+    expect(off.args).not.toContain('--append-system-prompt-file')
+    expect(off.args.filter((a) => a === '--plugin-dir')).toHaveLength(1)
+    expect(off.env.OPERANT_FACTORY).toBeUndefined()
+
+    const crew = store.createCrew('modes', '/code/modes')
+    expect(crew).toMatchObject({ engineering: false, factory: false })
+    expect(op.handlers['crews:update'](crew.id, { engineering: true, factory: true })).toMatchObject({ engineering: true, factory: true })
+    expect(() => op.handlers['crews:update'](crew.id, { factory: 'yes' as unknown as boolean })).toThrow()
+    const t1 = op.handlers['scratch:create']({ crewId: crew.id, title: 'b', agent: 'claude', model: 'claude-sonnet-5-5' }) as { id: number }
+    op.startScratch(t1.id)
+    const on = lastChild().spawn
+    expect(on.args.filter((a) => a === '--append-system-prompt-file')).toHaveLength(1)
+    expect(on.args).toEqual(expect.arrayContaining([join('/data/engineering', 'engineering'), join('/data/engineering', 'factory')]))
+    expect(on.env.OPERANT_FACTORY).toBe('1')
   })
 
   it('opens new Claude tiles in the Chat view, other tiles in the Terminal view', () => {

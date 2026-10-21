@@ -68,12 +68,7 @@ const licenseText = (dir, pkg) => {
   return `License: ${license}${author ? `\nAuthor: ${author}` : ''}\n(The package ships no license file.)`
 }
 
-const SHADCN = `shadcn/ui (components copied into renderer/src/components/ui)
-MIT License
-
-Copyright (c) 2023 shadcn
-
-Permission is hereby granted, free of charge, to any person obtaining a copy
+const MIT_TERMS = `Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
 in the Software without restriction, including without limitation the rights
 to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
@@ -91,6 +86,25 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.`
 
+const SHADCN = `shadcn/ui (components copied into renderer/src/components/ui)
+MIT License
+
+Copyright (c) 2023 shadcn
+
+${MIT_TERMS}`
+
+// The ideas behind the Engineering Mode skill pack (plugin/engineering, plugin/factory). The text is rewritten, not copied.
+const ENGINEERING_CREDITS = [
+  ['mattpocock/skills (ideas behind the Engineering Mode skills)', 'Copyright (c) 2026 Matt Pocock'],
+  ['addyosmani/agent-skills (ideas behind the Engineering Mode skills)', 'Copyright (c) 2025 Addy Osmani'],
+].map(([name, copyright]) => `${name}
+MIT License
+
+${copyright}
+
+${MIT_TERMS}`)
+
+
 const entries = [...seen.entries()]
   .map(([dir, pkg]) => ({ title: `${pkg.name} ${pkg.version}`, text: licenseText(dir, pkg) }))
   .sort((a, b) => a.title.localeCompare(b.title))
@@ -99,6 +113,7 @@ const body = [
   'Operant 3 includes the third-party software listed below. Each part is under its own license, given in full.',
   'Electron and Chromium licenses are in LICENSE.electron.txt and LICENSES.chromium.html next to the app.',
   SHADCN,
+  ...ENGINEERING_CREDITS,
   ...entries.map((e) => `${e.title}\n\n${e.text}`),
 ].join(rule)
 

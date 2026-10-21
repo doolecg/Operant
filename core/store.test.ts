@@ -20,6 +20,7 @@ describe('store', () => {
       const crew = old.createCrew('alpha', '/code/alpha')
       old.db.exec('ALTER TABLE lessons DROP COLUMN related; ALTER TABLE lessons DROP COLUMN consolidated_into')
       for (const c of ['session_id', 'turns', 'tokens', 'usd', 'tokens_estimated']) old.db.exec(`ALTER TABLE learn_runs DROP COLUMN ${c}`)
+      for (const c of ['engineering', 'factory']) old.db.exec(`ALTER TABLE crews DROP COLUMN ${c}`)
       old.db.exec(`PRAGMA user_version = ${MIGRATIONS.indexOf(LESSON_LINKS_MIGRATION)}`)
       old.db
         .prepare("INSERT INTO lessons (crew_id, text, kind, scope, created_at, updated_at) VALUES (?, 'keep it small', 'convention', 'project', 1, 1)")
@@ -52,6 +53,15 @@ describe('store', () => {
     expect(store.updateCrew(a.id, { name: 'alpha 2' }).name).toBe('alpha 2')
     expect(store.reorderCrews([b.id, a.id]).filter((c) => c.kind === 'project').map((c) => c.id)).toEqual([b.id, a.id])
     expect(() => store.deleteCrew(store.ensurePlayground('/code/pg').id)).toThrow(/Playground cannot be deleted/)
+  })
+
+  it('keeps the Engineering and Factory flags per project, off by default and untouched by other edits', () => {
+    const a = store.createCrew('alpha', '/code/alpha')
+    expect(a).toMatchObject({ engineering: false, factory: false })
+    expect(store.updateCrew(a.id, { engineering: true })).toMatchObject({ engineering: true, factory: false })
+    expect(store.updateCrew(a.id, { factory: true, name: 'alpha 2' })).toMatchObject({ engineering: true, factory: true, name: 'alpha 2' })
+    expect(store.updateCrew(a.id, { engineering: false })).toMatchObject({ engineering: false, factory: true })
+    expect(store.getCrew(a.id)).toMatchObject({ engineering: false, factory: true })
   })
 
   it('stores presets with guidance text, and built-in presets are seeded once', () => {

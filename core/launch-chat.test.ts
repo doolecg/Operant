@@ -59,6 +59,16 @@ describe('buildChatLaunch', () => {
     expect(l.files.some((f) => f.path.endsWith('scratch-7.json'))).toBe(true)
   })
 
+  it('gives a chat tile the mode preamble, pack plugin dirs, settings hooks file and OPERANT_FACTORY', () => {
+    const l = buildChatLaunch(tile(), { ...ctx, mods: { hooks: {} }, modePreamble: 'Subagent Factory Mode is on.', packPlugins: ['/data/engineering/factory'], factory: true })
+    expect(l.args.filter((a) => a === '--append-system-prompt-file')).toHaveLength(1)
+    expect(l.files.find((f) => f.path.startsWith('/tmp/roles/'))?.content).toBe('Subagent Factory Mode is on.\n')
+    expect(l.args).toContain('/data/engineering/factory')
+    expect(l.args).toContain('--settings')
+    expect(l.env.OPERANT_FACTORY).toBe('1')
+    expect(buildChatLaunch(tile(), ctx).env).not.toHaveProperty('OPERANT_FACTORY')
+  })
+
   it('adds --allow-dangerously-skip-permissions only for a bypass preset', () => {
     const preset = { id: 3, permissionMode: 'bypassPermissions', tools: '', allow: [], deny: [], cacheTtl: 'auto', contextCap: 0, roleText: null } as unknown as Preset
     expect(buildChatLaunch(tile(), ctx, { preset }).args).toContain('--allow-dangerously-skip-permissions')

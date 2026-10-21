@@ -83,6 +83,11 @@ export interface LaunchContext {
   mods?: Record<string, unknown>
   // The plugin folders of the enabled native mods (plugin/mods/<id>), one --plugin-dir each.
   modPlugins?: string[]
+  // Engineering Mode / Subagent Factory Mode (set per project, Claude tiles only): the text appended to the tile's
+  // system prompt, the skill pack folders (one --plugin-dir each), and whether Factory is on (OPERANT_FACTORY=1 arms the subagent cap hook).
+  modePreamble?: string
+  packPlugins?: string[]
+  factory?: boolean
   // The embedded browser's MCP endpoint. The config file holds no secret: Claude expands ${OPERANT_TOKEN} from the tile's env.
   browserMcp?: { url: string }
   // The CodeGraph MCP server for this session (Settings, Memory, Use CodeGraph, with the codegraph command installed). Passed as
@@ -316,6 +321,7 @@ function claudeCore(parts: ClaudeParts, ctx: LaunchContext): LaunchResult {
   }
   add('--plugin-dir', ctx.pluginDir)
   for (const dir of ctx.modPlugins ?? []) add('--plugin-dir', checkPath('modPlugin', dir))
+  for (const dir of ctx.packPlugins ?? []) add('--plugin-dir', checkPath('packPlugin', dir))
   if (parts.resume) add('--resume', sessionId)
   else add('--session-id', sessionId)
 
@@ -324,6 +330,7 @@ function claudeCore(parts: ClaudeParts, ctx: LaunchContext): LaunchResult {
   if (subagentTtl !== 'auto') env.CLAUDE_CODE_SUBAGENT_PROMPT_CACHE_TTL = subagentTtl
   if (cap) env.CLAUDE_CODE_AUTO_COMPACT_WINDOW = capFlag(cap)
   if (ctx.pinClaudeVersion !== false) env.DISABLE_AUTOUPDATER = '1'
+  if (ctx.factory) env.OPERANT_FACTORY = '1'
   Object.assign(env, operantEnv(ctx))
   return { file: 'claude', args, env, files, cwd }
 }
@@ -363,7 +370,9 @@ export function buildScratchLaunch(scratch: ScratchTerminal, ctx: LaunchContext,
     mcp: 'none',
   }
   const hasRules = settings.allow.length > 0 || settings.deny.length > 0
-  const guidance = preset?.roleText?.trim() ? guidanceFile(`p${checkId('presetId', preset.id)}`, preset.roleText, ctx, pathOf(ctx)) : null
+  // A preset's guidance text and the project's mode preamble share the one --append-system-prompt-file.
+  const guidanceText = [preset?.roleText?.trim(), ctx.modePreamble?.trim()].filter(Boolean).join('\n\n')
+  const guidance = guidanceText ? guidanceFile(preset?.roleText?.trim() ? `p${checkId('presetId', preset.id)}` : 'modes', guidanceText, ctx, pathOf(ctx)) : null
   const resume = opts.resume && scratch.sessionId ? scratch.sessionId : undefined
   return claudeCore({ settings, settingsName: hasRules || ctx.mods ? `scratch-${scratch.id}` : '', guidance, resume, cwd }, { ...ctx, sessionId: scratch.sessionId ?? ctx.sessionId })
 }

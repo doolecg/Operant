@@ -49,6 +49,8 @@ Operant is provided "as is", without warranty of any kind. The authors are not l
 
 Claude Code, OpenCode, Hindsight, CodeGraph, Playwright and the other tools Operant starts or installs are separate software under their own licenses and terms, which you accept with their makers when you install or use them. Claude Code is a product of Anthropic and is not open source. Operant is not made by, endorsed by or affiliated with Anthropic or the makers of those tools; their names are used only to say what Operant works with.
 
+The Engineering Mode and Subagent Factory Mode skill packs (`plugin/engineering` and `plugin/factory`) are written fresh for Operant. Their ideas draw on [mattpocock/skills](https://github.com/mattpocock/skills) (MIT, Matt Pocock) and [addyosmani/agent-skills](https://github.com/addyosmani/agent-skills) (MIT, Addy Osmani). Their copyright notices are in `THIRD_PARTY_NOTICES.txt`.
+
 Each installer ships `LICENSE.txt` and `THIRD_PARTY_NOTICES.txt` (the licenses of every package bundled with the app) in the `licenses` folder of the app's resources, alongside Electron's and Chromium's licenses. Settings, General, License opens that folder.
 
 ## Credits

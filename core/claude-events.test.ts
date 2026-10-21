@@ -35,7 +35,7 @@ describe('Mods hooks config', () => {
   it('registers no hooks for the native mods alone, but keeps the status line', () => {
     const cfg = hooksConfig(paths, { enabled: true, mods: mods({ subagents: false, folderTracker: true }), keepWarm: true, commandMenu: true })!
     expect(cfg.hooks).toEqual({})
-    expect(cfg.statusLine.command).toContain(' status ')
+    expect(cfg.statusLine!.command).toContain(' status ')
   })
 
   it('quotes the command with forward slashes and the events folder, and refuses unsafe paths', () => {
@@ -92,6 +92,81 @@ describe('hooksConfig recall hook', () => {
     expect(JSON.stringify(on.hooks.SessionStart)).toContain(' recall ')
     const off = hooksConfig(paths, { enabled: true, mods: mods({ subagents: false }), keepWarm: true, commandMenu: true })!
     expect(off.hooks.SessionStart).toBeUndefined()
+  })
+})
+
+describe('hooksConfig Factory Mode', () => {
+  const off = { enabled: false, mods: mods({ subagents: false }), keepWarm: true, commandMenu: true }
+
+  it('installs the sub-agent events and the Agent|Task PreToolUse hook with no status line when mods are off', () => {
+    const cfg = hooksConfig(paths, off, true, true)!
+    expect(Object.keys(cfg.hooks).sort()).toEqual(['PreToolUse', 'SubagentStart', 'SubagentStop'])
+    expect(cfg.hooks.PreToolUse).toEqual([{ matcher: 'Agent|Task', hooks: [{ type: 'command', command: expect.stringContaining(' hook ') }] }])
+    expect(cfg.statusLine).toBeUndefined()
+  })
+
+  it('is independent of the subagents panel mod, and widens the panel PreToolUse matcher when both are on', () => {
+    const noPanel = hooksConfig(paths, { ...off, enabled: true }, false, true)!
+    expect(Object.keys(noPanel.hooks).sort()).toEqual(['PreToolUse', 'SubagentStart', 'SubagentStop'])
+    expect(noPanel.statusLine).toBeDefined()
+    const both = hooksConfig(paths, { ...off, enabled: true, mods: mods({ subagents: true }) }, false, true)!
+    expect(both.hooks.PreToolUse).toEqual([{ matcher: 'Agent|Task', hooks: expect.any(Array) }])
+    expect(both.hooks.PostToolUse).toBeDefined()
+  })
+
+  it('stays null with mods off and Factory off', () => {
+    expect(hooksConfig(paths, off, true, false)).toBeNull()
+  })
+})
+
+describe('op-event.mjs Factory cap', () => {
+  const started = (n: number, stopped = 0) => [
+    ...Array.from({ length: n }, () => ({ hook_event_name: 'SubagentStart', session_id: SID })),
+    ...Array.from({ length: stopped }, () => ({ hook_event_name: 'SubagentStop', session_id: SID })),
+  ]
+
+  function pre(tool: string, events: object[], env: Record<string, string> = { OPERANT_FACTORY: '1' }, raw = '') {
+    const dir = mkdtempSync(join(tmpdir(), 'op-event-'))
+    dirs.push(dir)
+    const eventsDir = join(dir, 'events')
+    mkdirSync(eventsDir, { recursive: true })
+    writeFileSync(join(eventsDir, `${SID}.jsonl`), events.map((e) => JSON.stringify(e)).join('\n') + (events.length ? '\n' : '') + raw)
+    const res = spawnSync(process.execPath, [SCRIPT, 'hook', eventsDir], {
+      input: JSON.stringify({ session_id: SID, hook_event_name: 'PreToolUse', tool_name: tool, tool_input: {} }),
+      env: { PATH: process.env.PATH ?? '', OPERANT_SOURCE: 'operant', OPERANT_TILE_ID: '7', ...env },
+      encoding: 'utf8',
+    })
+    return res
+  }
+
+  it('denies an Agent or Task call while 3 helpers run, with the Claude Code PreToolUse deny decision', () => {
+    for (const tool of ['Agent', 'Task']) {
+      const res = pre(tool, started(3))
+      expect(res.status).toBe(0)
+      expect(JSON.parse(res.stdout)).toEqual({
+        hookSpecificOutput: {
+          hookEventName: 'PreToolUse',
+          permissionDecision: 'deny',
+          permissionDecisionReason: 'Subagent Factory Mode: 3 helpers are already running. Wait for one to finish.',
+        },
+      })
+    }
+  })
+
+  it('allows the call under the cap, once helpers have stopped, and for other tools', () => {
+    expect(pre('Agent', started(2)).stdout).toBe('')
+    expect(pre('Agent', started(4, 2)).stdout).toBe('')
+    expect(pre('Agent', started(3, 3)).stdout).toBe('')
+    expect(pre('Bash', started(3)).stdout).toBe('')
+  })
+
+  it('does nothing when Factory Mode is off', () => {
+    expect(pre('Agent', started(5), {}).stdout).toBe('')
+  })
+
+  it('ignores a torn line, and allows when there is nothing to read', () => {
+    expect(pre('Agent', started(2), { OPERANT_FACTORY: '1' }, '{"hook_event_na').stdout).toBe('')
+    expect(pre('Agent', []).stdout).toBe('')
   })
 })
 

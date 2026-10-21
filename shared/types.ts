@@ -14,6 +14,9 @@ export interface Crew {
   groupId: number | null
   // 'playground' is the built-in, project-less workspace (one row, cannot be deleted, no PRJ number, not in groups).
   kind: CrewKind
+  // Engineering Mode and Subagent Factory Mode: read when a Claude tile starts.
+  engineering: boolean
+  factory: boolean
 }
 
 export type CrewKind = 'project' | 'playground'
@@ -174,6 +177,8 @@ export interface CrewPatch {
   name?: string
   // Refused while any operator of the crew runs.
   folder?: string
+  engineering?: boolean
+  factory?: boolean
 }
 
 export interface SeatFields {

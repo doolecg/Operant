@@ -122,6 +122,37 @@ describe('tile launches', () => {
     expect(l.files[0]!.content).toBe('Be brief.\n')
   })
 
+  it('appends the mode preamble to the one guidance file, with the preset text first', () => {
+    const modes = { modePreamble: 'Engineering Mode is on.' }
+    const alone = buildScratchLaunch(tile(), { ...ctx, ...modes })
+    expect(alone.args.filter((a) => a === '--append-system-prompt-file')).toHaveLength(1)
+    expect(alone.files).toHaveLength(1)
+    expect(alone.files[0]!.content).toBe('Engineering Mode is on.\n')
+    expect(alone.args[alone.args.indexOf('--append-system-prompt-file') + 1]).toBe(alone.files[0]!.path)
+    const withPreset = buildScratchLaunch(tile({ presetId: 3 }), { ...ctx, ...modes }, { preset: { id: 3, roleText: 'Be brief.' } as never })
+    expect(withPreset.args.filter((a) => a === '--append-system-prompt-file')).toHaveLength(1)
+    expect(withPreset.files[0]!.content).toBe('Be brief.\n\nEngineering Mode is on.\n')
+    expect(buildScratchLaunch(tile(), { ...ctx, modePreamble: '' }).args).not.toContain('--append-system-prompt-file')
+  })
+
+  it('passes a --plugin-dir per mode pack and sets OPERANT_FACTORY only when Factory is on', () => {
+    const on = buildScratchLaunch(tile(), { ...ctx, packPlugins: ['/data/engineering/engineering', '/data/engineering/factory'], factory: true })
+    const dirs = on.args.flatMap((a, i) => (a === '--plugin-dir' ? [on.args[i + 1]] : []))
+    expect(dirs).toEqual(['/app/plugin', '/data/engineering/engineering', '/data/engineering/factory'])
+    expect(on.env.OPERANT_FACTORY).toBe('1')
+    const eng = buildScratchLaunch(tile(), { ...ctx, packPlugins: ['/data/engineering/engineering'] })
+    expect(eng.args.filter((a) => a === '--plugin-dir')).toHaveLength(2)
+    expect(eng.env).not.toHaveProperty('OPERANT_FACTORY')
+    expect(buildScratchLaunch(tile(), ctx).env).not.toHaveProperty('OPERANT_FACTORY')
+    expect(() => buildScratchLaunch(tile(), { ...ctx, packPlugins: ['/x\ny'] })).toThrow()
+  })
+
+  it('leaves the mode pack off non-Claude tiles', () => {
+    const l = buildScratchLaunch(tile({ agent: 'codex' }), { ...ctx, modePreamble: 'x', packPlugins: ['/p'], factory: true })
+    expect(l.args).toEqual(['-m', 'claude-sonnet-5-5'])
+    expect(l.env).not.toHaveProperty('OPERANT_FACTORY')
+  })
+
   it('has nothing to type for a shell tile and an OpenCode tile starts its TUI', () => {
     expect(buildScratchLaunch(tile({ agent: 'shell' }), ctx)).toMatchObject({ file: null, args: [] })
     expect(buildScratchLaunch(tile({ agent: 'opencode' }), ctx)).toMatchObject({ file: 'opencode', args: [] })

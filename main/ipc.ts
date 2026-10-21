@@ -92,6 +92,10 @@ export function registerIpc(
     'app:openLicenses': () => {
       void shell.openPath(app.isPackaged ? join(process.resourcesPath, 'licenses') : join(app.getAppPath(), 'out', 'licenses'))
     },
+    'engineering:openFolder': async () => {
+      const failure = await shell.openPath(join(app.getPath('userData'), 'engineering'))
+      if (failure) throw new Error(encodeIpcError('BAD_ARGS', failure))
+    },
     'update:status': () => updater.status,
     'update:check': async () => {
       await updater.check()
