@@ -1,3 +1,13 @@
+# Operant 3.4.2
+
+**Install:** download the file for your system from the assets below. Operant keeps itself up to date from these releases.
+
+## Changed
+- **The first-start setup says what Operant runs.** The setup window now explains that most installs run an npm, winget or pip command that puts the tool on your computer, outside Operant. On Windows it also says that Operant runs its own PowerShell scripts with `-ExecutionPolicy Bypass` for media controls and updates. This only applies to those scripts and does not change your computer's execution policy.
+- **The README lists what Operant runs on your machine**, so you can read it before you install.
+
+---
+
 # Operant 3.4.1
 
 **Install:** download the file for your system from the assets below. Operant keeps itself up to date from these releases.
