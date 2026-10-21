@@ -90,7 +90,6 @@ try {
   await inv('settings:set', { mainCli: 'claude' })
   await page.locator('[data-crew-row]').getByText('clip', { exact: true }).click({ position: { x: 4, y: 4 } })
   await page.getByRole('heading', { name: 'clip', level: 1 }).waitFor()
-  await page.getByRole('group', { name: 'Dashboard mode' }).getByRole('button', { name: 'Terminal', exact: true }).click()
   await page.locator('[data-crew-row]').getByText('clip', { exact: true }).click({ button: 'right', position: { x: 4, y: 4 } })
   await page.getByRole('menuitem', { name: 'New Claude terminal here' }).click()
   await page.getByRole('region', { name: /^Claude: / }).waitFor({ timeout: 20_000 })

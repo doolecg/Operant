@@ -1,4 +1,4 @@
-// App shell e2e: the two view pills (Terminal, Memory), the hideable project list with its top-bar button and keys (Alt+B,
+// App shell e2e: the hideable project list with its top-bar button and keys (Alt+B,
 // Alt+Z), the choice surviving a restart, the top-bar Activity menu (items, the unread badge, Clear all), and the Usage and
 // Git popouts (opened from the top bar, closed with Esc). Runs in the background with throwaway data.
 // Usage: node e2e/panels.mjs [outDir]  (default docs/specs/screenshots)
@@ -42,8 +42,6 @@ const poll = async (label, fn, timeout = 10_000) => {
   for (const end = Date.now() + timeout; Date.now() < end; await page.waitForTimeout(150)) if (await fn()) return
   throw new Error(`timed out waiting for ${label}`)
 }
-const pills = () => page.getByRole('group', { name: 'Dashboard mode' })
-const mode = (label) => pills().getByRole('button', { name: new RegExp(`^${label}`) })
 const layout = async () => (await inv('settings:get')).layout
 const sidebar = () => page.getByRole('complementary', { name: 'Projects' })
 const tilesRegion = () => page.getByRole('region', { name: 'Terminal tiles' })
@@ -61,14 +59,9 @@ try {
   await page.locator(`[data-crew-row="${crew.id}"]`).getByText('shell', { exact: true }).click({ position: { x: 4, y: 4 } })
   await page.getByRole('heading', { name: 'shell', level: 1 }).waitFor()
 
-  // Two pills, in order; Terminal is the default view.
-  await pills().waitFor()
-  const labels = await pills().getByRole('button').evaluateAll((els) => els.map((e) => e.getAttribute('data-mode')))
-  assert.deepEqual(labels, ['terminal', 'memory'])
   await sidebar().waitFor()
 
   // Terminal view: the tiles fill the width; there is no side panel and no Terminal side panel button.
-  await mode('Terminal').click()
   await tilesRegion().waitFor()
   await page.keyboard.press('Alt+Shift+T')
   await poll('shell tile', async () => (await page.locator('[data-tile]').count()) >= 1)
@@ -94,7 +87,6 @@ try {
   await launch()
   await page.getByRole('heading', { name: 'shell', level: 1 }).waitFor()
   assert.equal(await sidebar().count(), 0, 'the project list stays hidden after a restart')
-  await mode('Terminal').click()
   await tilesRegion().waitFor()
 
   // Alt+Z shows and hides the project list too.

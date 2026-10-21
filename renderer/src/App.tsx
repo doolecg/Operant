@@ -11,9 +11,8 @@ import { useWaitingTiles } from '@/components/terminal/useWaitingTiles'
 import { Toaster } from '@/components/ui/toaster'
 import { Sidebar } from '@/components/dashboard/Sidebar'
 import { TerminalView } from '@/components/terminal/TerminalView'
-import { LearningBadge } from '@/components/memory/LearningBadge'
+import { OPEN_SETTINGS_EVENT } from '@/components/memory/LearningBadge'
 import { ServersPopover } from '@/components/dashboard/ServersPopover'
-import { MemoryPage } from '@/components/memory/MemoryPage'
 import { ProviderLimitBadge } from '@/components/cost/ProviderBadge'
 import { SettingsPage } from '@/components/settings/SettingsPage'
 import { Button } from '@/components/ui/button'
@@ -26,7 +25,6 @@ import { GitChip } from '@/components/topbar/GitChip'
 import { MediaBar } from '@/components/topbar/MediaBar'
 import { ProjectBlock } from '@/components/topbar/ProjectBlock'
 import { ModeToggles } from '@/components/topbar/ModeToggles'
-import { ViewSwitcher, type Mode } from '@/components/topbar/ViewSwitcher'
 import { CliSelect } from '@/components/topbar/CliSelect'
 import { ActivityMenu } from '@/components/topbar/ActivityMenu'
 import { UsageDialog } from '@/components/cost/UsageDialog'
@@ -44,18 +42,8 @@ import type { Crew } from '@shared/types'
 import type { MainCli } from '@shared/settings'
 
 const LAST_CREW = 'operant.lastCrew'
-const MODE = 'operant.mode'
 
 const Divider = () => <span aria-hidden className="bg-border h-5 w-px shrink-0" />
-
-function readMode(): Mode {
-  try {
-    const v = localStorage.getItem(MODE)
-    return v === 'memory' ? v : 'terminal'
-  } catch {
-    return 'terminal'
-  }
-}
 
 function readLastCrew(): number | null {
   try {
@@ -72,7 +60,6 @@ export function App() {
   const [crewId, setCrewId] = useState<number | null>(readLastCrew)
   const [newCrew, setNewCrew] = useState(false)
   const [crewDialog, setCrewDialog] = useState<'edit' | 'delete' | null>(null)
-  const [mode, setModeState] = useState<Mode>(readMode)
   const [page, setPage] = useState<'dashboard' | 'settings'>('dashboard')
   const [settingsSection, setSettingsSection] = useState<string | undefined>()
   const [consoleOpen, setConsoleOpen] = useState(false)
@@ -89,21 +76,19 @@ export function App() {
   // The Welcome screen shows while there is no project, until the Playground has been opened.
   const [playgroundSeen, setPlaygroundSeen] = useState(false)
 
-  const setMode = (m: Mode) => {
-    setModeState(m)
-    try {
-      localStorage.setItem(MODE, m)
-    } catch {
-      /* storage unavailable */
-    }
-  }
-
   // Fall back to the first crew when the remembered one is gone.
   useEffect(() => {
     const list = crews.data
     if (!list) return
     if (crewId == null || !list.some((r) => r.id === crewId)) setCrewId((list.find((r) => r.kind !== 'playground') ?? list[0])?.id ?? null)
   }, [crews.data, crewId])
+
+  // The small memory button next to the context readout opens its settings page.
+  useEffect(() => {
+    const open = (e: Event) => openSettingsAt((e as CustomEvent<string>).detail)
+    window.addEventListener(OPEN_SETTINGS_EVENT, open)
+    return () => window.removeEventListener(OPEN_SETTINGS_EVENT, open)
+  }, [])
 
   // "Open diff" on a chat's changed-files card.
   useEffect(() => {
@@ -142,7 +127,6 @@ export function App() {
       bridge().on('notify:open', ({ scratchId, crewId: target }) => {
         setCrewId(target)
         setPage('dashboard')
-        setMode('terminal')
         terminals.setActive(scratchId)
       }),
     [],
@@ -187,7 +171,6 @@ export function App() {
       setCrewId(pg.id)
       setPlaygroundSeen(true)
       setPage('dashboard')
-      setMode('terminal')
     },
   }
 
@@ -237,7 +220,7 @@ export function App() {
       window.removeEventListener('mousedown', onMouse)
       unswallow()
     }
-  }, [settings.data?.keybinds, settings.data?.uiScale, saveSettings, crewId, runIndex, crew, terminals.openTab, crews.data, sidebarHidden, notesOpen, mode])
+  }, [settings.data?.keybinds, settings.data?.uiScale, saveSettings, crewId, runIndex, crew, terminals.openTab, crews.data, sidebarHidden, notesOpen])
 
   return (
     <TooltipProvider>
@@ -276,9 +259,8 @@ export function App() {
             </>
           )}
           <Divider />
-          <ViewSwitcher mode={mode} onMode={(m) => (setPage('dashboard'), setMode(m))} menu={tier >= 7} />
-          {mode === 'terminal' && tier < 7 && <CliSelect />}
-          {mode === 'terminal' && tier >= 7 && cliMenu}
+          {tier < 7 && <CliSelect />}
+          {tier >= 7 && cliMenu}
         </div>
         <div className="flex shrink-0 justify-center">{tb && tier < 6 && <ClockPill format={tb.clockFormat} seconds={tb.clockSeconds} date={tb.clockDate && tier < 2} />}</div>
         <div className="flex items-center justify-end gap-1.5">
@@ -303,7 +285,6 @@ export function App() {
             onNewCrew={(groupId) => (setNewCrewGroup(groupId), setNewCrew(true))}
             actions={projectMenu}
             waiting={waitingCrews}
-            onShowTerminal={() => setMode('terminal')}
             footer={
               <>
                 <Tooltip>
@@ -334,9 +315,8 @@ export function App() {
                   </TooltipTrigger>
                   <TooltipContent>Console (Ctrl+J)</TooltipContent>
                 </Tooltip>
-                <ServersPopover onOpened={(id) => (setCrewId(id), setPage('dashboard'), setMode('terminal'))} />
-                <LearningBadge onOpen={() => setMode('memory')} />
-                <ProviderLimitBadge onOpen={() => (setPage('dashboard'), setMode('terminal'), setUsageOpen(true))} />
+                <ServersPopover onOpened={(id) => (setCrewId(id), setPage('dashboard'))} />
+                <ProviderLimitBadge onOpen={() => (setPage('dashboard'), setUsageOpen(true))} />
                 <GitChip crewId={crewId} compact onOpen={() => setGitOpen(true)} />
               </>
             }
@@ -349,25 +329,17 @@ export function App() {
           ) : crews.data && !playgroundSeen && crews.data.every((c) => c.kind === 'playground') ? (
             <div className="bg-card min-h-0 flex-1 m-1.5 overflow-hidden rounded-2xl border shadow-xs dark:shadow-none"><Welcome onNewCrew={() => setNewCrew(true)} /></div>
           ) : (
-            <>
-              {mode === 'terminal' ? (
-                <div className="min-h-0 flex-1">
-                  {crewId != null && (
-                    <TerminalView
-                      crewId={crewId}
-                      scratch={projectScratch}
-                      active={terminals.active}
-                      onCloseScratch={closeTile.request}
-                      onStart={(kind) => crew && void terminals.openTab(crew, kind)}
-                    />
-                  )}
-                </div>
-              ) : (
-                <div className="bg-card min-h-0 flex-1 m-1.5 rounded-2xl border shadow-xs dark:shadow-none overflow-hidden">
-                  <MemoryPage crewId={crewId} />
-                </div>
+            <div className="min-h-0 flex-1">
+              {crewId != null && (
+                <TerminalView
+                  crewId={crewId}
+                  scratch={projectScratch}
+                  active={terminals.active}
+                  onCloseScratch={closeTile.request}
+                  onStart={(kind) => crew && void terminals.openTab(crew, kind)}
+                />
               )}
-            </>
+            </div>
           )}
           {consoleOpen && (
             <ConsoleDrawer
@@ -414,7 +386,7 @@ export function App() {
         <GitChangesDialog
           crew={changesTarget}
           onClose={() => setChangesTarget(null)}
-          onOpenPage={(c) => (setCrewId(c.id), setPage('dashboard'), setMode('terminal'), setGitOpen(true))}
+          onOpenPage={(c) => (setCrewId(c.id), setPage('dashboard'), setGitOpen(true))}
         />
       )}
       {crewId != null && <UsageDialog crewId={crewId} open={usageOpen} onOpenChange={setUsageOpen} />}

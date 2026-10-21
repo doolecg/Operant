@@ -151,7 +151,6 @@ try {
   crewB = (await inv('crews:create', { name: 'beta', folder: beta })).id
   await page.locator('[data-crew-row]').getByText('alpha', { exact: true }).click({ position: { x: 4, y: 4 } })
   await page.getByRole('heading', { name: 'alpha', level: 1 }).waitFor()
-  await page.getByRole('group', { name: 'Dashboard mode' }).getByRole('button', { name: 'Terminal', exact: true }).click()
   const uiStart = page.url()
 
   // ---------------- No AI: basic browsing ----------------
@@ -569,7 +568,6 @@ try {
     await launch()
     await page.locator('[data-crew-row]').getByText('alpha', { exact: true }).waitFor()
     await page.locator('[data-crew-row]').getByText('alpha', { exact: true }).click({ position: { x: 4, y: 4 } })
-    await page.getByRole('group', { name: 'Dashboard mode' }).getByRole('button', { name: 'Terminal', exact: true }).click()
     const open = async (name, crew, who) => {
       const row = page.locator('[data-crew-row]', { hasText: name })
       await row.getByText(name, { exact: true }).hover()

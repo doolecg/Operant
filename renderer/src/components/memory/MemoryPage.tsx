@@ -92,7 +92,7 @@ function MemoryTab({ crewId, search }: { crewId: number | null; search: string }
 }
 
 // Everything Operant remembers, by store, with the learning status on top.
-export function MemoryPage({ crewId }: { crewId: number | null }) {
+export function MemoryPage({ crewId, embedded = false }: { crewId: number | null; embedded?: boolean }) {
   const crews = useCrews()
   const [tab, setTab] = useState<Tab>('lessons')
   const [search, setSearch] = useState('')
@@ -114,13 +114,17 @@ export function MemoryPage({ crewId }: { crewId: number | null }) {
   const readCrew = filterCrew ?? crewId
   const pendingDrafts = (drafts.data ?? []).filter((d) => d.status === 'pending').length
 
+  // Embedded in a Settings page the page already scrolls and has its own heading.
+  const Shell = embedded ? 'div' : ScrollArea
   return (
-    <ScrollArea className="h-full" aria-label="Memory Manager">
-      <div className="mx-auto max-w-[96rem] space-y-5 p-6">
-        <div>
-          <h2 className="text-xl font-semibold">Memory</h2>
-          <p className="text-muted-foreground text-sm">Everything Operant has learned from your sessions, in each place it is kept.</p>
-        </div>
+    <Shell className={embedded ? undefined : 'h-full'} aria-label="Memory Manager">
+      <div className={embedded ? 'space-y-5' : 'mx-auto max-w-[96rem] space-y-5 p-6'}>
+        {!embedded && (
+          <div>
+            <h2 className="text-xl font-semibold">Memory</h2>
+            <p className="text-muted-foreground text-sm">Everything Operant has learned from your sessions, in each place it is kept.</p>
+          </div>
+        )}
 
         <LearningStatusPanel crewId={crewId} onShowDrafts={() => setTab('drafts')} />
 
@@ -168,6 +172,6 @@ export function MemoryPage({ crewId }: { crewId: number | null }) {
           <TabsContent value="drafts">{tab === 'drafts' && <DraftsList crewId={filterCrew ?? undefined} crews={crews.data ?? []} />}</TabsContent>
         </Tabs>
       </div>
-    </ScrollArea>
+    </Shell>
   )
 }

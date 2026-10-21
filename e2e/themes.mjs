@@ -49,7 +49,6 @@ try {
     await o.invoke('crews:create', { name: 'shop', folder })
   }, project)
   await page.locator('[data-crew-row]').getByText('shop', { exact: true }).click({ position: { x: 4, y: 4 } })
-  await page.getByRole('group', { name: 'Dashboard mode' }).getByRole('button', { name: 'Terminal', exact: true }).click()
   await page.keyboard.press('Alt+Shift+T')
   await page.locator('.xterm').first().waitFor()
 

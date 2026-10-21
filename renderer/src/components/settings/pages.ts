@@ -13,6 +13,7 @@ export const SETTINGS_SECTION_IDS = [
   'budgets',
   'presets',
   'teams',
+  'lessons',
   'learning',
   'memory',
   'aux',
@@ -102,6 +103,13 @@ export const SETTINGS_CATEGORIES: SettingsCategory[] = [
   {
     label: 'Memory & learning',
     pages: [
+      {
+        id: 'lessons',
+        label: 'Lessons',
+        description: 'Everything Operant has learned from your sessions, in each place it is kept: lessons, skill drafts, code notes and personal memory.',
+        keywords: 'lessons drafts skills learned memory manager review approve reject codegraph notes personal hindsight',
+        subsections: [{ id: 'lessons', label: 'Lessons and drafts' }],
+      },
       {
         id: 'memory',
         label: 'Memory',

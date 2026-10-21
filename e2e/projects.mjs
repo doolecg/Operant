@@ -157,8 +157,6 @@ try {
   await page.getByTestId('git-page').waitFor({ state: 'detached' })
 
   // Terminal drawer: a shell in the project folder, a second tab, closing tabs.
-  // In the Terminal view the project's shells are tiles, so the drawer is checked from the Memory view.
-  await page.getByRole('group', { name: 'Dashboard mode' }).getByRole('button', { name: 'Memory', exact: true }).click()
   await row('shop').click({ button: 'right' })
   await page.getByRole('menuitem', { name: 'New shell here' }).click()
   const drawer = page.getByTestId('terminal-drawer')

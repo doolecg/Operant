@@ -111,7 +111,6 @@ try {
 
   await page.locator('[data-crew-row]').getByText('shop', { exact: true }).click({ position: { x: 4, y: 4 } })
   await page.getByRole('heading', { name: 'shop', level: 1 }).waitFor()
-  await page.getByRole('group', { name: 'Dashboard mode' }).getByRole('button', { name: 'Terminal', exact: true }).click()
   // Usage opens as a popout from the sidebar footer's badge; Esc closes it.
   const usageModal = () => page.getByRole('dialog', { name: 'Usage' })
   await page.getByTestId('sidebar-footer').getByRole('button', { name: /^Provider limits: / }).click()

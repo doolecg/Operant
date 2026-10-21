@@ -5,9 +5,11 @@ import { useLearnStatus } from '@/lib/queries'
 import { cn } from '@/lib/utils'
 import { STORE_LABEL } from './ui'
 
-// Header badge for the learning loop: grey when off, amber when a store is down, the last run failed or something waits
-// for review, otherwise green. Opens the Memory page.
-export function LearningBadge({ onOpen }: { onOpen: () => void }) {
+export const OPEN_SETTINGS_EVENT = 'operant:open-settings'
+
+// The one small memory button, next to the context readout: grey when learning is off, amber when a store is down, the
+// last run failed or something waits for review, otherwise green. Opens the Lessons page in Settings.
+export function LearningBadge() {
   const status = useLearnStatus()
   const s = status.data
   if (!s) return null
@@ -28,12 +30,12 @@ export function LearningBadge({ onOpen }: { onOpen: () => void }) {
         <Button
           variant="ghost"
           size="sm"
-          className={cn('gap-1 px-2', tone === 'ok' && 'text-emerald-400', tone === 'warn' && 'text-amber-400', tone === 'off' && 'text-muted-foreground')}
+          className={cn('h-5 gap-0.5 px-1', tone === 'ok' && 'text-emerald-400', tone === 'warn' && 'text-amber-400', tone === 'off' && 'text-muted-foreground')}
           aria-label={`Learning health: ${text}`}
-          onClick={onOpen}
+          onClick={() => window.dispatchEvent(new CustomEvent(OPEN_SETTINGS_EVENT, { detail: 'lessons' }))}
         >
-          <Brain className="size-4" />
-          {waiting > 0 && <span className="text-xs">{waiting}</span>}
+          <Brain className="size-3.5" />
+          {waiting > 0 && <span className="text-[11px]">{waiting}</span>}
         </Button>
       </TooltipTrigger>
       <TooltipContent>{text}</TooltipContent>

@@ -40,7 +40,6 @@ try {
   await inv('settings:set', { tiles: { layout: 'dwindle', gaps: 6 } })
   await page.locator('[data-crew-row]').getByText('tiles', { exact: true }).click({ position: { x: 4, y: 4 } })
   await page.getByRole('heading', { name: 'tiles', level: 1 }).waitFor()
-  await page.getByRole('group', { name: 'Dashboard mode' }).getByRole('button', { name: 'Terminal', exact: true }).click()
 
   // No terminals yet: an empty note, no tile surface.
   await page.getByText('No terminals open').waitFor()

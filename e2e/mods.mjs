@@ -39,7 +39,6 @@ try {
   await inv('settings:set', { mainCli: 'claude', mods: { enabled: true, mods: { subagents: true } }, infoBar: true })
   await page.locator('[data-crew-row]').getByText('mods', { exact: true }).click({ position: { x: 4, y: 4 } })
   await page.getByRole('heading', { name: 'mods', level: 1 }).waitFor()
-  await page.getByRole('group', { name: 'Dashboard mode' }).getByRole('button', { name: 'Terminal', exact: true }).click()
 
   // A Claude tile: it opens in the Chat view, with the Agents panel beside it.
   await page.locator('[data-crew-row]').getByText('mods', { exact: true }).click({ button: 'right', position: { x: 4, y: 4 } })

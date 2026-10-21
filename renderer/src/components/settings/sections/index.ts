@@ -11,6 +11,7 @@ import { HindsightSection } from "./HindsightSection";
 import { InstallSection } from "./InstallSection";
 import { ImportExportSection } from "./ImportExportSection";
 import { LearningSection } from "./LearningSection";
+import { LessonsSection } from "./LessonsSection";
 import { McpSection } from "./McpSection";
 import { MemorySection } from "./MemorySection";
 import { ModsSection } from "./ModsSection";
@@ -39,6 +40,7 @@ export const SECTION_COMPONENTS: Record<SettingsSectionId, ComponentType> = {
   budgets: BudgetsSection,
   presets: PresetsSection,
   teams: TeamsSection,
+  lessons: LessonsSection,
   learning: LearningSection,
   memory: MemorySection,
   aux: AuxSection,

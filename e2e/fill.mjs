@@ -109,7 +109,6 @@ try {
   await inv('crews:create', { name: 'fill', folder: project })
   await inv('settings:set', { mainCli: 'claude' })
   await page.locator('[data-crew-row]').getByText('fill', { exact: true }).click({ position: { x: 4, y: 4 } })
-  await page.getByRole('group', { name: 'Dashboard mode' }).getByRole('button', { name: 'Terminal', exact: true }).click()
   await page.locator('[data-crew-row]').getByText('fill', { exact: true }).click({ button: 'right', position: { x: 4, y: 4 } })
   await page.getByRole('menuitem', { name: 'New shell here' }).click()
   await page.locator('.xterm').first().waitFor({ timeout: 20_000 })

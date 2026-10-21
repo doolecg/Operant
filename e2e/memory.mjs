@@ -64,7 +64,6 @@ async function until(label, fn, timeout = 60_000) {
   }
   throw new Error(`timed out waiting for ${label}${last instanceof Error ? `: ${last.message}` : ''}`)
 }
-const mode = (label) => page.getByRole('group', { name: 'Dashboard mode' }).getByRole('button', { name: label, exact: true })
 const pick = async (label, option) => {
   await page.getByRole('combobox', { name: label }).click()
   await page.getByRole('option', { name: option, exact: true }).click()
@@ -235,9 +234,7 @@ try {
 
   await step('Memory page lists the lessons with filters and search', async () => {
     await page.keyboard.press('Control+,')
-    await mode('Terminal').waitFor()
-    await mode('Memory').click()
-    await page.getByRole('heading', { name: 'Memory', level: 2 }).waitFor()
+    await page.getByRole('button', { name: 'Lessons', exact: true }).click()
     await lessonRow(ids.convention).waitFor()
     assert.equal(await page.locator('[data-lesson]').count(), 4)
     await page.getByLabel('Search memory').fill('vitest')
@@ -371,7 +368,6 @@ try {
   })
 
   await step('header badge shows learning health and opens the Memory page', async () => {
-    await mode('Terminal').click()
     const badge = page.getByRole('button', { name: /^Learning health:/ })
     await badge.waitFor()
     // Hindsight is opt-in: switched on here, against the unreachable remote URL saved above, so it shows as down.

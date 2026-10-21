@@ -62,7 +62,6 @@ try {
   await inv('settings:set', { mainCli: 'claude', browser: { homeUrl: `${base}/`, autonomy: 'full' } })
   const crew = await inv('crews:create', { name: 'alpha', folder: cwd })
   await page.locator('[data-crew-row]').getByText('alpha', { exact: true }).click({ position: { x: 4, y: 4 } })
-  await page.getByRole('group', { name: 'Dashboard mode' }).getByRole('button', { name: 'Terminal', exact: true }).click()
   const row = page.locator('[data-crew-row]', { hasText: 'alpha' })
   await row.getByText('alpha', { exact: true }).hover()
   await row.getByRole('button', { name: 'Open browser in alpha' }).click()

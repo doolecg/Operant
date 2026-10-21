@@ -1,3 +1,4 @@
+import { LearningBadge } from '@/components/memory/LearningBadge'
 import { useMemo } from 'react'
 import type { ChatState, SubagentItem } from '@shared/claude-chat'
 import { runningSubagentCount } from '@shared/mods'
@@ -62,6 +63,7 @@ export function InfoRow({ state }: { state: ChatState }) {
             {kTokens(used)}/{kTokens(max)}
           </span>
         )}
+        <LearningBadge />
       </span>
       {usage.fiveHour !== null && <Figure name="5h" pct={usage.fiveHour} />}
       {usage.sevenDay !== null && <Figure name="7d" pct={usage.sevenDay} />}
