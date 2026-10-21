@@ -90,6 +90,16 @@ export function useChatWaiting(scratchId: number | null): boolean {
   })
 }
 
+// True while any of these Claude tiles is in the middle of a turn.
+export function useAnyChatWorking(ids: number[]): boolean {
+  const key = ids.join(',')
+  const subscribe = useCallback((l: () => void) => {
+    const offs = ids.map((id) => subscribeTo(id, l))
+    return () => offs.forEach((off) => off())
+  }, [key])
+  return useSyncExternalStore(subscribe, () => ids.some((id) => entries.get(id)?.state?.turn.phase === 'working'))
+}
+
 // "Edit from here" puts the rewound message back into the tile's chat box: the Composer registers here.
 const composers = new Map<number, (m: ChatSendInput) => void>()
 

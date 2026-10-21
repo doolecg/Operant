@@ -219,6 +219,17 @@ describe('Operant: Chat view tiles', () => {
     expect(() => op.handlers['chat:setEffort'](t.id, 'galaxy')).toThrow()
   })
 
+  it('a Claude process that exits after the database closed (quit during a turn) does not throw', () => {
+    const t = makeTile()
+    op.startScratch(t.id)
+    // As after Store.close(): reads throw. (The real close stays for afterEach.)
+    vi.spyOn(store, 'isOpen', 'get').mockReturnValue(false)
+    vi.spyOn(store, 'getScratch').mockImplementation(() => {
+      throw new Error('database is not open')
+    })
+    expect(() => lastChild().child.emit('close', 0, null)).not.toThrow()
+  })
+
   it('closing the tile learns from it at once, without asking, and only once', async () => {
     const t = makeTile()
     op.startScratch(t.id)

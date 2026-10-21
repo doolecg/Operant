@@ -9,7 +9,7 @@ import { cn } from '@/lib/utils'
 import { AgentThread } from './AgentThread'
 import { Composer } from './Composer'
 import { HistoryStrip } from './HistoryStrip'
-import { FactoryBar, FactoryRail } from './FactoryBox'
+import { FactoryBar, FactoryRail, type FactoryWorker } from './FactoryBox'
 import { StageBar, StageRail } from './StageBox'
 import { ConversationList } from './ConversationList'
 import { StatusLine } from './StatusLine'
@@ -37,11 +37,13 @@ interface Props {
   crewId?: number
   engineering?: boolean
   factory?: boolean
+  // The project's Claude tiles and the preset each runs, for the Factory levels' pixel bars.
+  workers?: FactoryWorker[]
 }
 
 // The Chat view of a Claude tile: the conversation (Claude's text on the background, owner messages as soft bubbles,
 // tools as quiet rows, one bordered card per prompt), the running status line and the composer.
-export function ChatView({ scratchId, launchEffort, tileModel, onTerminal, projectName = null, threadTitle = 'Chat', crewId, engineering = false, factory = false }: Props) {
+export function ChatView({ scratchId, launchEffort, tileModel, onTerminal, projectName = null, threadTitle = 'Chat', crewId, engineering = false, factory = false, workers }: Props) {
   const state = useChatState(scratchId)
   const caps = useCapabilities().data
   const scroller = useRef<HTMLDivElement>(null)
@@ -170,7 +172,7 @@ export function ChatView({ scratchId, launchEffort, tileModel, onTerminal, proje
   return (
     <div className={cn('@container relative flex h-full min-h-0 flex-col', returning.current && 'm-drill-out')} onKeyDown={onKeyDown} data-chat="view">
       <StageBar crewId={crewId ?? null} on={engineering} />
-      <FactoryBar crewId={crewId ?? null} on={factory} />
+      <FactoryBar crewId={crewId ?? null} on={factory} workers={workers} />
       <div className="relative min-h-0 flex-1">
         <div ref={scroller} onScroll={onScroll} onWheel={leaveGlide} onTouchStart={leaveGlide} onPointerDown={leaveGlide} role="log" aria-live="polite" aria-relevant="additions" aria-label="Conversation" className={cn('h-full overflow-y-auto', strip && '[scrollbar-width:none] [&::-webkit-scrollbar]:hidden')}>
           <div ref={inner} className="mx-auto flex max-w-[720px] flex-col gap-3.5 px-5 pt-7 pb-4">
@@ -203,7 +205,7 @@ export function ChatView({ scratchId, launchEffort, tileModel, onTerminal, proje
         </div>
         <aside aria-label="Chat navigation" className="pointer-events-none absolute top-3 right-1 bottom-3 z-10 flex flex-col gap-4 @[900px]:right-auto @[900px]:left-4 @[900px]:w-[200px] [&>*]:pointer-events-auto">
           <StageRail crewId={crewId ?? null} on={engineering} />
-          <FactoryRail crewId={crewId ?? null} on={factory} />
+          <FactoryRail crewId={crewId ?? null} on={factory} workers={workers} />
           {strip && <HistoryStrip scroller={scroller} lines={lines} />}
         </aside>
         {!atBottom && (

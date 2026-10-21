@@ -80,7 +80,7 @@ export function TerminalView({ crewId, scratch, active, onCloseScratch, onStart 
     .join(',')
   const views = useQuery({
     queryKey: ['scratchViews', crewId, claudeIds],
-    queryFn: async () => Object.fromEntries((await call('scratch:list', crewId)).map((s) => [s.id, { view: s.view, effort: s.effort, model: s.model }])),
+    queryFn: async () => Object.fromEntries((await call('scratch:list', crewId)).map((s) => [s.id, { view: s.view, effort: s.effort, model: s.model, presetId: s.presetId }])),
     enabled: claudeIds !== '',
   }).data
   const viewOf = (t: ScratchTileInfo): ScratchView | undefined => (t.scratch.kind === 'claude' ? views?.[t.scratch.scratchId]?.view : 'terminal')
@@ -103,7 +103,7 @@ export function TerminalView({ crewId, scratch, active, onCloseScratch, onStart 
     if (t.scratch.kind === 'claude' && view === 'chat')
       return (
         <div className="relative h-full min-h-0">
-          <ChatView scratchId={t.scratch.scratchId} launchEffort={effortOf(t)} tileModel={views?.[t.scratch.scratchId]?.model ?? ''} onTerminal={() => void switchView(t, 'terminal')} projectName={crew?.name} threadTitle={t.title} crewId={crewId} engineering={crew?.engineering ?? false} factory={crew?.factory ?? false} />
+          <ChatView scratchId={t.scratch.scratchId} launchEffort={effortOf(t)} tileModel={views?.[t.scratch.scratchId]?.model ?? ''} onTerminal={() => void switchView(t, 'terminal')} projectName={crew?.name} threadTitle={t.title} crewId={crewId} engineering={crew?.engineering ?? false} factory={crew?.factory ?? false} workers={Object.entries(views ?? {}).map(([id, v]) => ({ id: Number(id), presetId: v.presetId }))} />
         </div>
       )
     return (

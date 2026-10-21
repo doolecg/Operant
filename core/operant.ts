@@ -1823,6 +1823,7 @@ export class Operant extends EventEmitter<PushEvents> {
   }
 
   private onScratchExit(scratchId: number, exitCode: number): void {
+    if (!this.store.isOpen) return
     this.detachScratch(scratchId)
     this.cli?.revokeToken(scratchId)
     this.claudeAgents?.end(scratchId)
@@ -1907,6 +1908,8 @@ export class Operant extends EventEmitter<PushEvents> {
   }
 
   private onChatExit(scratchId: number, info: { code: number | null; expected: boolean }): void {
+    // A process that ends during quit finds the database already closed.
+    if (!this.store.isOpen) return
     this.detachScratch(scratchId)
     this.cli?.revokeToken(scratchId)
     this.claudeAgents?.end(scratchId)
