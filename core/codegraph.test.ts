@@ -65,3 +65,42 @@ describe('globalCodegraph', () => {
     expect(status.error).toBe(fresh.CODEGRAPH_MISSING)
   })
 })
+
+describe('indexing off the main thread', () => {
+  let dir = ''
+  afterEach(() => dir && rmSync(dir, { recursive: true, force: true }))
+
+  it('does not block the event loop while another process holds the database write lock, and reports the lock', async () => {
+    dir = mkdtempSync(join(tmpdir(), 'operant-cg-lock-'))
+    writeFileSync(join(dir, 'a.ts'), 'export const a = 1\n')
+    const idx = new CrewIndexes()
+    await idx.index(dir)
+    const { DatabaseSync } = await import('node:sqlite')
+    const holder = new DatabaseSync(join(dir, '.codegraph', 'codegraph.db'))
+    holder.exec('BEGIN IMMEDIATE')
+    writeFileSync(join(dir, 'b.ts'), 'export const b = 1\n')
+    let worst = 0
+    let last = Date.now()
+    const timer = setInterval(() => {
+      const now = Date.now()
+      worst = Math.max(worst, now - last - 50)
+      last = now
+    }, 50)
+    try {
+      await expect(idx.index(dir)).rejects.toThrow(/locked/i)
+    } finally {
+      clearInterval(timer)
+      holder.exec('ROLLBACK')
+      holder.close()
+    }
+    expect(worst).toBeLessThan(1000)
+    expect(idx.status(dir).indexing).toBe(false)
+  }, 60_000)
+
+  it('stops a run that takes too long', async () => {
+    dir = mkdtempSync(join(tmpdir(), 'operant-cg-slow-'))
+    writeFileSync(join(dir, 'a.ts'), 'export const a = 1\n')
+    await expect(new CrewIndexes().index(dir, 1)).rejects.toThrow(/stopped/)
+    expect(new CrewIndexes().status(dir).indexing).toBe(false)
+  }, 60_000)
+})

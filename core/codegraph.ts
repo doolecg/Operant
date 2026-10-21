@@ -1,6 +1,7 @@
 import { existsSync } from 'node:fs'
 import { createRequire } from 'node:module'
 import { join } from 'node:path'
+import { Worker } from 'node:worker_threads'
 import type { CodeGraph as CodeGraphClass } from '@colbymchenry/codegraph'
 import type { IndexStatus } from '../shared/types'
 import { runHidden, type RunResult } from './proc'
@@ -21,6 +22,48 @@ function load(libraryPath?: string | null): CodeGraphStatic {
   const req = createRequire(import.meta.url ?? __filename)
   loaded = (req(libraryPath ?? '@colbymchenry/codegraph') as { CodeGraph: CodeGraphStatic }).CodeGraph
   return loaded
+}
+
+// Indexing and rebuilding write to the database, and SQLite waits (about 5 s per try) when another process holds a write lock
+// on it (a CodeGraph server or watcher of an agent session). Done on the main thread that wait froze the whole window, so
+// both run in a worker thread; a run that takes too long is stopped.
+export const INDEX_TIMEOUT_MS = 10 * 60_000
+const WORKER = `
+const { parentPort, workerData: w } = require('node:worker_threads')
+const run = async () => {
+  const { CodeGraph } = require(w.lib)
+  if (w.op === 'rebuild') {
+    const g = await CodeGraph.recreate(w.folder)
+    try { await g.indexAll() } finally { g.close() }
+    return
+  }
+  const g = CodeGraph.isInitialized(w.folder) ? await CodeGraph.open(w.folder) : await CodeGraph.init(w.folder)
+  try { await (CodeGraph.isInitialized(w.folder) && g.getStats().fileCount > 0 ? g.sync() : g.indexAll()) } finally { g.close() }
+}
+run().then(() => parentPort.postMessage({ ok: true }), (e) => parentPort.postMessage({ ok: false, error: e && e.message ? e.message : String(e) }))
+`
+
+function libraryFile(libraryPath?: string | null): string {
+  if (libraryPath === null) throw new Error(CODEGRAPH_MISSING)
+  return createRequire(import.meta.url ?? __filename).resolve(libraryPath ?? '@colbymchenry/codegraph')
+}
+
+function runInWorker(op: 'index' | 'rebuild', folder: string, lib: string, timeoutMs: number): Promise<void> {
+  return new Promise((resolve, reject) => {
+    const worker = new Worker(WORKER, { eval: true, workerData: { op, folder, lib } })
+    const done = (err?: Error) => {
+      clearTimeout(timer)
+      void worker.terminate()
+      if (err) reject(err)
+      else resolve()
+    }
+    const timer = setTimeout(() => done(new Error(`Indexing took longer than ${Math.round(timeoutMs / 60_000)} minutes and was stopped.`)), timeoutMs)
+    worker.once('message', (m: { ok: boolean; error?: string }) =>
+      done(m.ok ? undefined : new Error(/locked/i.test(m.error ?? '') ? 'The CodeGraph index is locked by another program (an agent session or a CodeGraph server). Try again in a moment.' : (m.error ?? 'Indexing failed'))),
+    )
+    worker.once('error', (e) => done(e instanceof Error ? e : new Error(String(e))))
+    worker.once('exit', (code) => code !== 0 && done(new Error(`The indexer stopped (exit ${code}).`)))
+  })
 }
 
 // The SDK of a global `npm i -g @colbymchenry/codegraph`. npm's global folder is asked for once at startup; after that
@@ -99,17 +142,11 @@ export class CrewIndexes {
     }
   }
 
-  async index(folder: string): Promise<IndexStatus> {
+  async index(folder: string, timeoutMs = INDEX_TIMEOUT_MS): Promise<IndexStatus> {
     if (this.indexing.has(folder)) return this.status(folder)
     this.indexing.add(folder)
     try {
-      const CodeGraph = load(this.libraryPath)
-      const g = CodeGraph.isInitialized(folder) ? await CodeGraph.open(folder) : await CodeGraph.init(folder)
-      try {
-        await (CodeGraph.isInitialized(folder) && g.getStats().fileCount > 0 ? g.sync() : g.indexAll())
-      } finally {
-        g.close()
-      }
+      await runInWorker('index', folder, libraryFile(this.libraryPath), timeoutMs)
     } finally {
       this.indexing.delete(folder)
     }
@@ -117,17 +154,11 @@ export class CrewIndexes {
   }
 
   // A forced full rebuild: the existing index is discarded and every file is indexed again. Runs only when asked.
-  async rebuild(folder: string): Promise<IndexStatus> {
+  async rebuild(folder: string, timeoutMs = INDEX_TIMEOUT_MS): Promise<IndexStatus> {
     if (this.indexing.has(folder)) throw new Error('This project is already being indexed')
     this.indexing.add(folder)
     try {
-      const CodeGraph = load(this.libraryPath)
-      const g = await CodeGraph.recreate(folder)
-      try {
-        await g.indexAll()
-      } finally {
-        g.close()
-      }
+      await runInWorker('rebuild', folder, libraryFile(this.libraryPath), timeoutMs)
     } finally {
       this.indexing.delete(folder)
     }
