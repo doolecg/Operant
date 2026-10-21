@@ -3,7 +3,7 @@ import { Loader2 } from 'lucide-react'
 import { firstStartItems, shouldShowSetup, statusLabel, type InstallId } from '@shared/install'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
-import { useInstallRun, useInstallStatus, useSaveSettings, useSettings } from '@/lib/queries'
+import { useAppInfo, useInstallRun, useInstallStatus, useSaveSettings, useSettings } from '@/lib/queries'
 
 // Offered once, at the first start: the optional tools. Nothing is ticked, and nothing runs until "Install selected".
 export function SetupDialog() {
@@ -16,6 +16,7 @@ export function SetupDialog() {
   const [results, setResults] = useState<Partial<Record<InstallId, string>>>({})
   const [finished, setFinished] = useState(false)
   const items = firstStartItems(settings.data?.mainCli, status.data)
+  const platform = useAppInfo().data?.platform ?? 'win32'
 
   const open = shouldShowSetup(settings.data?.setupDone) && status.data !== undefined
   const busy = running !== null
@@ -85,6 +86,15 @@ export function SetupDialog() {
             )
           })}
         </ul>
+        <div className="text-muted-foreground mx-6 space-y-1 rounded-md bg-muted p-3 text-xs" role="note" aria-label="What Operant runs">
+          <p>Most installs run a package manager command (npm, winget or pip) that installs the tool on this computer, outside Operant. The dictation model downloads into Operant itself.</p>
+          {platform === 'win32' && (
+            <p>
+              On Windows Operant also runs its own bundled PowerShell scripts with <code>-ExecutionPolicy Bypass</code>, for media controls and updates.
+              This applies only to those scripts and does not change your execution policy.
+            </p>
+          )}
+        </div>
         <DialogFooter>
           {finished ? (
             <Button onClick={finish}>Done</Button>
