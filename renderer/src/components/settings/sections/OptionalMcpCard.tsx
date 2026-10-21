@@ -41,6 +41,8 @@ interface McpRowProps {
   badge: ReactNode
   description: string
   install: ReactNode
+  // Where the program is and the way to look for it or pick it.
+  locate?: ReactNode
   error?: string | undefined
 }
 
@@ -154,7 +156,12 @@ export function OptionalMcpPanel({ crewId, e, row }: { crewId: number | null; e:
         install={row.install}
         add={addButton}
         remove={removeButton}
-        below={form}
+        below={
+          <>
+            {row.locate}
+            {form}
+          </>
+        }
       />
     )
   }

@@ -1,13 +1,17 @@
 import { useState, type ReactNode } from 'react'
 import { Loader2 } from 'lucide-react'
-import { installItems, GIT_MCP_ROW_NAME, MCP_RUNTIME_INSTALL, canRunInstall, commandText, installItem, statusLabel, type InstallId } from '@shared/install'
+import { installItems, GIT_MCP_ROW_NAME, MCP_RUNTIME_INSTALL, PROGRAM_IDS, canRunInstall, commandText, installItem, statusLabel, type InstallId, type InstallStatusItem } from '@shared/install'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { ConfirmDialog } from '@/components/ui/confirm-dialog'
+import { LocateActions } from '../LocateActions'
 import { OptionalMcpPanel, STATUS_LABEL } from './OptionalMcpCard'
 import { ToolRow } from './ToolRow'
 import { useAppInfo, useInstallRun, useInstallStatus, useOptionalMcp, useSaveSettings, useSettings } from '@/lib/queries'
+
+// "Location: <path>" for a tool that is there, and whether the owner chose it.
+const locationText = (s: InstallStatusItem | undefined) => (s?.path ? `Location: ${s.path}${s.custom ? ' (chosen by you)' : ''}` : null)
 
 export function InstallSection() {
   const status = useInstallStatus()
@@ -43,17 +47,18 @@ export function InstallSection() {
     <>
       <Card>
         <CardHeader>
-          <CardTitle className="text-base">Tools</CardTitle>
+          <CardTitle className="text-base">Programs and runtimes</CardTitle>
           <CardDescription>
             Nothing here is installed until you click Install and confirm the command. A feature whose tool is missing stays hidden.
           </CardDescription>
         </CardHeader>
         <CardContent className="divide-y">
-          {installItems(settings.data?.mainCli, status.data).map((it) => {
+          {installItems(settings.data?.mainCli, status.data).filter((it) => it.id !== 'superpowers').map((it) => {
             const s = status.data?.find((x) => x.id === it.id)
             const mcpId = it.id === 'codegraph' || it.id === 'playwright' ? it.id : null
             const entry = mcpId ? mcpOf(mcpId) : undefined
             const installBtn = installButton(it.id, `Install ${it.name}`, s?.state === 'installed')
+            const locate = s && PROGRAM_IDS.includes(it.id) ? <LocateActions item={s} /> : undefined
             const badge = <Badge variant={s?.state === 'installed' ? 'secondary' : 'outline'}>{status.isPending ? 'Checking' : statusLabel(s)}</Badge>
             if (entry) {
               return (
@@ -72,12 +77,18 @@ export function InstallSection() {
                     ),
                     description: it.enables,
                     install: installBtn,
+                    locate,
                     error: errors[it.id],
                   }}
                 />
               )
             }
-            const detail = [it.note, it.id === 'claude' ? `Install: ${commandText(it.id, platform)}` : null].filter(Boolean).join(' ')
+            const lines = [it.note, it.id === 'claude' ? `Install: ${commandText(it.id, platform)}` : null, locationText(s)].filter(Boolean)
+            const detail = lines.map((l) => (
+              <span key={l} className="block">
+                {l}
+              </span>
+            ))
             return (
               <ToolRow
                 key={it.id}
@@ -86,9 +97,10 @@ export function InstallSection() {
                 badge={badge}
                 tag={it.optional ? 'optional' : 'required'}
                 description={it.enables}
-                detail={detail || undefined}
+                detail={lines.length ? detail : undefined}
                 error={errors[it.id]}
                 install={installBtn}
+                below={locate}
               />
             )
           })}

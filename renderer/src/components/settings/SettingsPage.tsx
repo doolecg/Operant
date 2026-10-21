@@ -21,7 +21,7 @@ const subsectionHit = (p: Page, q: string) => (q && !p.label.toLowerCase().inclu
 export function SettingsPage({ initialSection, onClose }: { initialSection?: string; onClose: () => void }) {
   const settings = useSettings()
   const info = useAppInfo()
-  const hidden = hiddenSections(useInstallStatus().data, settings.data?.mainCli)
+  const hidden = hiddenSections(useInstallStatus().data)
   const [target, setTarget] = useState<Target>(() => resolveSettingsTarget(initialSection) ?? { page: SETTINGS_PAGES[0]! })
   const [query, setQuery] = useState('')
   const q = query.trim().toLowerCase()

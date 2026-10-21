@@ -1,7 +1,7 @@
 import { EventEmitter } from 'node:events'
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
-import { dirname, isAbsolute, join } from 'node:path'
+import { dirname, isAbsolute, join, parse } from 'node:path'
 import type { CoreChannel, IpcApi, IpcEvents } from '../shared/ipc'
 import { mergeSettings, sanitizeSettings, type Settings, type SettingsPatch } from '../shared/settings'
 import type {
@@ -72,6 +72,8 @@ import { ClaudeAgents } from './claude-agents'
 import { hooksConfig, type ModsPaths } from './claude-events'
 import { packStatus, resetPack } from './engineering'
 import { readTask, watchTasks } from './task-stage'
+import { applyToolPaths, findInDefaults, PROGRAM_BINARY } from './tool-locations'
+import type { InstallId, InstallStatusItem } from '../shared/install'
 import { buildPreamble } from '../shared/engineering'
 import { openCodeDbPath } from './opencode-usage'
 import { enabledMods, type CapabilityReport, type ClaudeTileState } from '../shared/mods'
@@ -369,6 +371,7 @@ export class Operant extends EventEmitter<PushEvents> {
           },
         })
       : null
+    applyToolPaths(this.toolPaths())
     this.prober = new CapabilityProber(opts.capabilityProbe ?? systemProbeDeps(openCodeDbPath()))
     this.scheduler = opts.scheduler ?? realScheduler
     this.settings = sanitizeSettings(store.getJson('settings'))
@@ -517,6 +520,7 @@ export class Operant extends EventEmitter<PushEvents> {
       ...this.engineeringHandlers(),
       ...this.opsHandlers(),
       ...this.installHandlers(),
+      ...this.toolsHandlers(),
     }
     // Every refusal leaves core as an OperantError with a code.
     const wrapped: Record<string, (...args: unknown[]) => unknown> = {}
@@ -1117,9 +1121,71 @@ export class Operant extends EventEmitter<PushEvents> {
     }
   }
 
+  private toolPaths(): Record<string, string> {
+    const v = this.store.getJson('toolPaths')
+    return v && typeof v === 'object' && !Array.isArray(v) ? (v as Record<string, string>) : {}
+  }
+
+  // Applies the owner's program paths to PATH and makes the next capability read probe again.
+  private setToolPaths(paths: Record<string, string>): void {
+    this.store.setJson('toolPaths', paths)
+    applyToolPaths(paths)
+    void this.prober.refresh().catch(() => undefined)
+  }
+
+  private async toolStatus(): Promise<InstallStatusItem[]> {
+    const own = this.toolPaths()
+    return (await this.installer.status()).map((s) => (own[s.id] && s.state === 'installed' ? { ...s, custom: true } : s))
+  }
+
+  private async toolItem(id: InstallId): Promise<InstallStatusItem> {
+    const item = (await this.toolStatus()).find((s) => s.id === id)
+    if (!item) throw notFound(`Unknown tool ${String(id)}`)
+    return item
+  }
+
+  // Uses `file` for the program; when it does not run as that program the old path is put back.
+  private async useToolPath(id: InstallId, file: string): Promise<InstallStatusItem> {
+    // The file must be the program itself (claude.exe, not some other file in its folder).
+    if (parse(file).name.toLowerCase() !== PROGRAM_BINARY[id]) throw bad(`Pick the program named ${PROGRAM_BINARY[id]}`)
+    const before = this.toolPaths()
+    this.setToolPaths({ ...before, [id]: file })
+    const item = await this.toolItem(id)
+    if (item.state !== 'installed') {
+      this.setToolPaths(before)
+      throw bad(`That file did not run as ${PROGRAM_BINARY[id]}. Pick the ${PROGRAM_BINARY[id]} program itself.`)
+    }
+    return item
+  }
+
+  private toolsHandlers(): Group<'tools'> {
+    const program = (id: InstallId) => {
+      if (!PROGRAM_BINARY[id]) throw bad('That one is not a program Operant looks for')
+    }
+    return {
+      'tools:find': async (id) => {
+        program(id)
+        const file = findInDefaults(id)
+        return file ? this.useToolPath(id, file) : this.toolItem(id)
+      },
+      'tools:locate': async (id) => {
+        program(id)
+        const win = process.platform === 'win32'
+        const file = await this.fileDialogs?.open({ name: PROGRAM_BINARY[id]!, extensions: win ? ['exe', 'cmd', 'bat'] : ['*'] })
+        return file ? this.useToolPath(id, file) : null
+      },
+      'tools:forget': async (id) => {
+        program(id)
+        const { [id]: _gone, ...rest } = this.toolPaths()
+        this.setToolPaths(rest)
+        return this.toolItem(id)
+      },
+    }
+  }
+
   private installHandlers(): Group<'install'> {
     return {
-      'install:status': () => this.installer.status(),
+      'install:status': () => this.toolStatus(),
       'install:run': async (id) => {
         const r = await this.installer.run(id)
         // A new CLI on PATH: the next capability read must probe again.

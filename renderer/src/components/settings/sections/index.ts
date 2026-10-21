@@ -19,7 +19,7 @@ import { PresetsSection } from "./PresetsSection";
 import { ProjectsSection } from "./ProjectsSection";
 import { ResetSection } from "./ResetSection";
 import { ShortcutsSection } from "./ShortcutsSection";
-import { SuperpowersSection } from "./SuperpowersSection";
+import { SkillsSection } from "./SkillsSection";
 import { TeamsSection } from "./TeamsSection";
 import { TerminalSection, TilesSection } from "./TerminalSection";
 import { TerminalsSection } from "./TerminalsSection";
@@ -47,7 +47,7 @@ export const SECTION_COMPONENTS: Record<SettingsSectionId, ComponentType> = {
   hindsight: HindsightSection,
   codegraph: CodegraphSection,
   backups: BackupsSection,
-  superpowers: SuperpowersSection,
+  superpowers: SkillsSection,
   mcp: McpSection,
   import: ImportExportSection,
   shortcuts: ShortcutsSection,

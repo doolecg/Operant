@@ -1,8 +1,9 @@
 import { useState } from 'react'
 import { Loader2 } from 'lucide-react'
-import { firstStartItems, shouldShowSetup, statusLabel, type InstallId } from '@shared/install'
+import { PROGRAM_IDS, firstStartItems, shouldShowSetup, statusLabel, type InstallId } from '@shared/install'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
+import { LocateActions } from '@/components/settings/LocateActions'
 import { useAppInfo, useInstallRun, useInstallStatus, useSaveSettings, useSettings } from '@/lib/queries'
 
 // Offered once, at the first start: the optional tools. Nothing is ticked, and nothing runs until "Install selected".
@@ -18,6 +19,7 @@ export function SetupDialog() {
   const items = firstStartItems(settings.data?.mainCli, status.data)
   const platform = useAppInfo().data?.platform ?? 'win32'
 
+  const claudeMissing = status.data?.find((x) => x.id === 'claude' && x.state === 'missing')
   const open = shouldShowSetup(settings.data?.setupDone) && status.data !== undefined
   const busy = running !== null
   const finish = () => save.mutate({ setupDone: true }, { onSettled: () => { setFinished(false); setResults({}); setPicked(new Set()) } })
@@ -43,6 +45,13 @@ export function SetupDialog() {
             Operant works without these. Pick the ones you want and Operant installs them for you. You can do this later from Settings, Install.
           </DialogDescription>
         </DialogHeader>
+        {claudeMissing && (
+          <div className="mx-6 space-y-0.5 rounded-md border p-3 text-sm" role="note" aria-label="Claude Code was not found">
+            <p className="font-medium">Claude Code was not found</p>
+            <p className="text-muted-foreground text-xs">Operant needs it for Claude chats. Look in its default places, or point Operant at the program if you installed it somewhere else.</p>
+            <LocateActions item={claudeMissing} />
+          </div>
+        )}
         <ul className="space-y-2 px-6" aria-label="Optional tools">
           {items.map((it) => {
             const s = status.data?.find((x) => x.id === it.id)
@@ -72,6 +81,11 @@ export function SetupDialog() {
                     <span className="text-muted-foreground block text-xs">{installed ? statusLabel(s) : null}</span>
                   </span>
                 </label>
+                {s && s.state === 'missing' && PROGRAM_IDS.includes(it.id) && (
+                  <div className="pl-6">
+                    <LocateActions item={s} />
+                  </div>
+                )}
                 {running === it.id && (
                   <p className="text-muted-foreground flex items-center gap-2 pl-6 text-xs" role="status">
                     <Loader2 className="size-3 animate-spin" /> Installing {it.name}

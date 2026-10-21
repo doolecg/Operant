@@ -3,7 +3,8 @@ import { homedir } from 'node:os'
 import { join } from 'node:path'
 import { INSTALL_IDS, hindsightFromUv, installAttempts, lastErrorLine, stateFromVersionRun, type InstallId, type InstallResult, type InstallStatusItem } from '../shared/install'
 import { detectSuperpowers } from './superpowers'
-import { runHidden, type RunResult } from './proc'
+import { resolveCli, runHidden, type RunResult } from './proc'
+import { PROGRAM_BINARY } from './tool-locations'
 
 const PROBE_TIMEOUT_MS = 8000
 const INSTALL_TIMEOUT_MS = 10 * 60_000
@@ -75,7 +76,11 @@ export class Installer {
     // The speech model is cached by the app window, so core cannot see it: the window fills this one in.
     const dictation: InstallStatusItem = { id: 'dictation', state: 'unknown' }
     const byId: Record<InstallId, InstallStatusItem> = { claude, opencode, uv, nodejs, hindsight: hindsightFromUv(uv), codegraph, playwright, superpowers, dictation }
-    return INSTALL_IDS.map((id) => byId[id])
+    return INSTALL_IDS.map((id) => {
+      const binary = PROGRAM_BINARY[id]
+      const found = binary ? resolveCli(binary, d.env, d.platform)?.file : id === 'playwright' ? playwrightBrowsersDir(d.env, d.platform, homedir()) : id === 'superpowers' ? sp.path : undefined
+      return found && byId[id].state === 'installed' ? { ...byId[id], path: found } : byId[id]
+    })
   }
 
   // Runs the install for one tool. Only ever called from the confirm flow. Never throws: the result says what went wrong.

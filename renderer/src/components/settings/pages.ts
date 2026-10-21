@@ -80,9 +80,7 @@ export const SETTINGS_CATEGORIES: SettingsCategory[] = [
     label: 'Claude & OpenCode',
     pages: [
       { id: 'mods', label: 'Mods', description: 'The features of Operant you can turn off: the Agents panel, info bar, Keep warm, Commands menu and the Claude Code mods.', keywords: 'hooks status line subagent info bar keep warm commands engineering factory mode pack skills reset', subsections: [{ id: 'mods', label: 'Mods' }] },
-      { id: 'superpowers', label: 'Superpowers', description: 'The Superpowers skills pack that presets can use.', keywords: 'skills plugin pack', subsections: [{ id: 'superpowers', label: 'Superpowers' }] },
       { id: 'browser', label: 'Browser', description: 'The browser tile in each project, and whether the AI may drive it.', keywords: 'browser web ai control playwright cookies home page search', subsections: [{ id: 'browser', label: 'Browser' }] },
-      { id: 'mcp', label: 'MCP servers', description: 'Model Context Protocol servers for Claude Code and OpenCode. Secrets stay masked.', keywords: 'mcp server tools claude opencode', subsections: [{ id: 'mcp', label: 'MCP servers' }] },
     ],
   },
   {
@@ -165,10 +163,14 @@ export const SETTINGS_CATEGORIES: SettingsCategory[] = [
     pages: [
       {
         id: 'install',
-        label: 'Install',
-        description: 'The tools Operant can use, whether each is installed, and a button to install it.',
-        keywords: 'install setup uv opencode codegraph playwright superpowers dictation claude winget npm',
-        subsections: [{ id: 'install', label: 'Tools' }],
+        label: 'Tools and installs',
+        description: 'Every program, skill and MCP server Operant uses: where it is, and a button to install it, look for it or point Operant at it.',
+        keywords: 'install setup location path locate find uv opencode codegraph playwright superpowers skills mcp servers dictation claude winget npm',
+        subsections: [
+          { id: 'install', label: 'Programs' },
+          { id: 'superpowers', label: 'Skills' },
+          { id: 'mcp', label: 'MCP servers' },
+        ],
       },
     ],
   },

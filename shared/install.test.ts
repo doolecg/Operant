@@ -67,7 +67,7 @@ describe('install', () => {
     const sp = { id: 'superpowers' as const, state: 'installed' as const }
     expect(hiddenSections(undefined)).toEqual([])
     expect(hiddenSections([uv, sp])).toEqual(['hindsight'])
-    expect(hiddenSections([{ id: 'uv', state: 'unknown' }, { id: 'superpowers', state: 'missing' }])).toEqual(['superpowers'])
+    expect(hiddenSections([{ id: 'uv', state: 'unknown' }, { id: 'superpowers', state: 'missing' }])).toEqual([])
   })
 
   it('keys the install list and first-start defaults to the default CLI', () => {
@@ -83,9 +83,6 @@ describe('install', () => {
     expect(installItems('opencode', [{ id: 'claude', state: 'installed' }]).map((i) => i.id)).toContain('superpowers')
     expect(installItems('claude', noClaude).map((i) => i.id)).toContain('superpowers')
     expect(firstStartItems('claude').map((i) => i.id)).toEqual(FIRST_START_ITEMS.map((i) => i.id))
-    expect(hiddenSections(noClaude, 'opencode')).toEqual(['superpowers'])
-    expect(hiddenSections(noClaude, 'claude')).toEqual([])
-    expect(hiddenSections(undefined, 'opencode')).toEqual([])
   })
 
   it('labels statuses and follows uv for Hindsight', () => {

@@ -42,3 +42,12 @@ export function useInstallRun() {
     },
   })
 }
+
+// Finds a program in its default places, asks for its file, or goes back to PATH. Refreshes what depends on the program afterwards.
+export function useToolPath() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: ({ op, id }: { op: 'find' | 'locate' | 'forget'; id: InstallId }) => call(`tools:${op}`, id),
+    onSettled: () => Promise.all(['install', 'capabilities', 'mcp'].map((k) => qc.invalidateQueries({ queryKey: [k] }))),
+  })
+}

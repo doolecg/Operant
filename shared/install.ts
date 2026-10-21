@@ -10,6 +10,10 @@ export interface InstallStatusItem {
   id: InstallId
   state: InstallState
   version?: string
+  // Where it is: the program on PATH, the pack folder, the browsers folder.
+  path?: string
+  // The owner pointed Operant at this path (Locate, or found in the default places).
+  custom?: boolean
 }
 
 export type InstallResult = { id: InstallId; ok: true } | { id: InstallId; ok: false; error: string }
@@ -66,6 +70,9 @@ export function installItem(id: InstallId): InstallItem {
 
 // What the first-start setup offers.
 export const FIRST_START_ITEMS: InstallItem[] = INSTALL_ITEMS.filter((i) => i.firstStart)
+
+// The rows that are programs on PATH, which can be found in their default places or pointed at.
+export const PROGRAM_IDS: InstallId[] = ['claude', 'opencode', 'uv', 'nodejs', 'codegraph']
 
 // The tool the default CLI needs is required and the other CLI is optional; rows that only work through Claude Code
 // (the Superpowers pack installs through `claude plugin install`) are left out when OpenCode is the default and Claude is not installed.
@@ -160,11 +167,9 @@ export function lastErrorLine(text: string): string {
 }
 
 // Settings sections that need a tool which is known to be missing. While the status is still loading nothing is hidden.
-export function hiddenSections(statuses: InstallStatusItem[] | undefined, mainCli: MainCliKind = 'claude'): string[] {
-  const out: string[] = []
-  if (toolMissing(statuses, 'superpowers') || (mainCli === 'opencode' && toolMissing(statuses, 'claude'))) out.push('superpowers')
-  if (toolMissing(statuses, 'uv')) out.push('hindsight')
-  return out
+// The Skills section stays: it is where Superpowers is installed.
+export function hiddenSections(statuses: InstallStatusItem[] | undefined): string[] {
+  return toolMissing(statuses, 'uv') ? ['hindsight'] : []
 }
 
 // A feature that needs a tool is shown unless the tool is known to be missing; unknown never hides.

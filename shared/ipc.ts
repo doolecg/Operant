@@ -286,6 +286,12 @@ export interface IpcApi extends ChatApi {
   // Every tool Operant can use and whether it is installed; 'install:run' installs one (only after the user confirmed its command).
   'install:status': () => InstallStatusItem[]
   'install:run': (id: InstallId) => InstallResult
+  // Looks for a program in the places its installer uses; when found Operant uses it from there. Returns the row's status after.
+  'tools:find': (id: InstallId) => InstallStatusItem
+  // Asks for the program's file (a file picker) and uses it; null when cancelled. Refused when that file does not run as the program.
+  'tools:locate': (id: InstallId) => InstallStatusItem | null
+  // Goes back to what is on PATH.
+  'tools:forget': (id: InstallId) => InstallStatusItem
   // MCP servers for the project's folder (null = user-level only); `refresh` re-runs the status checks.
   'mcp:list': (crewId: number | null, refresh?: boolean) => McpOverview
   'mcp:add': (crewId: number | null, input: McpServerInput) => McpOverview
@@ -693,6 +699,9 @@ export const CORE_CHANNELS: CoreChannel[] = [
   'superpowers:status',
   'install:status',
   'install:run',
+  'tools:find',
+  'tools:locate',
+  'tools:forget',
   'tiles:getLayout',
   'tiles:saveLayout',
   'scratch:list',
