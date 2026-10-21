@@ -464,7 +464,7 @@ export function Composer({ scratchId, state, launchEffort, tileModel, disabled, 
             ))}
           </div>
         )}
-        <div className={cn('border-border bg-popover rounded-[18px] border py-1.5 pr-2 pl-[18px] shadow-[0_10px_30px_rgba(0,0,0,.18)] dark:shadow-[0_10px_30px_rgba(0,0,0,.45)]', (running || dictation.state !== 'idle') && 'chat-ai-border')}>
+        <div className={cn('border-border bg-popover rounded-[18px] border py-1.5 pr-2 pl-[18px] shadow-[0_10px_30px_rgba(0,0,0,.18)] dark:shadow-[0_10px_30px_rgba(0,0,0,.45)]', dictation.state === 'recording' && 'chat-ai-border')}>
           {images.length > 0 && (
             <div className="mb-2 flex flex-wrap gap-1.5">
               {images.map((im, i) => (

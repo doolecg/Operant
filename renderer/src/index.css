@@ -209,7 +209,7 @@
 }
 .op-term .xterm .xterm-scrollable-element > .shadow { display: none; }
 
-/* Chat box: a soft, gently breathing orange and pink glow while Claude works or dictation is busy. */
+/* Chat box: a soft, gently breathing orange and pink glow while the mic is recording. */
 @keyframes chat-ai-glow {
   0%, 100% { opacity: .55; }
   50% { opacity: .85; }
