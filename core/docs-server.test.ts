@@ -2,7 +2,7 @@ import { mkdirSync, mkdtempSync, rmSync, symlinkSync, writeFileSync } from 'node
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
-import { DocsServer, parseDocPath, resolveDocFile } from './docs-server'
+import { DocsServer, parseDocPath, resolveDocFile, scopedToken } from './docs-server'
 
 let root = ''
 let outside = ''
@@ -26,21 +26,27 @@ beforeAll(() => {
 afterAll(() => rmSync(join(root, '..'), { recursive: true, force: true }))
 
 describe('parseDocPath', () => {
-  const t = 'tok123'
-  it('accepts the token and decodes segments', () => {
-    expect(parseDocPath(`/d/${t}/4/docs/a%20b.md`, t)).toEqual({ kind: 'file', crewId: 4, segments: ['docs', 'a b.md'] })
-    expect(parseDocPath(`/p/${t}/7`, t)).toEqual({ kind: 'memory', id: '7' })
-    expect(parseDocPath(`/x/${t}/3/page.html`, t)).toEqual({ kind: 'loose', id: '3', segments: ['page.html'] })
+  const secret = 'tok123'
+  const t = scopedToken(secret, 'd', '4')
+  it('accepts the scoped token and decodes segments', () => {
+    expect(parseDocPath(`/d/${t}/4/docs/a%20b.md`, secret)).toEqual({ kind: 'file', crewId: 4, segments: ['docs', 'a b.md'] })
+    expect(parseDocPath(`/p/${scopedToken(secret, 'p', '7')}/7`, secret)).toEqual({ kind: 'memory', id: '7' })
+    expect(parseDocPath(`/x/${scopedToken(secret, 'x', '3')}/3/page.html`, secret)).toEqual({ kind: 'loose', id: '3', segments: ['page.html'] })
+  })
+  it("refuses another project's or document's token", () => {
+    expect(parseDocPath(`/d/${t}/5/docs/a.md`, secret)).toBeNull()
+    expect(parseDocPath(`/p/${t}/4`, secret)).toBeNull()
+    expect(parseDocPath(`/d/${secret}/4/docs/a.md`, secret)).toBeNull()
   })
   it('refuses a wrong token, traversal, separators and NUL', () => {
-    expect(parseDocPath('/d/nope/4/docs/a.md', t)).toBeNull()
-    expect(parseDocPath(`/d/${t}/4/../a.md`, t)).toBeNull()
-    expect(parseDocPath(`/d/${t}/4/%2e%2e/a.md`, t)).toBeNull()
-    expect(parseDocPath(`/d/${t}/4/docs%2fa.md`, t)).toBeNull()
-    expect(parseDocPath(`/d/${t}/4/docs%5Ca.md`, t)).toBeNull()
-    expect(parseDocPath(`/d/${t}/4/a%00.md`, t)).toBeNull()
-    expect(parseDocPath(`/d/${t}/x/a.md`, t)).toBeNull()
-    expect(parseDocPath(`/d/${t}/4`, t)).toBeNull()
+    expect(parseDocPath('/d/nope/4/docs/a.md', secret)).toBeNull()
+    expect(parseDocPath(`/d/${t}/4/../a.md`, secret)).toBeNull()
+    expect(parseDocPath(`/d/${t}/4/%2e%2e/a.md`, secret)).toBeNull()
+    expect(parseDocPath(`/d/${t}/4/docs%2fa.md`, secret)).toBeNull()
+    expect(parseDocPath(`/d/${t}/4/docs%5Ca.md`, secret)).toBeNull()
+    expect(parseDocPath(`/d/${t}/4/a%00.md`, secret)).toBeNull()
+    expect(parseDocPath(`/d/${t}/x/a.md`, secret)).toBeNull()
+    expect(parseDocPath(`/d/${t}/4`, secret)).toBeNull()
   })
 })
 
@@ -65,7 +71,7 @@ describe('resolveDocFile', () => {
 
 describe('DocsServer', () => {
   it('serves files and plans over loopback, refusing the rest', async () => {
-    const s = new DocsServer({ folderOf: (id) => (id === 1 ? root : null) })
+    const s = new DocsServer({ folderOf: (id) => (id === 1 || id === 2 ? root : null) })
     try {
       const url = await s.urlFor(1, 'docs/b.md')
       const res = await fetch(url)
@@ -73,8 +79,9 @@ describe('DocsServer', () => {
       expect(res.headers.get('x-content-type-options')).toBe('nosniff')
       expect(res.headers.get('content-security-policy')).toContain("default-src 'none'")
       expect(await res.text()).toContain('&lt;i&gt;x&lt;/i&gt;')
+      expect((await fetch(url.replace(url.split('/')[4]!, 'bad'))).status).toBe(404)
+      // Project 2's folder exists, but project 1's token does not open it.
       expect((await fetch(url.replace('/1/', '/2/'))).status).toBe(404)
-      expect((await fetch(url.replace(s.token, 'bad'))).status).toBe(404)
       expect((await fetch(url, { method: 'POST' })).status).toBe(405)
       const plan = await fetch(await s.urlForMemory('Plan', '# Plan'))
       expect(await plan.text()).toContain('<h1>Plan</h1>')

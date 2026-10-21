@@ -118,6 +118,8 @@ export class SessionManager extends EventEmitter<SessionEvents> {
     this.sessions.set(key, session)
 
     pty.onData((data) => {
+      // Late output of a session forceStop dropped must not reach a new one started under the same key.
+      if (this.sessions.get(key) !== session) return
       session.buffer = (session.buffer + data).slice(-BUFFER_LIMIT)
       this.emit('data', key, data)
     })

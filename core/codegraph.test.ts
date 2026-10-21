@@ -34,15 +34,27 @@ describe('globalCodegraph', () => {
     expect(get()).toBe(join('/g/node_modules', '@colbymchenry', 'codegraph'))
   })
 
-  it('stays null without an install and looks again on the next call', async () => {
+  it('picks up an install made later without asking npm again', async () => {
     let installed = false
     let runs = 0
     const get = globalCodegraph(async () => (runs++, { code: 0, stdout: '/g/node_modules', stderr: '' }), () => installed)
     await tick()
     expect(get()).toBeNull()
     installed = true
-    await tick()
     expect(get()).toBe(join('/g/node_modules', '@colbymchenry', 'codegraph'))
+    expect(runs).toBe(1)
+  })
+
+  it('asks npm again at most every 10 seconds while it has no answer', async () => {
+    let t = 0
+    let runs = 0
+    const get = globalCodegraph(async () => (runs++, { code: 1, stdout: '', stderr: 'npm missing' }), () => true, () => t)
+    await tick()
+    get()
+    get()
+    expect(runs).toBe(1)
+    t = 10_000
+    get()
     expect(runs).toBe(2)
   })
 

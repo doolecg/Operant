@@ -3,7 +3,7 @@
 // held in memory (a presented plan) at /p/<token>/<id>. A document Claude wrote outside the project (the person opens it
 // from the artifacts list) gets its own folder served at /x/<token>/<id>/<path>. The token is random per run; paths are
 // confined to the project folder, or to that document's folder. Markdown is rendered to HTML here.
-import { randomBytes, timingSafeEqual } from 'node:crypto'
+import { createHmac, randomBytes, timingSafeEqual } from 'node:crypto'
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from 'node:http'
 import type { AddressInfo } from 'node:net'
 import { readFileSync, realpathSync, statSync } from 'node:fs'
@@ -43,13 +43,19 @@ const sameToken = (a: string, b: string): boolean => a.length === b.length && ti
 
 const BAD_SEGMENT = /[\\/\0]/
 
+// The token in a URL is derived from the run's secret and what it opens (one project, one document), so a page served
+// for one project cannot build a working URL for another project's files or another document.
+export const scopedToken = (secret: string, kind: string, id: string): string =>
+  createHmac('sha256', secret).update(`${kind}/${id}`).digest('hex').slice(0, 36)
+
 // Splits a request path into its route, or null when the token is wrong or the path is not one of ours. Every segment
 // is decoded once and must not hold a separator, a NUL, or be empty, "." or "..".
-export function parseDocPath(rawPath: string, token: string): DocRoute | null {
+export function parseDocPath(rawPath: string, secret: string): DocRoute | null {
   const parts = rawPath.split('/')
   if (parts[0] !== '' || parts.length < 4) return null
-  const [, kind, given, ...rest] = parts
-  if (!given || !sameToken(given, token)) return null
+  const [, kind, given, first] = parts
+  const rest = parts.slice(3)
+  if (!kind || !given || first === undefined || !sameToken(given, scopedToken(secret, kind, first))) return null
   const segments: string[] = []
   for (const raw of rest) {
     let s: string
@@ -129,7 +135,7 @@ export class DocsServer {
   // The address of a project file (path relative to the project folder, forward slashes).
   async urlFor(crewId: number, relPath: string): Promise<string> {
     const port = await this.port()
-    return `http://127.0.0.1:${String(port)}/d/${this.token}/${String(crewId)}/${relPath.split('/').map(encodeURIComponent).join('/')}`
+    return `http://127.0.0.1:${String(port)}/d/${scopedToken(this.token, 'd', String(crewId))}/${String(crewId)}/${relPath.split('/').map(encodeURIComponent).join('/')}`
   }
 
   // The address of a Markdown document held in memory (the oldest ones are dropped past a cap).
@@ -138,7 +144,7 @@ export class DocsServer {
     const id = String(this.nextId++)
     this.memory.set(id, { title, md })
     if (this.memory.size > MEMORY_MAX) this.memory.delete(this.memory.keys().next().value as string)
-    return `http://127.0.0.1:${String(port)}/p/${this.token}/${id}`
+    return `http://127.0.0.1:${String(port)}/p/${scopedToken(this.token, 'p', id)}/${id}`
   }
 
   // The address of a document outside any project; its folder is served from then on so the files it links to load.
@@ -153,7 +159,7 @@ export class DocsServer {
       this.loose.set(id, folder)
       if (this.loose.size > LOOSE_MAX) this.loose.delete(this.loose.keys().next().value as string)
     }
-    return `http://127.0.0.1:${String(port)}/x/${this.token}/${id}/${encodeURIComponent(basename(file))}`
+    return `http://127.0.0.1:${String(port)}/x/${scopedToken(this.token, 'x', id)}/${id}/${encodeURIComponent(basename(file))}`
   }
 
   async close(): Promise<void> {

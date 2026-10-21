@@ -23,27 +23,32 @@ function load(libraryPath?: string | null): CodeGraphStatic {
   return loaded
 }
 
-// The SDK of a global `npm i -g @colbymchenry/codegraph`. The returned getter is null until npm reports a global
-// root holding it; while null, each call looks again in the background.
+// The SDK of a global `npm i -g @colbymchenry/codegraph`. npm's global folder is asked for once at startup; after that
+// each call only checks the folder, so an install made while Operant runs counts straight away. Null while missing.
+// Without npm's answer (npm missing or slow) it asks again, at most every RETRY_MS.
+const RETRY_MS = 10_000
 export function globalCodegraph(
   run: () => Promise<RunResult> = () => runHidden('npm', ['root', '-g'], { shell: process.platform === 'win32', timeoutMs: 15_000, quiet: true }),
   exists: (p: string) => boolean = existsSync,
+  now: () => number = Date.now,
 ): () => string | null {
-  let found: string | null = null
-  let looking = false
-  const look = (): void => {
-    if (looking) return
-    looking = true
+  let root: string | null = null
+  let lastAsked = -Infinity
+  const ask = (): void => {
+    if (now() - lastAsked < RETRY_MS) return
+    lastAsked = now()
     void run().then((r) => {
-      looking = false
-      const dir = r.code === 0 ? join(r.stdout.trim(), '@colbymchenry', 'codegraph') : ''
-      if (dir && exists(join(dir, 'package.json'))) found = dir
+      if (r.code === 0 && r.stdout.trim()) root = r.stdout.trim()
     })
   }
-  look()
+  ask()
   return () => {
-    if (found === null) look()
-    return found
+    if (root === null) {
+      ask()
+      return null
+    }
+    const dir = join(root, '@colbymchenry', 'codegraph')
+    return exists(join(dir, 'package.json')) ? dir : null
   }
 }
 

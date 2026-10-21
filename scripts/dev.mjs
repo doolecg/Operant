@@ -6,6 +6,8 @@ import { build, createServer } from 'vite'
 
 await build({ configFile: 'vite.main.config.ts', mode: 'development' })
 await build({ configFile: 'vite.main.config.ts', mode: 'preload' })
+// The license files Settings, General, License opens.
+await import('./notices.mjs')
 const server = await createServer({ configFile: 'vite.config.ts' })
 await server.listen()
 const url = server.resolvedUrls.local[0]

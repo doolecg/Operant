@@ -16,6 +16,9 @@ const LOG_MAX_LINE = 600
 export function scrubLogLine(text: string): string {
   return scrubSecrets(text)
     .replace(/\b(sk|pk|ghp|gho|github_pat|xox[abp])[-_][A-Za-z0-9_-]{16,}/g, '[secret]')
+    .replace(/\b(AKIA|ASIA)[A-Z0-9]{16}\b/g, '[secret]')
+    .replace(/\bAIza[A-Za-z0-9_-]{35}\b/g, '[secret]')
+    .replace(/\beyJ[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}/g, '[secret]')
     .replace(/\bBearer\s+[A-Za-z0-9._~+/=-]{16,}/gi, 'Bearer [secret]')
     .replace(/((?:api[_-]?key|token|secret|password)["']?\s*[:=]\s*["']?)[^\s"',}]{8,}/gi, '$1[secret]')
 }

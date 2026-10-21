@@ -188,6 +188,7 @@ export class ChatSession {
   private nextId = 1
   private interruptTimer: unknown = null
   private stopTimer: unknown = null
+  private retryTimer: unknown = null
   private statusTimer: unknown = null
   private lastContextAt = 0
   private waitingKey: string | null = null
@@ -454,7 +455,8 @@ export class ChatSession {
     if (!expected && !this.disposed && this.inUseRetries < IN_USE_RETRIES && this.errLines.some((l) => /already in use/i.test(l))) {
       this.inUseRetries++
       this.push(this.mapper.setProcess('starting'))
-      this.setTimer(() => {
+      this.retryTimer = this.setTimer(() => {
+        this.retryTimer = null
         if (!this.child && !this.disposed) this.start()
       }, IN_USE_RETRY_MS)
       for (const w of this.stopWaiters.splice(0)) w()
@@ -499,6 +501,12 @@ export class ChatSession {
 
   // Ends the process: closes stdin, kills the tree if it does not exit in 3 s. Resolves when it is gone.
   stop(): Promise<void> {
+    // A pending "already in use" retry would start Claude again after the stop.
+    if (this.retryTimer !== null) {
+      this.clearTimer(this.retryTimer)
+      this.retryTimer = null
+      this.push(this.mapper.setProcess('stopped'))
+    }
     const child = this.child
     if (!child) return Promise.resolve()
     this.expectedExit = true

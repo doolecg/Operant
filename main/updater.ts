@@ -1,7 +1,7 @@
 // Auto-update from GitHub releases: check at startup and every few hours, download the installer for
 // this system in the background, then install on click (with relaunch) or when the app quits.
 import { spawn, spawnSync } from 'node:child_process'
-import { accessSync, constants, createWriteStream, existsSync, readFileSync, renameSync, statfsSync, statSync, unlinkSync } from 'node:fs'
+import { accessSync, constants, createWriteStream, existsSync, mkdirSync, readdirSync, readFileSync, renameSync, rmSync, statfsSync, statSync, unlinkSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { basename, dirname, join, resolve } from 'node:path'
 import { Readable } from 'node:stream'
@@ -41,6 +41,8 @@ interface Ready {
   url?: string
   kind: InstallKind
 }
+
+const VERSION_RE = /^\d+\.\d+\.\d+(-[0-9A-Za-z.]+)?$/
 
 const HEADERS = { 'User-Agent': 'operant2', Accept: 'application/vnd.github+json' }
 
@@ -121,8 +123,12 @@ export function createUpdater({
   }
 
   async function fetchAsset(asset: ReleaseAsset, version: string, kind: InstallKind, onDownload: () => void): Promise<string> {
-    const dir = tmpdir()
+    // A per-user folder, not the shared temp folder: on Linux another user could plant a file in /tmp.
+    const dir = join(app.getPath('userData'), 'updates')
+    mkdirSync(dir, { recursive: true })
     const file = join(dir, `Operant3-${version}.${EXT[kind]}`)
+    // Only the newest download is kept.
+    for (const name of readdirSync(dir)) if (join(dir, name) !== file) rmSync(join(dir, name), { force: true, recursive: true })
     if (!downloaded(file, asset.size)) {
       checkDiskSpace(dir, asset.size, version)
       onDownload()
@@ -143,7 +149,7 @@ export function createUpdater({
       }
     }
     try {
-      await verifyDigest(file, asset.digest)
+      if (!(await verifyDigest(file, asset.digest))) throw new Error(`${version} has no checksum to check the download against`)
     } catch (err) {
       unlinkSync(file)
       throw err
@@ -169,6 +175,8 @@ export function createUpdater({
       const rel = channel === 'beta' ? pickRelease(body, 'beta') : (body as Release)
       if (!rel?.tag_name) throw new Error('no releases found')
       const version = rel.tag_name.replace(/^v/, '')
+      // The version reaches file names and the install script: only a plain version number is accepted.
+      if (!VERSION_RE.test(version)) throw new Error(`unexpected release tag ${rel.tag_name}`)
       info = { ...info, latest: version }
       if (!newer(version, currentVersion)) {
         report({ state: 'current' })
@@ -194,7 +202,9 @@ export function createUpdater({
       ready = { version, file, notes, url: rel.html_url, kind }
       report({ state: 'ready', version, notes, url: rel.html_url, message: failure })
     } catch (err) {
-      report({ state: 'error', message: err instanceof Error ? err.message : String(err) })
+      // A failed check must not hide an update that is already downloaded and waiting to install.
+      if (ready && existsSync(ready.file)) report({ state: 'ready', version: ready.version, notes: ready.notes, url: ready.url, message: failure })
+      else report({ state: 'error', message: err instanceof Error ? err.message : String(err) })
     } finally {
       busy = false
     }
