@@ -25,6 +25,7 @@ import { OPEN_CHANGES_EVENT } from '@/components/chat/ChangedFilesCard'
 import { GitChip } from '@/components/topbar/GitChip'
 import { MediaBar } from '@/components/topbar/MediaBar'
 import { ProjectBlock } from '@/components/topbar/ProjectBlock'
+import { ModeToggles } from '@/components/topbar/ModeToggles'
 import { ViewSwitcher, type Mode } from '@/components/topbar/ViewSwitcher'
 import { CliSelect } from '@/components/topbar/CliSelect'
 import { ActivityMenu } from '@/components/topbar/ActivityMenu'
@@ -271,6 +272,7 @@ export function App() {
                 onEdit={() => setCrewDialog('edit')}
                 onDelete={() => setCrewDialog('delete')}
               />
+              <ModeToggles crew={crew} tier={tier} />
             </>
           )}
           <Divider />

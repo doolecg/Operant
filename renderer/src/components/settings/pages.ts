@@ -78,7 +78,7 @@ export const SETTINGS_CATEGORIES: SettingsCategory[] = [
   {
     label: 'Claude & OpenCode',
     pages: [
-      { id: 'mods', label: 'Mods', description: 'The features of Operant you can turn off: the Agents panel, info bar, Keep warm, Commands menu and the Claude Code mods.', keywords: 'hooks status line subagent info bar keep warm commands', subsections: [{ id: 'mods', label: 'Mods' }] },
+      { id: 'mods', label: 'Mods', description: 'The features of Operant you can turn off: the Agents panel, info bar, Keep warm, Commands menu and the Claude Code mods.', keywords: 'hooks status line subagent info bar keep warm commands engineering factory mode pack skills reset', subsections: [{ id: 'mods', label: 'Mods' }] },
       { id: 'superpowers', label: 'Superpowers', description: 'The Superpowers skills pack that presets can use.', keywords: 'skills plugin pack', subsections: [{ id: 'superpowers', label: 'Superpowers' }] },
       { id: 'browser', label: 'Browser', description: 'The browser tile in each project, and whether the AI may drive it.', keywords: 'browser web ai control playwright cookies home page search', subsections: [{ id: 'browser', label: 'Browser' }] },
       { id: 'mcp', label: 'MCP servers', description: 'Model Context Protocol servers for Claude Code and OpenCode. Secrets stay masked.', keywords: 'mcp server tools claude opencode', subsections: [{ id: 'mcp', label: 'MCP servers' }] },

@@ -1,8 +1,12 @@
+import { useState } from 'react'
+import { decodeIpcError } from '@shared/ipc'
 import { Switch } from '@/components/ui/switch'
+import { Button } from '@/components/ui/button'
 import { modEffect, type ModId, type ModRowId } from '@shared/mods'
 import { MODS } from '@/components/mods/registry'
-import { useCapabilities, useSaveSettings, useSettings } from '@/lib/queries'
-import { NumberField, Row } from '../parts'
+import { call, useCapabilities, useEngineeringStatus, useResetEngineering, useSaveSettings, useSettings } from '@/lib/queries'
+import { toast } from '@/lib/toast'
+import { ConfirmDialog, NumberField, Row } from '../parts'
 
 const LABELS: Record<ModRowId, string> = {
   subagents: 'Agents panel',
@@ -22,6 +26,9 @@ export function ModsSection() {
   const settings = useSettings()
   const save = useSaveSettings()
   const caps = useCapabilities().data?.claude
+  const pack = useEngineeringStatus().data
+  const reset = useResetEngineering()
+  const [confirmReset, setConfirmReset] = useState(false)
   const s = settings.data
   if (!s) return null
   const m = s.mods
@@ -73,6 +80,35 @@ export function ModsSection() {
         </Row>
       </div>
       <p className="text-muted-foreground px-1 text-xs">Operant's status line replaces your own inside Operant Claude tiles.</p>
+      <h3 className="px-1 pt-2 text-sm font-medium">Engineering</h3>
+      <p className="text-muted-foreground px-1 text-xs">Turn the two modes on per project with the switches in the top bar.</p>
+      <div className="bg-muted/50 rounded-2xl px-5 py-2">
+        <Row label="Engineering pack" hint="The skills the two modes use. Your copy lives in the Operant data folder; edit it freely. Reset puts the built-in version back and keeps a backup of your edits.">
+          <div className="flex gap-2">
+            <Button variant="ghost" onClick={() => call('engineering:openFolder').catch((e) => toast(decodeIpcError(e).message, true))}>
+              Open folder
+            </Button>
+            <Button variant="ghost" onClick={() => setConfirmReset(true)}>
+              Reset to built-in
+            </Button>
+          </div>
+        </Row>
+      </div>
+      <ConfirmDialog
+        open={confirmReset}
+        title="Reset the engineering pack?"
+        confirmLabel="Reset"
+        busy={reset.isPending}
+        onClose={() => setConfirmReset(false)}
+        onConfirm={() =>
+          reset.mutate([], {
+            onSuccess: () => (setConfirmReset(false), toast('Engineering pack reset.')),
+            onError: (e) => (setConfirmReset(false), toast(decodeIpcError(e).message, true)),
+          })
+        }
+      >
+        <p>{pack?.edited.length ? `${pack.edited.length} edited ${pack.edited.length === 1 ? 'file' : 'files'} will be backed up first.` : 'No files are edited. The built-in version is put back.'}</p>
+      </ConfirmDialog>
     </>
   )
 }
