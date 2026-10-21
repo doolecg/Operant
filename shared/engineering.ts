@@ -15,6 +15,47 @@ export interface PackDirs {
   factoryDir: string
 }
 
+export type StageKey = 'frame' | 'spec' | 'slices' | 'plan' | 'build' | 'ship'
+
+export interface StageLine {
+  key: StageKey
+  label: string
+  state: 'done' | 'current' | 'todo'
+  detail?: string
+}
+
+// A numbered slice line in slices.html: a checkbox (or [x] / [ ]) followed by "3." - criteria boxes have no number, so they are not counted.
+const SLICE_RE = /(<input[^>]*type=["']?checkbox["']?[^>]*>|\[[ xX]\])\s*(?:<[^>]+>\s*)*\d+\./g
+
+export function countSlices(html: string | null): { ticked: number; total: number } {
+  let ticked = 0
+  let total = 0
+  for (const m of html?.matchAll(SLICE_RE) ?? []) {
+    total++
+    if (/checked|\[[xX]\]/.test(m[1]!)) ticked++
+  }
+  return { ticked, total }
+}
+
+// Where an Engineering task is, read from the files in its folder: the first stage not finished is the current one. Ship is never "done".
+export function taskStages(files: readonly string[], slicesHtml: string | null): StageLine[] {
+  const has = (f: string) => files.includes(f)
+  const { ticked, total } = countSlices(slicesHtml)
+  const stages: Array<[StageKey, string, boolean, string?]> = [
+    ['frame', 'Frame', has('spec.html'), undefined],
+    ['spec', 'Spec', has('slices.html'), undefined],
+    ['slices', 'Slices', total > 0, undefined],
+    ['plan', 'Plan OK', ticked > 0, 'waiting for your OK'],
+    ['build', 'Build', total > 0 && ticked === total, total > 0 ? `${ticked} of ${total}` : undefined],
+    ['ship', 'Ship', false, undefined],
+  ]
+  const at = stages.findIndex((s) => !s[2])
+  return stages.map(([key, label, , detail], i) => {
+    const state = i < at ? 'done' : i === at ? 'current' : 'todo'
+    return { key, label, state, ...(detail && (state === 'current' || (key === 'build' && ticked > 0)) ? { detail } : {}) }
+  })
+}
+
 // The block added to a Claude tile's appended system prompt for the project's modes; '' when both are off.
 export function buildPreamble(modes: ProjectModes, dirs: PackDirs): string {
   const at = (dir: string, rest: string) => `${dir.replace(/[\\/]+$/, '')}/${rest}`
