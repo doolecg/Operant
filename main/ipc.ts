@@ -210,6 +210,7 @@ export function registerIpc(
   forward('learn:askOnClose')
   forward('index:status')
   forward('notes:changed')
+  forward('engineering:tasks')
   forward('budget')
   forward('settings')
   forward('claudeTile:state')

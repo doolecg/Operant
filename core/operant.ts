@@ -71,6 +71,7 @@ import { CapabilityProber, systemProbeDeps, type ProbeDeps } from './capabilitie
 import { ClaudeAgents } from './claude-agents'
 import { hooksConfig, type ModsPaths } from './claude-events'
 import { packStatus, resetPack } from './engineering'
+import { readTaskStages, watchTasks } from './task-stage'
 import { buildPreamble } from '../shared/engineering'
 import { openCodeDbPath } from './opencode-usage'
 import { enabledMods, type CapabilityReport, type ClaudeTileState } from '../shared/mods'
@@ -305,6 +306,8 @@ export class Operant extends EventEmitter<PushEvents> {
   private readonly claudeAgents: ClaudeAgents | null
   private readonly modPluginsDir: string | null
   private readonly engineeringDir: string | null
+  // Per project, started when the first stage list is asked for: reports engineering:tasks when its task folders change.
+  private readonly taskWatchers = new Map<number, () => void>()
   private readonly prober: CapabilityProber
   private readonly installer = new Installer(systemInstallDeps(claudeDirOf()))
   private readonly cli: CliAccess | null
@@ -637,6 +640,8 @@ export class Operant extends EventEmitter<PushEvents> {
           this.sessions.stop(this.scratchKey(id))
           this.detachScratch(id)
         }
+        this.taskWatchers.get(crewId)?.()
+        this.taskWatchers.delete(crewId)
         store.deleteCrew(crewId)
         this.log('crew', `Project ${crew.name} deleted`)
         try {
@@ -1017,6 +1022,11 @@ export class Operant extends EventEmitter<PushEvents> {
     const status = () => ({ edited: this.engineeringDir ? packStatus(this.engineeringDir).edited : [], folder: this.engineeringDir ?? '' })
     return {
       'engineering:status': status,
+      'engineering:stages': (crewId) => {
+        const crew = this.requireCrew(crewId)
+        if (!this.taskWatchers.has(crewId)) this.taskWatchers.set(crewId, watchTasks(crew.folder, () => this.emit('engineering:tasks', { crewId })))
+        return readTaskStages(crew.folder)
+      },
       'engineering:reset': () => {
         if (this.engineeringDir) resetPack(this.pluginDir, this.engineeringDir, this.now())
         return status()
@@ -1375,6 +1385,8 @@ export class Operant extends EventEmitter<PushEvents> {
       }
     }
     this.stopTimers()
+    for (const stop of this.taskWatchers.values()) stop()
+    this.taskWatchers.clear()
     await bounded(() => this.chat.stopAll())
     await bounded(() => this.docs.close())
     await bounded(() => killAllOwn(this.shutdownStepMs))

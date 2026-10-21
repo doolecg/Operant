@@ -2,13 +2,15 @@ import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, typ
 import { ArrowDown } from 'lucide-react'
 import type { SubagentItem } from '@shared/claude-chat'
 import { validPath } from '@shared/chat-lineage'
+import { historyLines } from '@shared/chat-history-lines'
 import { cliBlocked } from '@/lib/capabilities'
 import { useCapabilities } from '@/lib/queries'
 import { cn } from '@/lib/utils'
 import { AgentThread } from './AgentThread'
 import { Composer } from './Composer'
+import { HistoryStrip } from './HistoryStrip'
+import { StageBox } from './StageBox'
 import { ConversationList } from './ConversationList'
-import { InfoRow } from './InfoRow'
 import { StatusLine } from './StatusLine'
 import { TaskList } from './TaskList'
 import { capItems, mainThread } from './chatHelpers'
@@ -30,11 +32,14 @@ interface Props {
   // Names for the breadcrumbs when an agent's conversation is open.
   projectName?: string | null
   threadTitle?: string
+  // The project, for the Engineering stage box (shown when `engineering` is on).
+  crewId?: number
+  engineering?: boolean
 }
 
 // The Chat view of a Claude tile: the conversation (Claude's text on the background, owner messages as soft bubbles,
 // tools as quiet rows, one bordered card per prompt), the running status line and the composer.
-export function ChatView({ scratchId, launchEffort, tileModel, onTerminal, projectName = null, threadTitle = 'Chat' }: Props) {
+export function ChatView({ scratchId, launchEffort, tileModel, onTerminal, projectName = null, threadTitle = 'Chat', crewId, engineering = false }: Props) {
   const state = useChatState(scratchId)
   const caps = useCapabilities().data
   const scroller = useRef<HTMLDivElement>(null)
@@ -54,6 +59,8 @@ export function ChatView({ scratchId, launchEffort, tileModel, onTerminal, proje
   if (current) returning.current = true
   const main = useMemo(() => (items ? mainThread(items) : []), [items])
   const capped = useMemo(() => capItems(main, limit), [main, limit])
+  const lines = useMemo(() => historyLines(capped.items), [capped.items])
+  const strip = lines.length > 1
 
   const toBottom = useCallback(() => {
     const el = scroller.current
@@ -160,8 +167,9 @@ export function ChatView({ scratchId, launchEffort, tileModel, onTerminal, proje
 
   return (
     <div className={cn('relative flex h-full min-h-0 flex-col', returning.current && 'm-drill-out')} onKeyDown={onKeyDown} data-chat="view">
+      <StageBox crewId={crewId ?? null} on={engineering} />
       <div className="relative min-h-0 flex-1">
-        <div ref={scroller} onScroll={onScroll} onWheel={leaveGlide} onTouchStart={leaveGlide} onPointerDown={leaveGlide} role="log" aria-live="polite" aria-relevant="additions" aria-label="Conversation" className="h-full overflow-y-auto">
+        <div ref={scroller} onScroll={onScroll} onWheel={leaveGlide} onTouchStart={leaveGlide} onPointerDown={leaveGlide} role="log" aria-live="polite" aria-relevant="additions" aria-label="Conversation" className={cn('h-full overflow-y-auto', strip && '[scrollbar-width:none] [&::-webkit-scrollbar]:hidden')}>
           <div ref={inner} className="mx-auto flex max-w-[720px] flex-col gap-3.5 px-5 pt-7 pb-4">
             {state.mcpFailed.length > 0 && <div className="text-warning text-[13px]">MCP server failed to connect: {state.mcpFailed.join(', ')}</div>}
             {(capped.hidden > 0 || state.hasEarlier) && (
@@ -190,6 +198,7 @@ export function ChatView({ scratchId, launchEffort, tileModel, onTerminal, proje
             {state.process === 'stopped' && items!.length > 0 && <div className="text-muted-foreground text-xs">Claude Code is stopped. Sending a message starts it again.</div>}
           </div>
         </div>
+        {strip && <HistoryStrip scroller={scroller} lines={lines} />}
         {!atBottom && (
           <button
             type="button"
@@ -202,7 +211,6 @@ export function ChatView({ scratchId, launchEffort, tileModel, onTerminal, proje
       </div>
       <StatusLine state={state} />
       <TaskList state={state} />
-      <InfoRow state={state} />
       <Composer scratchId={scratchId} state={state} launchEffort={launchEffort} tileModel={tileModel} onSent={jump} />
     </div>
   )

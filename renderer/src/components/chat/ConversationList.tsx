@@ -99,7 +99,7 @@ export const ConversationList = memo(function ConversationList({ scratchId, item
         <ToolGroupRow summary={row.summary} items={row.items} small={small} />
       </div>
     ) : (
-      <div key={row.item.id} className={cn(cls, row.item.kind === 'user' && 'flex justify-end')} data-item={row.item.kind}>
+      <div key={row.item.id} className={cn(cls, row.item.kind === 'user' && 'flex justify-end')} data-item={row.item.kind} data-item-id={row.item.id}>
         <ItemView scratchId={scratchId} item={row.item} onOpenAgent={onOpenAgent} onTerminal={onTerminal} small={small} prompts={prompts} />
       </div>
     )

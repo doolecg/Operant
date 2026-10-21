@@ -58,7 +58,7 @@ import type { GitBranches, GitCommit, GitCommitDetails, GitCommitResult, GitDiff
 import type { Settings, SettingsPatch } from './settings'
 import type { MediaState, MediaTimeline } from './media'
 import type { CapabilityReport, ClaudeTileState } from './mods'
-import type { EngineeringStatus } from './engineering'
+import type { EngineeringStatus, StageLine } from './engineering'
 import type { RunningCounts } from './notify'
 import type { TilePopoutRequest } from './tile-popout'
 import { CHAT_CHANNELS, type ChatApi, type ChatEvents, type ChatImage } from './claude-chat'
@@ -308,6 +308,8 @@ export interface IpcApi extends ChatApi {
   // Engineering Mode and Subagent Factory skill packs: which files the owner edited, and reset (backs those up first).
   'engineering:status': () => EngineeringStatus
   'engineering:reset': () => EngineeringStatus
+  // The stages of the project's newest Engineering task (null when it has none). Every change pushes engineering:tasks.
+  'engineering:stages': (crewId: number) => StageLine[] | null
   // Handled by main: opens <userData>/engineering in the file manager.
   'engineering:openFolder': () => void
   // A Claude Code tile's sub-agents, status line and events state (null when the tile has none yet).
@@ -512,6 +514,8 @@ export interface IpcEvents {
   'index:status': { crewId: number; status: IndexStatus }
   // A project's notes changed.
   'notes:changed': { crewId: number }
+  // A file in a project's .operant/engineering folder changed.
+  'engineering:tasks': { crewId: number }
   // A project went over its warning share of a daily budget.
   // crewId is null for the all-projects cap.
   budget: { crewId: number | null; window: BudgetWindow; spentUsd: number; capUsd: number; pct: number }
@@ -727,6 +731,7 @@ export const CORE_CHANNELS: CoreChannel[] = [
   'claude:doctor',
   'engineering:status',
   'engineering:reset',
+  'engineering:stages',
   'claudeTile:get',
   ...CHAT_CHANNELS,
   'settings:get',

@@ -18,6 +18,7 @@ import { EffortPopover } from './EffortPopover'
 import { setActivity } from './activityStore'
 import { CommandMenu } from './CommandMenu'
 import { LearnPill } from './ComposerPills'
+import { InfoRow } from './InfoRow'
 import { QueueStrip } from './QueueStrip'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { chatActions, onComposerRestore } from './useChat'
@@ -444,10 +445,9 @@ export function Composer({ scratchId, state, launchEffort, tileModel, disabled, 
         )}
         {!enhancing && lastRun?.note && <span className="text-muted-foreground/70 text-[11px]">{lastRun.note}</span>}
         </div>
-        <div className="ml-auto flex max-w-full flex-wrap items-center justify-end gap-x-2 gap-y-1">
-          <KeepWarmLine state={state} />
-          <LearnPill scratchId={scratchId} />
-        </div>
+        <LearnPill scratchId={scratchId} />
+        <KeepWarmLine state={state} />
+        <InfoRow state={state} />
       </div>
       {state.queue.length > 0 && <QueueStrip queue={state.queue} sendBlocked={sendBlocked} onEdit={(id) => void editQueued(id)} onMove={(id, by) => chatActions.queueMove(scratchId, id, by)} onSend={(id) => chatActions.queueSend(scratchId, id)} onRemove={(id) => chatActions.queueRemove(scratchId, id)} />}
       <div className="relative mx-auto max-w-[720px]">

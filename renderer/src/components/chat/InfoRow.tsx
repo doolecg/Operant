@@ -41,7 +41,7 @@ function Figure({ name, pct }: { name: string; pct: number }) {
   )
 }
 
-// One compact row just above the prompt: the context window as a pixel meter with its percent and tokens, the 5-hour and
+// One compact row at the right of the composer's button row, after Enhance prompt and Learn: the context window as a pixel meter with its percent and tokens, the 5-hour and
 // 7-day plan usage when known, and how many sub-agents are running. Model and effort live in the composer.
 export function InfoRow({ state }: { state: ChatState }) {
   const settings = useSettings().data
@@ -53,7 +53,7 @@ export function InfoRow({ state }: { state: ChatState }) {
   const value = pct === null ? null : Math.round(pct)
   const tone = value === null ? 'muted' : meterTone(value, settings?.contextWarnPct ?? 60, settings?.contextDangerPct ?? 85)
   return (
-    <div role="group" aria-label="Session info" data-chat="info-row" className="mx-auto flex w-full max-w-[720px] flex-wrap items-center gap-x-4 gap-y-1 px-5 pb-1.5 text-xs">
+    <div role="group" aria-label="Session info" data-chat="info-row" className="flex min-w-0 flex-1 flex-wrap items-center justify-end gap-x-4 gap-y-1 text-xs">
       <span className="inline-flex items-center gap-1.5">
         <span className="text-muted-foreground">context</span>
         <PixelBar width={72} fraction={(value ?? 0) / 100} tone={tone} label={value === null ? 'Context window, not reported yet' : `Context window ${value}% full`} />
