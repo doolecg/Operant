@@ -9,7 +9,8 @@ export function StatusLine({ state }: { state: ChatState }) {
   const { turn } = state
   const active = turn.phase === 'working' || turn.phase === 'waiting'
   const now = useNow(active && turn.startedAt !== null)
-  if (!active) return null
+  // The row keeps its height when nothing runs, so the conversation above does not jump 28px at the start and end of a turn.
+  if (!active) return <div aria-hidden className="h-7 shrink-0" />
   const waiting = turn.pendingCount > 0
   const elapsed = turn.startedAt !== null ? Math.max(0, now - turn.startedAt) : turn.elapsedMs
   return (

@@ -1,4 +1,4 @@
-import { memo, useMemo } from 'react'
+import { memo, useMemo, useRef } from 'react'
 import { buildRows, type ChatItem, type ChatRow } from '@shared/claude-chat'
 import { planTurns, type TurnEntry } from '@shared/chat-summary'
 import { collectChanges, type FileChange } from '@shared/chat-changes'
@@ -93,6 +93,11 @@ function toRows(entries: TurnEntry[]): Row[] {
 
 export const ConversationList = memo(function ConversationList({ scratchId, items, onOpenAgent, onTerminal, small, prompts = true, live = false, turnStartedAt }: Props) {
   const rows = useMemo(() => toRows(planTurns(items, { live, startedAt: turnStartedAt })), [items, live, turnStartedAt])
+  // A row that was ever among the newest keeps rendering in full: turning it lazy later (the turn ending adds rows after it)
+  // would collapse its height to the 60px guess for a frame and make the view jump.
+  const eager = useRef(new Set<string>())
+  const idOf = (row: Row) => ('item' in row ? row.item.id : row.id)
+  rows.slice(-6).forEach((r) => eager.current.add(idOf(r)))
   const renderRow = (row: ChatRow, cls?: string) =>
     row.type === 'toolGroup' ? (
       <div key={row.id} className={cls}>
@@ -105,8 +110,8 @@ export const ConversationList = memo(function ConversationList({ scratchId, item
     )
   return (
     <>
-      {rows.map((row, i) => {
-        const cls = i >= rows.length - 6 ? undefined : lazy
+      {rows.map((row) => {
+        const cls = eager.current.has(idOf(row)) ? undefined : lazy
         if (row.type === 'fold')
           return (
             <div key={row.id} className={cls}>
