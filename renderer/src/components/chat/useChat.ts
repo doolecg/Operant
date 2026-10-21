@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState, useSyncExternalStore } from 'react'
 import { decodeIpcError } from '@shared/ipc'
-import { emptyChatState, reduceChat, type ChatDecision, type ChatItem, type ChatOp, type ChatState } from '@shared/claude-chat'
+import { emptyChatState, reduceChat, type ChatDecision, type ChatItem, type ChatOp, type ChatSendInput, type ChatState } from '@shared/claude-chat'
 import { bridge } from '@/lib/bridge'
 import { toast } from '@/lib/toast'
 
@@ -93,6 +93,17 @@ export const chatActions = {
     }
   },
   interrupt: (id: number) => void bridge().invoke('chat:interrupt', id).catch(fail),
+  queueSend: (id: number, queuedId: string) => void bridge().invoke('chat:queueSend', id, queuedId).catch(fail),
+  queueMove: (id: number, queuedId: string, by: -1 | 1) => void bridge().invoke('chat:queueMove', id, queuedId, by).catch(fail),
+  queueRemove: (id: number, queuedId: string) => void bridge().invoke('chat:queueRemove', id, queuedId).catch(fail),
+  async queueTake(id: number, queuedId: string): Promise<ChatSendInput | null> {
+    try {
+      return await bridge().invoke('chat:queueTake', id, queuedId)
+    } catch (e) {
+      fail(e)
+      return null
+    }
+  },
   permission: (id: number, requestId: string, decision: ChatDecision) =>
     void bridge().invoke('chat:permission', id, requestId, decision).catch(fail),
   setMode: (id: number, mode: string) => void bridge().invoke('chat:setMode', id, mode).catch(fail),

@@ -17,9 +17,11 @@ import { applySuggestion, currentModel, filterCommands, highlightParts, modeLabe
 import { EffortPopover } from './EffortPopover'
 import { setActivity } from './activityStore'
 import { CommandMenu } from './CommandMenu'
-import { LearnPill, SteerPill } from './ComposerPills'
+import { LearnPill } from './ComposerPills'
+import { QueueStrip } from './QueueStrip'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { chatActions } from './useChat'
+import { altEnterTarget, editRefusal, planSteer } from '@shared/chat-queue'
 
 interface Attachment {
   mediaType: string
@@ -263,6 +265,22 @@ export function Composer({ scratchId, state, launchEffort, tileModel, disabled, 
     onSent()
   }
 
+  // The core also refuses while Claude stops or compacts (and says why in a toast).
+  const steerNow = planSteer({ process: state.process, turnRunning: running, stopping: false, compacting: false, runningSubagents: 0 })
+  const sendBlocked = steerNow.ok ? null : steerNow.reason
+
+  // Edit on a queued message: it leaves the queue and its text goes into the box. A draft in the box is never replaced
+  // (the edit is refused); one typed while the message was being taken keeps its text, the message goes above it.
+  const editQueued = async (id: string) => {
+    const refusal = editRefusal({ text, images: images.length })
+    if (refusal) return toast(refusal, true)
+    const m = await chatActions.queueTake(scratchId, id)
+    if (!m) return toast('That message was already sent', true)
+    setText((t) => (t.trim() ? `${m.text}\n\n${t}` : m.text))
+    setImages((x) => [...(m.images ?? []).map((i) => ({ ...i, preview: `data:${i.mediaType};base64,${i.base64}` })), ...x])
+    area.current?.focus()
+  }
+
   const accept = (i: number) => {
     const h = hits[i]
     if (!h || !trigger) return
@@ -282,6 +300,10 @@ export function Composer({ scratchId, state, launchEffort, tileModel, disabled, 
       if (e.key === 'ArrowUp') return (e.preventDefault(), setSel((s) => (s - 1 + hits.length) % hits.length))
       if (e.key === 'Tab' || (e.key === 'Enter' && !e.shiftKey)) return (e.preventDefault(), accept(sel))
       if (e.key === 'Escape') return (e.preventDefault(), e.stopPropagation(), setDismissed(dismissKey))
+    }
+    if (e.key === 'Enter' && e.altKey) {
+      const id = altEnterTarget({ text, images: images.length }, state.queue)
+      if (id) return (e.preventDefault(), chatActions.queueSend(scratchId, id))
     }
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault()
@@ -413,9 +435,9 @@ export function Composer({ scratchId, state, launchEffort, tileModel, disabled, 
         <div className="ml-auto flex max-w-full flex-wrap items-center justify-end gap-x-2 gap-y-1">
           <KeepWarmLine state={state} />
           <LearnPill scratchId={scratchId} />
-          <SteerPill scratchId={scratchId} running={running} queued={state.items.filter((i) => i.kind === 'user' && i.queued && !i.seen && !i.steer).length} />
         </div>
       </div>
+      {state.queue.length > 0 && <QueueStrip queue={state.queue} sendBlocked={sendBlocked} onEdit={(id) => void editQueued(id)} onMove={(id, by) => chatActions.queueMove(scratchId, id, by)} onSend={(id) => chatActions.queueSend(scratchId, id)} onRemove={(id) => chatActions.queueRemove(scratchId, id)} />}
       <div className="relative mx-auto max-w-[720px]">
         {suggesting && (
           <div role="listbox" aria-label={trigger?.kind === '/' ? 'Commands' : 'Files'} className="bg-popover border-border absolute right-0 bottom-full left-0 z-20 mb-2 max-h-72 overflow-y-auto rounded-[18px] border p-1.5 shadow-[0_10px_30px_rgba(0,0,0,.18)] dark:shadow-[0_10px_30px_rgba(0,0,0,.45)]">

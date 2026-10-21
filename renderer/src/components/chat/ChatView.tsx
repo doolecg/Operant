@@ -119,7 +119,14 @@ export function ChatView({ scratchId, launchEffort, tileModel, onTerminal }: Pro
               </button>
             )}
             {capped.items.length === 0 && state.process !== 'starting' && <p className="text-muted-foreground py-10 text-center text-[13px]">Ask Claude to work on this project.</p>}
-            <ConversationList scratchId={scratchId} items={capped.items} onOpenAgent={(id) => selectAgent(scratchId, id)} onTerminal={onTerminal} />
+            <ConversationList
+              scratchId={scratchId}
+              items={capped.items}
+              onOpenAgent={(id) => selectAgent(scratchId, id)}
+              onTerminal={onTerminal}
+              live={state.turn.phase === 'working' || state.turn.phase === 'waiting'}
+              turnStartedAt={state.turn.startedAt}
+            />
             {state.process === 'starting' && <div className="text-muted-foreground animate-pulse text-[13px]">Starting Claude Code…</div>}
             {state.process === 'crashed' && !crashNotice && (
               <div className="text-destructive flex items-center gap-3 text-[13px]">

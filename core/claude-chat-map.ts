@@ -24,6 +24,7 @@ import {
   type NoticeSource,
   type PermissionItem,
   type PlanItem,
+  type QueuedMessage,
   type QuestionItem,
   type SubagentItem,
   type ToolItem,
@@ -238,9 +239,18 @@ export class ChatMapper {
     return this.drain()
   }
 
-  // How many queued messages Claude has not read yet (steer notes left out).
-  unseenQueued(): number {
-    return this.state.items.filter((i) => i.kind === 'user' && i.queued && !i.seen && !i.steer).length
+  get turnRunning(): boolean {
+    return this.turnActive
+  }
+
+  get isCompacting(): boolean {
+    return this.compacting
+  }
+
+  // The messages Operant holds back until the turn ends (the queue strip).
+  setQueue(queue: QueuedMessage[]): ChatOp[] {
+    this.meta({ queue })
+    return this.drain()
   }
 
   // Claude Code read a message written on stdin (its --replay-user-messages echo): the bubble shows Seen.

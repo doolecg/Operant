@@ -13,6 +13,7 @@ import {
   type NoticeItem,
   type SubagentItem,
 } from '../shared/claude-chat'
+import { moveQueued, planSteer, runningSubagents } from '../shared/chat-queue'
 import { LineBuffer } from './console'
 import { ChatMapper, mapTranscript } from './claude-chat-map'
 import { assertFakeClaude } from './model-run'
@@ -34,8 +35,14 @@ const CRASH_LIMIT = 3
 const STDERR_LINES = 20
 const IN_USE_RETRIES = 8
 const IN_USE_RETRY_MS = 1000
-// Steer with queued messages waiting: the note Claude reads first, just before those messages.
-const STEER_QUEUED_NOTE = 'I sent more messages while you were working. They come right after this one: read them before you go on.'
+
+// A message held until Claude's turn ends (see ChatSession.send); the strip shows it as a QueuedMessage.
+interface HeldMessage {
+  id: string
+  text: string
+  images: NonNullable<ChatSendInput['images']>
+  at: number
+}
 
 // ---------------------------------------------------------------- spawning
 
@@ -167,6 +174,8 @@ export interface ChatSessionDeps {
   }
 }
 
+const toDataUrl = (i: { mediaType: string; base64: string }) => ({ mediaType: i.mediaType, dataUrl: `data:${i.mediaType};base64,${i.base64}` })
+
 const hasFile = (p: string): boolean => {
   try {
     return existsSync(p)
@@ -194,6 +203,9 @@ export class ChatSession {
   private waitingKey: string | null = null
   private disposed = false
   private stopWaiters: Array<() => void> = []
+  private held: HeldMessage[] = []
+  // Stop was pressed: the turn that ends because of it does not start the next held message.
+  private holdAfterStop = false
   private readonly now: () => number
   private readonly setTimer: (fn: () => void, ms: number) => unknown
   private readonly clearTimer: (h: unknown) => void
@@ -440,6 +452,10 @@ export class ChatSession {
     }
     this.syncWaiting()
     if (this.mapper.takeStatusDirty()) this.scheduleStatus()
+    if (type === 'result') {
+      if (this.holdAfterStop) this.holdAfterStop = false
+      else this.writeNextHeld()
+    }
   }
 
   private onClosed(child: ChatChild, code: number | null): void {
@@ -449,6 +465,7 @@ export class ChatSession {
     for (const h of [this.interruptTimer, this.stopTimer]) if (h !== null) this.clearTimer(h)
     this.interruptTimer = null
     this.stopTimer = null
+    this.holdAfterStop = false
     const expected = this.expectedExit
     this.push(this.mapper.noteProcessGone())
     // The Terminal view's Claude may still be letting go of this session id (a view switch): try again shortly.
@@ -559,40 +576,81 @@ export class ChatSession {
     if (!this.ensureRunning()) return
     // A message sent while a plan waits is the comment on it: the plan is denied with that text, which Claude reads first.
     const planRequest = images.length ? null : this.mapper.pendingPlanRequest()
+    // While a turn runs (or earlier messages still wait) the message is held here, not written: the strip can edit,
+    // reorder and remove it until it goes to Claude.
+    if (planRequest === null && (this.mapper.turnRunning || this.held.length)) {
+      this.held.push({ id: `q${this.nextId++}`, text, images, at: this.now() })
+      this.publishHeld()
+      this.writeNextHeld()
+      return
+    }
     // The uuid comes back in Claude Code's replay of the message when it reads it (the bubble then shows Seen).
     const uuid = randomUUID()
-    this.push(
-      this.mapper.noteUserMessage(
-        text,
-        images.map((i) => ({ mediaType: i.mediaType, dataUrl: `data:${i.mediaType};base64,${i.base64}` })),
-        planRequest !== null,
-        false,
-        uuid,
-      ),
-    )
+    this.push(this.mapper.noteUserMessage(text, images.map(toDataUrl), planRequest !== null, false, uuid))
     if (planRequest && this.answer(planRequest, { kind: 'plan', approve: 'keep', message: text })) return
+    this.writeUser(uuid, text, images)
+  }
+
+  private writeUser(uuid: string, text: string, images: HeldMessage['images'], priority?: 'now'): boolean {
     const content: unknown[] = [...images.map((i) => ({ type: 'image', source: { type: 'base64', media_type: i.mediaType, data: i.base64 } }))]
     if (text) content.push({ type: 'text', text })
-    this.write({ type: 'user', uuid, message: { role: 'user', content }, parent_tool_use_id: null, session_id: this.deps.sessionId })
+    return this.write({ type: 'user', uuid, ...(priority ? { priority } : {}), message: { role: 'user', content }, parent_tool_use_id: null, session_id: this.deps.sessionId })
   }
 
-  // A note into the running turn: written to stdin like any message (Claude Code takes it at its next step), shown as a steer bubble.
-  steer(text: string): void {
-    const t = (text ?? '').trim()
-    if (!t) return
-    if (!this.ensureRunning()) return
+  private deliver(m: HeldMessage, how: 'idle' | 'now' | 'next' = 'idle'): void {
     const uuid = randomUUID()
-    this.push(this.mapper.noteUserMessage(t, [], false, true, uuid))
-    this.write({ type: 'user', uuid, message: { role: 'user', content: [{ type: 'text', text: t }] }, parent_tool_use_id: null, session_id: this.deps.sessionId })
+    this.push(this.mapper.noteUserMessage(m.text, m.images.map(toDataUrl), false, how !== 'idle', uuid))
+    this.writeUser(uuid, m.text, m.images, how === 'now' ? 'now' : undefined)
   }
 
-  // Queued messages Claude has not read yet: a note at priority 'now' stops the current step (Claude Code takes it
-  // before anything else queued), then Claude reads the queued messages and carries on. False when none are waiting.
-  steerQueued(): boolean {
-    if (!this.child || !this.mapper.unseenQueued()) return false
-    const uuid = randomUUID()
-    this.push(this.mapper.noteUserMessage(STEER_QUEUED_NOTE, [], false, true, uuid))
-    return this.write({ type: 'user', uuid, priority: 'now', message: { role: 'user', content: [{ type: 'text', text: STEER_QUEUED_NOTE }] }, parent_tool_use_id: null, session_id: this.deps.sessionId })
+  private publishHeld(): void {
+    this.push(this.mapper.setQueue(this.held.map(({ id, text, images, at }) => ({ id, text, imageCount: images.length, at }))))
+  }
+
+  // The turn is over: the first held message goes to Claude. It starts the next turn, so the rest keep waiting.
+  private writeNextHeld(): void {
+    if (!this.child || this.mapper.turnRunning) return
+    const next = this.held.shift()
+    if (!next) return
+    this.publishHeld()
+    this.deliver(next)
+  }
+
+  private get stopping(): boolean {
+    return this.child !== null && (this.expectedExit || this.interruptTimer !== null)
+  }
+
+  // "Send now": a held message goes to Claude at once. Returns why not (null: written), see planSteer.
+  sendHeldNow(id: string): string | null {
+    const i = this.held.findIndex((m) => m.id === id)
+    if (i < 0) return 'That message is no longer queued'
+    const plan = planSteer({ process: this.mapper.state.process, turnRunning: this.mapper.turnRunning, stopping: this.stopping, compacting: this.mapper.isCompacting, runningSubagents: runningSubagents(this.mapper.items) })
+    if (!plan.ok) return plan.reason
+    const [m] = this.held.splice(i, 1)
+    this.publishHeld()
+    this.deliver(m!, plan.how)
+    return null
+  }
+
+  moveHeld(id: string, by: -1 | 1): void {
+    const next = moveQueued(this.held, id, by)
+    if (!next) return
+    this.held = next
+    this.publishHeld()
+  }
+
+  removeHeld(id: string): void {
+    if (!this.held.some((m) => m.id === id)) return
+    this.held = this.held.filter((m) => m.id !== id)
+    this.publishHeld()
+  }
+
+  // Takes a held message out of the queue and hands it back (null: it was written or removed meanwhile).
+  takeHeld(id: string): ChatSendInput | null {
+    const m = this.held.find((x) => x.id === id)
+    if (!m) return null
+    this.removeHeld(id)
+    return { text: m.text, ...(m.images.length ? { images: m.images } : {}) }
   }
 
   // Keep-warm's message, through the same process and session as the owner's messages (so the same cache is read).
@@ -604,6 +662,7 @@ export class ChatSession {
 
   interrupt(): void {
     if (!this.child) return
+    if (this.mapper.turnRunning) this.holdAfterStop = true
     const id = `int-${this.nextId++}`
     this.mapper.expect(id, 'interrupt')
     this.write({ type: 'control_request', request_id: id, request: { subtype: 'interrupt' } })

@@ -230,3 +230,64 @@
 @media (prefers-reduced-motion: reduce) {
   .chat-ai-border::before { animation: none; }
 }
+
+/* Motion tokens shared by the Chat view's rows: press, focus, enter, the running-tool breathe and the agent dot pulse. */
+:root {
+  --m-ease: cubic-bezier(.32, .72, 0, 1);
+  --m-hover: 200ms;
+  --m-select: 170ms;
+  --m-tab: 340ms;
+  --m-enter: 340ms;
+}
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --m-hover: 0ms;
+    --m-select: 0ms;
+    --m-tab: 80ms;
+    --m-enter: 80ms;
+  }
+}
+
+@keyframes m-fade-slide {
+  from { opacity: 0; transform: translateY(var(--m-y, 10px)) scale(.98); filter: blur(4px); }
+  to { opacity: 1; transform: none; filter: none; }
+}
+@keyframes m-breathe {
+  0%, 100% { opacity: .78; }
+  50% { opacity: 1; }
+}
+@keyframes m-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: .35; }
+}
+
+@layer components {
+  /* Buttons and rows: a quick press, an eased colour change, a soft focus ring. */
+  .m-press {
+    transition: transform var(--m-select) var(--m-ease), background-color var(--m-hover) var(--m-ease), color var(--m-hover) var(--m-ease);
+  }
+  .m-press:active:not(:disabled) {
+    transform: scale(.96);
+    transition-duration: 90ms;
+  }
+  .m-press:focus-visible {
+    outline: 2px solid color-mix(in srgb, var(--primary), transparent 35%);
+    outline-offset: 2px;
+  }
+  /* A new row fades and slides in; no filter is left on it once it has arrived. */
+  .m-enter {
+    animation: m-fade-slide var(--m-enter) var(--m-ease) backwards;
+  }
+  .m-enter-row {
+    --m-y: 4px;
+  }
+  .m-breathe {
+    animation: m-breathe 3.4s ease-in-out infinite;
+  }
+  .m-pulse {
+    animation: m-pulse 1.2s ease-in-out infinite;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .m-enter, .m-breathe, .m-pulse { animation: none; }
+}

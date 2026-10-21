@@ -1959,11 +1959,16 @@ export class Operant extends EventEmitter<PushEvents> {
         if (typeof toolUseId !== 'string' || !toolUseId) throw bad('A sub-agent id is needed')
         if (!live(scratchId).stopAgent(toolUseId)) throw conflict('Claude Code has not reported a task id for this sub-agent, so it cannot be stopped on its own')
       },
-      'chat:steer': (scratchId, text) => {
-        if (typeof text !== 'string' || !text.trim()) throw bad('A steer note needs text')
-        live(scratchId).steer(text)
+      'chat:queueSend': (scratchId, id) => {
+        const why = live(scratchId).sendHeldNow(String(id))
+        if (why) throw conflict(why)
       },
-      'chat:steerQueued': (scratchId) => live(scratchId).steerQueued(),
+      'chat:queueMove': (scratchId, id, by) => {
+        if (by !== -1 && by !== 1) throw bad('A queued message moves one place up or down')
+        live(scratchId).moveHeld(String(id), by)
+      },
+      'chat:queueRemove': (scratchId, id) => live(scratchId).removeHeld(String(id)),
+      'chat:queueTake': (scratchId, id) => live(scratchId).takeHeld(String(id)),
       'chat:permission': (scratchId, requestId, decision) => {
         if (typeof requestId !== 'string' || !decision || typeof decision.kind !== 'string') throw bad('Not a valid answer')
         if (!live(scratchId).answer(requestId, decision)) throw conflict('That prompt is no longer waiting')

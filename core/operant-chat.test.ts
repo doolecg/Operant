@@ -10,7 +10,7 @@ import { Operant, type CliAccess, type Scheduler } from './operant'
 import { SessionManager, type Pty, type PtyFactory } from './sessions'
 import { Store } from './store'
 import type { CliTarget } from './cli-server'
-import type { ChatOp } from '../shared/claude-chat'
+import type { ChatOp, ChatState } from '../shared/claude-chat'
 
 class FakePty implements Pty {
   written: string[] = []
@@ -226,14 +226,22 @@ describe('Operant: Chat view tiles', () => {
     expect(consolidated).toEqual([crew.id])
   })
 
-  it('chat:steer writes a note into the running turn and shows it as a steer item', async () => {
+  it('queue handlers reorder, refuse, take and remove messages held while Claude works', () => {
     const t = makeTile()
     op.startScratch(t.id)
-    op.handlers['chat:send'](t.id, { text: 'go' })
-    op.handlers['chat:steer'](t.id, '  use tabs  ')
-    expect(() => op.handlers['chat:steer'](t.id, '   ')).toThrow()
-    const items = (await op.handlers['chat:snapshot'](t.id)).items
-    expect(items.filter((i) => i.kind === 'user').map((i) => [i.kind === 'user' && i.text, i.kind === 'user' && i.steer])).toEqual([['go', undefined], ['use tabs', true]])
+    const { child } = lastChild()
+    for (const text of ['go', 'later', 'last', 'extra']) op.handlers['chat:send'](t.id, { text })
+    const queue = () => (op.handlers['chat:snapshot'](t.id) as ChatState).queue
+    expect(queue().map((q) => q.text)).toEqual(['later', 'last', 'extra'])
+    expect(child.written.filter((w) => w.type === 'user')).toHaveLength(1)
+    expect(() => op.handlers['chat:queueMove'](t.id, queue()[0]!.id, 2 as never)).toThrow()
+    op.handlers['chat:queueMove'](t.id, queue()[1]!.id, -1)
+    expect(queue().map((q) => q.text)).toEqual(['last', 'later', 'extra'])
+    expect(() => op.handlers['chat:queueSend'](t.id, queue()[0]!.id)).toThrow(/not running/)
+    expect(op.handlers['chat:queueTake'](t.id, queue()[0]!.id)).toEqual({ text: 'last' })
+    op.handlers['chat:queueRemove'](t.id, queue()[1]!.id)
+    expect(queue().map((q) => q.text)).toEqual(['later'])
+    expect(op.handlers['chat:queueTake'](t.id, 'gone')).toBeNull()
   })
 
   it('switches Chat -> Terminal -> Chat between turns on the same session, without learning', async () => {

@@ -61,8 +61,17 @@ export interface UserItem {
   // Claude Code read it (its --replay-user-messages echo arrived): shows a "Seen" tag. Live messages only.
   seen?: boolean
   at: number
-  // A short note sent into a running turn to change Claude's course (chat:steer).
+  // Sent into a running turn on purpose from the queue strip ("Send now").
   steer?: boolean
+}
+
+// A message the owner sent while Claude works: Operant holds it (it is not in `items`) and writes it to Claude when the
+// turn ends, or at once on "Send now". The images stay in core; the strip only needs how many.
+export interface QueuedMessage {
+  id: string
+  text: string
+  imageCount: number
+  at: number
 }
 
 // Assistant prose (Markdown). `streaming` is true while text deltas still arrive.
@@ -396,6 +405,8 @@ export interface ChatState {
   rateLimit: { type: string; utilization: number; resetsAt: number; status: string } | null
   // /keepwarm (null: never turned on for this tile).
   keepWarm: KeepWarmView | null
+  // Messages sent while Claude works, in the order they will be written (see QueuedMessage).
+  queue: QueuedMessage[]
 }
 
 export type ChatMeta = Omit<ChatState, 'items'>
@@ -436,6 +447,7 @@ export function emptyChatState(scratchId: number): ChatState {
     contextUsage: null,
     rateLimit: null,
     keepWarm: null,
+    queue: [],
   }
 }
 
@@ -514,20 +526,23 @@ export interface ChatHistoryPage {
 export interface ChatApi {
   // Current state; for a tile whose process is not running, the transcript's newest items with process 'stopped'.
   'chat:snapshot': (scratchId: number) => ChatState
-  // Writes a user message. While a turn runs Claude Code queues it (the bubble shows "Queued"). Restarts a stopped or
-  // crashed process first (resume), unless it crashed three times within a minute.
+  // Writes a user message. While a turn runs Operant holds it in state.queue and writes it when the turn ends. Restarts a
+  // stopped or crashed process first (resume), unless it crashed three times within a minute.
   'chat:send': (scratchId: number, input: ChatSendInput) => void
   // Interrupt: the turn ends with an "Interrupted" notice; if Claude Code does not answer within 5 s the process is
   // killed and restarted with --resume on the next send.
   'chat:interrupt': (scratchId: number) => void
   // Stops ONE sub-agent (stop_task with its task id); the rest of the turn carries on. Refused (CONFLICT) while Claude Code has not reported the agent's task id.
   'chat:stopAgent': (scratchId: number, toolUseId: string) => void
-  // A short note into the running turn: Claude Code reads it at its next step and changes course without the turn
-  // stopping. The user item carries steer: true. With no turn running it is an ordinary message.
-  'chat:steer': (scratchId: number, text: string) => void
-  // Makes Claude read the queued messages it has not seen yet now: a short note at priority 'now', which stops the
-  // current step; Claude reads the queued messages right after it and carries on. False when nothing is waiting.
-  'chat:steerQueued': (scratchId: number) => boolean
+  // "Send now" on a queued message: written to Claude at once (see planSteer in chat-queue.ts for how). Refused (CONFLICT)
+  // while Claude Code is stopping, compacting or not running, or when the message is no longer queued.
+  'chat:queueSend': (scratchId: number, id: string) => void
+  // Moves a queued message one place up (-1) or down (1).
+  'chat:queueMove': (scratchId: number, id: string, by: -1 | 1) => void
+  'chat:queueRemove': (scratchId: number, id: string) => void
+  // Takes a queued message out of the queue and returns it (the strip's Edit puts it in the chat box). Null when it was
+  // already written or removed.
+  'chat:queueTake': (scratchId: number, id: string) => ChatSendInput | null
   'chat:permission': (scratchId: number, requestId: string, decision: ChatDecision) => void
   // set_permission_mode; state.permissionMode updates when Claude Code confirms.
   'chat:setMode': (scratchId: number, mode: string) => void
@@ -554,8 +569,10 @@ export const CHAT_CHANNELS = [
   'chat:send',
   'chat:interrupt',
   'chat:stopAgent',
-  'chat:steer',
-  'chat:steerQueued',
+  'chat:queueSend',
+  'chat:queueMove',
+  'chat:queueRemove',
+  'chat:queueTake',
   'chat:permission',
   'chat:setMode',
   'chat:setModel',

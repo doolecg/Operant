@@ -1,4 +1,4 @@
-import { memo, useState } from 'react'
+import { memo, useState, type ReactNode } from 'react'
 import { AlertCircle, Bot, Box, BrainCircuit, Camera, ChevronRight, Copy, FileText, Gauge, Globe, Info, ListChecks, Minimize2, Network, Pencil, Plug, Search, Sparkles, Square, SquareTerminal, Webhook, Wrench, type LucideIcon } from 'lucide-react'
 import {
   partialTarget,
@@ -12,10 +12,14 @@ import {
   type TurnItem,
   type UserItem,
 } from '@shared/claude-chat'
+import { agentTimer, elapsedText, isAgentOpen } from '@shared/chat-summary'
 import { Markdown, CopyTextButton } from '@/components/ui/markdown'
 import { PixelBar, meterTone } from '@/components/ui/pixel-bar'
+import { Critter } from '@/components/mods/agents/Critter'
+import { critterFor } from '@/components/mods/agents/agentView'
 import { cn } from '@/lib/utils'
-import { agentContext, agentRowFor, agentTitle, agentTldr, firstLines, formatDuration, isToolRunning, kTokens, noticeChipIcon, toolIconKey, tokensSuffix, toolRowParts, type ChipIcon, type ToolIconKey } from './chatHelpers'
+import { agentRowFor, agentTitle, agentTldr, firstLines, formatDuration, isToolRunning, kTokens, noticeChipIcon, toolIconKey, tokensSuffix, toolRowParts, type AgentDot, type ChipIcon, type ToolIconKey } from './chatHelpers'
+import { useClock } from './clock'
 import { ImageModal } from './ImageModal'
 
 const TOOL_ICONS: Record<ToolIconKey, LucideIcon> = {
@@ -148,7 +152,7 @@ export const AssistantText = memo(function AssistantText({ item, small }: { item
 
 // ---------------------------------------------------------------- quiet rows
 
-const rowBtn = 'text-muted-foreground hover:text-foreground flex w-full items-center gap-2 py-[3px] text-left text-[13px]'
+const rowBtn = 'm-press text-muted-foreground hover:text-foreground hover:bg-accent -mx-1.5 flex w-[calc(100%+0.75rem)] items-center gap-2 rounded-md px-1.5 py-[3px] text-left text-[13px]'
 
 export const ThinkingRow = memo(function ThinkingRow({ item }: { item: ThinkingItem }) {
   const [open, setOpen] = useState(false)
@@ -163,10 +167,10 @@ export const ThinkingRow = memo(function ThinkingRow({ item }: { item: ThinkingI
         aria-expanded={canOpen ? open : undefined}
         title={item.tokens ? `About ${item.tokens} thinking tokens (Claude Code's estimate)` : undefined}
         onClick={() => setOpen((o) => !o)}
-        className={cn(rowBtn, !canOpen && 'cursor-default hover:text-muted-foreground')}
+        className={cn(rowBtn, !canOpen && 'cursor-default hover:bg-transparent hover:text-muted-foreground')}
       >
         <ChevronRight className={cn('size-3 shrink-0 transition-transform', open && 'rotate-90')} aria-hidden />
-        <span>{label}</span>
+        <span className={cn(!done && 'm-breathe')}>{label}</span>
         {!done && <Spinner />}
       </button>
       {open && canOpen && <div className="text-muted-foreground ml-5 text-[13px] whitespace-pre-wrap">{item.text}</div>}
@@ -233,12 +237,13 @@ export const ToolRow = memo(function ToolRow({ t, small }: { t: ToolItem; small?
         type="button"
         aria-expanded={open}
         aria-label={`Tool: ${p.verb} ${target}, ${state}`}
+        title={target !== t.summary && t.summary ? t.summary : undefined}
         onClick={() => setOpen((o) => !o)}
         className={cn(rowBtn, small && 'text-xs')}
       >
         <ChevronRight className={cn('size-3 shrink-0 transition-transform', open && 'rotate-90')} aria-hidden />
         <Icon className="size-3.5 shrink-0" aria-hidden />
-        <span className="min-w-0 truncate">
+        <span className={cn('min-w-0 truncate', running && 'm-breathe')}>
           {p.tone === 'denied' && <span className="text-foreground">Denied: </span>}
           <span className={cn('text-foreground font-medium', p.tone === 'failed' && 'text-destructive')}>{p.verb}</span>
           {target && <span className="text-muted-foreground/80"> {target}</span>}
@@ -248,7 +253,6 @@ export const ToolRow = memo(function ToolRow({ t, small }: { t: ToolItem; small?
             <span className="text-success">{p.stat.split(' ')[0]}</span> <span className="text-destructive">{p.stat.split(' ')[1]}</span>
           </span>
         )}
-        {running && <Spinner />}
       </button>
       {open && <ToolDetails t={t} />}
     </div>
@@ -274,24 +278,77 @@ export const ToolGroupRow = memo(function ToolGroupRow({ summary, items, small }
   )
 })
 
+const AGENT_DOT: Record<AgentDot, string> = { running: 'bg-info', waiting: 'bg-warning', done: 'bg-success', failed: 'bg-destructive', unknown: 'bg-muted-foreground' }
+const AGENT_WORD: Record<AgentDot, string> = { running: 'Running', waiting: 'Waiting', done: 'Finished', failed: 'Failed', unknown: 'Stopped' }
+
+// An agent: its icon with a status dot, bold name, quiet status word, one line (what it does now, or how it ended), its timer and a chevron.
 export const SubagentRow = memo(function SubagentRow({ item, onOpen, small }: { item: SubagentItem; onOpen: (id: string) => void; small?: boolean }) {
-  const running = item.status === 'running' || item.status === 'waiting'
+  const open = isAgentOpen(item)
+  const now = useClock(open)
   const row = agentRowFor(item)
-  const title = agentTitle(row)
-  const tldr = agentTldr(item)
-  const ctx = agentContext(item)
+  const critter = critterFor(item.id)
+  const ms = agentTimer(item, now)
+  const line = (open ? item.latest.trim() : item.status === 'interrupted' ? '' : agentTldr(item)) || row.description
   return (
-    <button type="button" onClick={() => onOpen(item.id)} title="Open this agent in the Agents panel" className={cn(rowBtn, 'items-start', small && 'text-xs')} data-chat="agent">
-      <ChevronRight className="mt-[3px] size-3 shrink-0" aria-hidden />
-      <span className="min-w-0 flex-1">
-        <span className={cn('text-foreground block truncate font-semibold', item.status === 'failed' && 'text-destructive')}>{title}</span>
-        {ctx && <ContextBar ctx={ctx} />}
-        {tldr && <span className="block truncate text-xs">{tldr}</span>}
+    <button
+      type="button"
+      onClick={() => onOpen(item.id)}
+      title="Open this agent in the Agents panel"
+      className={cn('m-press m-enter m-enter-row hover:bg-accent flex w-full items-center gap-2.5 rounded-xl px-2 py-2 text-left', small && 'text-xs')}
+      data-chat="agent"
+    >
+      <span className="relative shrink-0">
+        <Critter hat={critter.hat} tint={critter.tint} bob={open} size={28} />
+        <i aria-hidden className={cn('absolute -right-0.5 -bottom-0.5 size-1.5 rounded-full', AGENT_DOT[row.dot], open && 'm-pulse')} />
       </span>
-      {running && <Spinner className="mt-1" />}
+      <span className="min-w-0 flex-1">
+        <span className="flex items-baseline gap-2">
+          <span className={cn('text-foreground min-w-0 truncate text-[13px] font-semibold', row.dot === 'failed' && 'text-destructive')}>{agentTitle(row)}</span>
+          <span className="text-muted-foreground shrink-0 text-xs">{AGENT_WORD[row.dot]}</span>
+        </span>
+        <span className="text-muted-foreground block truncate text-xs">{line}</span>
+      </span>
+      {ms !== null && <span className="text-muted-foreground shrink-0 text-xs tabular-nums">{elapsedText(ms)}</span>}
+      <ChevronRight className="text-muted-foreground size-3.5 shrink-0" aria-hidden />
     </button>
   )
 })
+
+// Above two or more agents of a turn: "2 running, 1 finished".
+export function AgentsSummary({ text, small }: { text: string; small?: boolean }) {
+  return (
+    <div className={cn('text-muted-foreground m-enter m-enter-row px-2 text-[13px]', small && 'text-xs')} data-chat="agents-summary">
+      {text}
+    </div>
+  )
+}
+
+// A finished turn's thinking and tool rows in one row: "Worked for 4m 23s" (or "You stopped after 12s"); a click shows them.
+export function TurnFold({ ms, stopped, failed, small, children }: { ms: number; stopped: boolean; failed: number; small?: boolean; children: ReactNode }) {
+  const [open, setOpen] = useState(false)
+  return (
+    <div data-chat="turn-fold">
+      <button type="button" aria-expanded={open} onClick={() => setOpen((o) => !o)} className={cn(rowBtn, 'w-fit max-w-full', small && 'text-xs')}>
+        <span className="min-w-0 truncate">
+          {stopped ? 'You stopped after' : 'Worked for'} {elapsedText(ms)}
+        </span>
+        {failed > 0 && <span className="text-destructive shrink-0">{failed} failed</span>}
+        <ChevronRight className={cn('size-3 shrink-0 transition-transform', open && 'rotate-90')} aria-hidden />
+      </button>
+      {open && <div className="m-enter m-enter-row mt-0.5 ml-5 flex flex-col gap-1">{children}</div>}
+    </div>
+  )
+}
+
+// The running turn's heading: "Working for 4m 23s", ticking once a second.
+export function WorkingHeading({ startedAt, small }: { startedAt: number; small?: boolean }) {
+  const now = useClock(true)
+  return (
+    <div className={cn('text-muted-foreground py-[3px] text-[13px] tabular-nums', small && 'text-xs')} data-chat="working">
+      Working for {elapsedText(now - startedAt)}
+    </div>
+  )
+}
 
 // A pixel meter of how much of the model's context window the agent uses.
 export function ContextBar({ ctx }: { ctx: { pct: number; used: number; window: number } }) {

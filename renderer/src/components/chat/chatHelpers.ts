@@ -1,5 +1,6 @@
 import { claudeContextWindow, modelName } from '@shared/models'
 import { isAgentTool, itemsOf, mcpParts, toolVerb, type ChatCommand, type ChatItem, type ChatModel, type ChatState, type SubagentItem, type ToolItem } from '@shared/claude-chat'
+import { shellProgram } from '@shared/chat-summary'
 
 // Pure helpers of the Chat view (formatting, menus, suggestions, the agent list). No React here so they can be tested.
 
@@ -253,7 +254,7 @@ export function toolRowParts(t: ToolItem): ToolRowParts {
   const finished = t.status !== 'preparing' && t.status !== 'running'
   const stat = t.diff ? `+${t.diff.added} −${t.diff.removed}` : null
   const tone = t.status === 'failed' ? 'failed' : t.status === 'denied' ? 'denied' : 'normal'
-  return { verb: toolVerb(t.name, finished), target: t.summary, stat, tone }
+  return { verb: toolVerb(t.name, finished), target: shellProgram(t) ?? t.summary, stat, tone }
 }
 
 export type ToolIconKey = 'memory' | 'code' | 'web' | 'file' | 'edit' | 'terminal' | 'search' | 'skill' | 'agent' | 'todo' | 'plug' | 'tool'

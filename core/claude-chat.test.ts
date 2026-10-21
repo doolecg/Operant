@@ -107,6 +107,7 @@ function harness(over: Partial<ChatSessionDeps> = {}, transcript?: string) {
 }
 
 const initResponse = () => fixture('mod').find((l) => l.type === 'control_response')!
+const RESULT = { type: 'result', subtype: 'success', is_error: false, num_turns: 1, duration_ms: 5 }
 
 describe('ChatSession: process and protocol', () => {
   it('sends initialize first, becomes ready on its answer, then asks for the context breakdown', () => {
@@ -138,7 +139,7 @@ describe('ChatSession: process and protocol', () => {
     expect(h.session.state.process).toBe('ready')
   })
 
-  it('writes a user message with images first and marks later messages queued', () => {
+  it('writes a user message with images first and holds later messages until the turn ends', () => {
     const h = harness()
     h.session.start()
     const c = h.children[0]!
@@ -151,32 +152,126 @@ describe('ChatSession: process and protocol', () => {
       session_id: 's1',
     })
     h.session.send({ text: 'and this' })
-    const users = h.session.state.items.filter((i) => i.kind === 'user')
-    expect(users.map((u) => (u.kind === 'user' ? [u.text, u.queued, u.images.length] : null))).toEqual([['look at this', false, 1], ['and this', true, 0]])
+    const users = () => h.session.state.items.flatMap((i) => (i.kind === 'user' ? [[i.text, i.queued, i.images.length]] : []))
+    expect(users()).toEqual([['look at this', false, 1]])
+    expect(h.session.state.queue).toEqual([{ id: expect.any(String), text: 'and this', imageCount: 0, at: expect.any(Number) }])
     h.session.send({ text: '   ' })
-    expect(c.withType('user')).toHaveLength(2)
+    expect(c.withType('user')).toHaveLength(1)
     expect(h.session.state.turn.phase).toBe('working')
+    c.out(RESULT)
+    expect(c.last()).toMatchObject({ type: 'user', message: { content: [{ type: 'text', text: 'and this' }] } })
+    expect(users()).toEqual([['look at this', false, 1], ['and this', false, 0]])
+    expect(h.session.state.queue).toEqual([])
   })
 
-  it('marks a message seen when Claude Code replays it, and Steer makes Claude read unseen queued messages now', () => {
+  it('writes one held message per turn, in order', () => {
     const h = harness()
     h.session.start()
     const c = h.children[0]!
+    for (const t of ['a', 'b', 'c']) h.session.send({ text: t })
+    expect(c.withType('user')).toHaveLength(1)
+    expect(h.session.state.queue.map((q) => q.text)).toEqual(['b', 'c'])
+    c.out(RESULT)
+    expect(c.withType('user').map((w) => w.message.content[0].text)).toEqual(['a', 'b'])
+    expect(h.session.state.queue.map((q) => q.text)).toEqual(['c'])
+    c.out(RESULT)
+    expect(c.withType('user').map((w) => w.message.content[0].text)).toEqual(['a', 'b', 'c'])
+    expect(h.mirror().queue).toEqual([])
+  })
+
+  it('moves, removes and takes held messages; a taken message keeps its images and is not written', () => {
+    const h = harness()
+    h.session.start()
+    const c = h.children[0]!
+    h.session.send({ text: 'go' })
+    for (const t of ['b', 'c', 'd']) h.session.send({ text: t, images: t === 'c' ? [{ mediaType: 'image/png', base64: 'AAAA' }] : [] })
+    const ids = () => h.session.state.queue.map((q) => q.id)
+    const [b, cc, d] = ids() as [string, string, string]
+    h.session.moveHeld(d, -1)
+    h.session.moveHeld(b, -1)
+    expect(h.session.state.queue.map((q) => q.text)).toEqual(['b', 'd', 'c'])
+    expect(h.session.state.queue.at(-1)!.imageCount).toBe(1)
+    h.session.removeHeld(d)
+    expect(h.session.takeHeld(cc)).toEqual({ text: 'c', images: [{ mediaType: 'image/png', base64: 'AAAA' }] })
+    expect(h.session.takeHeld(cc)).toBeNull()
+    expect(h.session.takeHeld('nope')).toBeNull()
+    expect(h.mirror().queue.map((q) => q.text)).toEqual(['b'])
+    c.out(RESULT)
+    c.out(RESULT)
+    expect(c.withType('user').map((w) => w.message.content[0].text)).toEqual(['go', 'b'])
+  })
+
+  it('Send now writes a held message at once: stopping the current step, or joining at the next one while sub-agents run', () => {
+    const h = harness()
+    h.session.start()
+    const c = h.children[0]!
+    c.out(initResponse())
+    h.session.send({ text: 'go' })
     h.session.send({ text: 'first' })
     h.session.send({ text: 'second' })
-    const [first, second] = c.withType('user') as { uuid: string }[]
+    const [first, second] = h.session.state.queue.map((q) => q.id) as [string, string]
+    expect(h.session.sendHeldNow(second)).toBeNull()
+    expect(c.last()).toMatchObject({ type: 'user', priority: 'now', message: { content: [{ type: 'text', text: 'second' }] } })
+    expect(h.session.state.queue.map((q) => q.text)).toEqual(['first'])
+    expect(h.session.state.items.filter((i) => i.kind === 'user').map((i) => (i.kind === 'user' ? [i.text, i.steer ?? false] : null))).toEqual([['go', false], ['second', true]])
+    c.out({ type: 'assistant', message: { id: 'm1', role: 'assistant', model: 'claude-haiku-5-5', content: [{ type: 'tool_use', id: 'toolu_A', name: 'Agent', input: { description: 'Look', prompt: 'p', subagent_type: 'Explore' } }] }, parent_tool_use_id: null })
+    expect(h.session.sendHeldNow(first)).toBeNull()
+    expect(c.last()).toMatchObject({ type: 'user', message: { content: [{ type: 'text', text: 'first' }] } })
+    expect(c.last()).not.toHaveProperty('priority')
+    expect(h.session.sendHeldNow(first)).toMatch(/no longer queued/)
+  })
+
+  it('Send now is refused while Claude Code is not running, compacting or stopping, and the message stays queued', () => {
+    const h = harness()
+    h.session.start()
+    const c = h.children[0]!
+    h.session.send({ text: 'go' })
+    h.session.send({ text: 'later' })
+    const id = h.session.state.queue[0]!.id
+    expect(h.session.sendHeldNow(id)).toMatch(/not running/)
+    c.out(initResponse())
+    c.out({ type: 'system', subtype: 'status', status: 'compacting' })
+    expect(h.session.sendHeldNow(id)).toMatch(/compacting/)
+    c.out({ type: 'system', subtype: 'status', status: null })
+    h.session.interrupt()
+    expect(h.session.sendHeldNow(id)).toMatch(/stopping/)
+    expect(h.session.state.queue.map((q) => q.text)).toEqual(['later'])
+    expect(c.withType('user')).toHaveLength(1)
+  })
+
+  it('after Stop the held messages wait; the next message sent starts them in order', () => {
+    const h = harness()
+    h.session.start()
+    const c = h.children[0]!
+    h.session.send({ text: 'go' })
+    h.session.send({ text: 'b' })
+    h.session.interrupt()
+    c.out({ type: 'result', subtype: 'error_during_execution', is_error: true, num_turns: 1, duration_ms: 5, terminal_reason: 'aborted_streaming' })
+    expect(c.withType('user')).toHaveLength(1)
+    expect(h.session.state.queue.map((q) => q.text)).toEqual(['b'])
+    h.session.send({ text: 'c' })
+    expect(c.withType('user').map((w) => w.message.content[0].text)).toEqual(['go', 'b'])
+    expect(h.session.state.queue.map((q) => q.text)).toEqual(['c'])
+  })
+
+  it('marks a message seen when Claude Code replays it, also one sent now from the queue', () => {
+    const h = harness()
+    h.session.start()
+    const c = h.children[0]!
+    c.out(initResponse())
+    h.session.send({ text: 'first' })
+    h.session.send({ text: 'second' })
     const users = () => h.session.state.items.flatMap((i) => (i.kind === 'user' ? [[i.text, i.queued, i.seen ?? false]] : []))
-    c.out({ type: 'user', isReplay: true, uuid: first!.uuid, message: { role: 'user', content: [{ type: 'text', text: 'first' }] }, parent_tool_use_id: null })
+    const replay = (uuid: string, text: string) => c.out({ type: 'user', isReplay: true, uuid, message: { role: 'user', content: [{ type: 'text', text }] }, parent_tool_use_id: null })
+    replay((c.withType('user')[0] as { uuid: string }).uuid, 'first')
+    expect(users()).toEqual([['first', false, true]])
+    expect(h.session.sendHeldNow(h.session.state.queue[0]!.id)).toBeNull()
     expect(users()).toEqual([['first', false, true], ['second', true, false]])
-    expect(h.session.steerQueued()).toBe(true)
-    expect(c.last()).toMatchObject({ type: 'user', priority: 'now', message: { content: [{ type: 'text', text: expect.stringContaining('read them') }] } })
-    c.out({ type: 'user', isReplay: true, uuid: second!.uuid, message: { role: 'user', content: [{ type: 'text', text: 'second' }] }, parent_tool_use_id: null })
-    expect(users().slice(0, 2)).toEqual([['first', false, true], ['second', false, true]])
+    replay((c.last() as { uuid: string }).uuid, 'second')
+    expect(users()).toEqual([['first', false, true], ['second', false, true]])
     // A replay with no known uuid (a keep-warm ping) adds nothing.
-    c.out({ type: 'user', isReplay: true, uuid: 'x', message: { role: 'user', content: [{ type: 'text', text: 'ping' }] }, parent_tool_use_id: null })
-    expect(users()).toHaveLength(3)
-    // Nothing unseen is waiting (the steer note itself does not count): Steer has nothing to push.
-    expect(h.session.steerQueued()).toBe(false)
+    replay('x', 'ping')
+    expect(users()).toHaveLength(2)
   })
 
   it('answers a permission prompt with the control_response Claude Code expects', () => {
