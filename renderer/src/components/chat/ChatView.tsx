@@ -17,6 +17,7 @@ import { chatActions, useChatState } from './useChat'
 
 const RENDER_CAP = 300
 const NEAR_BOTTOM = 80
+const FOLLOW_MS = 120
 
 interface Props {
   scratchId: number
@@ -59,17 +60,39 @@ export function ChatView({ scratchId, launchEffort, tileModel, onTerminal, proje
     if (el) el.scrollTop = el.scrollHeight
   }, [])
 
+  // Growth while the owner is near the bottom glides there, at most once per FOLLOW_MS; a long way down (opening the chat) or reduced motion snaps.
+  const glideAt = useRef(0)
+  const glideTimer = useRef<number | undefined>(undefined)
+  const glideUntil = useRef(0)
+  const follow: () => void = useCallback(() => {
+    const el = scroller.current
+    if (!el || !stuck.current) return
+    if (el.scrollHeight - el.scrollTop - el.clientHeight > el.clientHeight || window.matchMedia('(prefers-reduced-motion: reduce)').matches) return toBottom()
+    const wait = FOLLOW_MS - (performance.now() - glideAt.current)
+    if (wait > 0) {
+      glideTimer.current ??= window.setTimeout(() => {
+        glideTimer.current = undefined
+        follow()
+      }, wait)
+      return
+    }
+    glideAt.current = performance.now()
+    glideUntil.current = glideAt.current + 400
+    el.scrollTo({ top: el.scrollHeight, behavior: 'smooth' })
+  }, [toBottom])
+  useEffect(() => () => window.clearTimeout(glideTimer.current), [])
+
   // Follow the newest content while the owner has not scrolled away.
   useLayoutEffect(() => {
     const el = inner.current
     if (!el) return
-    const ro = new ResizeObserver(() => stuck.current && toBottom())
+    const ro = new ResizeObserver(follow)
     ro.observe(el)
     return () => ro.disconnect()
-  }, [toBottom, state === null, !current])
+  }, [follow, state === null, !current])
   useLayoutEffect(() => {
-    if (stuck.current) toBottom()
-  }, [items, toBottom, !current])
+    if (stuck.current) follow()
+  }, [items, follow, !current])
   // Coming back from an agent: the scroll position it was left at.
   useLayoutEffect(() => {
     const el = scroller.current
@@ -84,13 +107,16 @@ export function ChatView({ scratchId, launchEffort, tileModel, onTerminal, proje
     if (!el) return
     const near = el.scrollHeight - el.scrollTop - el.clientHeight < NEAR_BOTTOM
     lastTop.current = el.scrollTop
-    stuck.current = near
+    // Growth during a glide can put the bottom more than NEAR_BOTTOM away; that is not the owner scrolling off.
+    if (near || performance.now() > glideUntil.current) stuck.current = near
     setAtBottom(near)
   }
+  const leaveGlide = () => (glideUntil.current = 0)
   const jump = () => {
     stuck.current = true
     setAtBottom(true)
-    toBottom()
+    glideUntil.current = performance.now() + 1000
+    scroller.current?.scrollTo({ top: scroller.current.scrollHeight, behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth' })
   }
 
   const loadEarlier = async () => {
@@ -135,7 +161,7 @@ export function ChatView({ scratchId, launchEffort, tileModel, onTerminal, proje
   return (
     <div className={cn('relative flex h-full min-h-0 flex-col', returning.current && 'm-drill-out')} onKeyDown={onKeyDown} data-chat="view">
       <div className="relative min-h-0 flex-1">
-        <div ref={scroller} onScroll={onScroll} role="log" aria-live="polite" aria-relevant="additions" aria-label="Conversation" className="h-full overflow-y-auto">
+        <div ref={scroller} onScroll={onScroll} onWheel={leaveGlide} onTouchStart={leaveGlide} onPointerDown={leaveGlide} role="log" aria-live="polite" aria-relevant="additions" aria-label="Conversation" className="h-full overflow-y-auto">
           <div ref={inner} className="mx-auto flex max-w-[720px] flex-col gap-3.5 px-5 pt-7 pb-4">
             {state.mcpFailed.length > 0 && <div className="text-warning text-[13px]">MCP server failed to connect: {state.mcpFailed.join(', ')}</div>}
             {(capped.hidden > 0 || state.hasEarlier) && (

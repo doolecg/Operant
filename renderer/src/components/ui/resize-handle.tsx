@@ -37,6 +37,7 @@ export function ResizeHandle({ target, axis, grow, min, max, label, onResize, on
     e.preventDefault()
     e.currentTarget.setPointerCapture(e.pointerId)
     drag.current = { from: pos(e), size: size(), last: size() }
+    target.current?.setAttribute('data-resizing', '')
     setActive(true)
   }
   const move = (e: PointerEvent) => {
@@ -48,6 +49,7 @@ export function ResizeHandle({ target, axis, grow, min, max, label, onResize, on
   const up = () => {
     const d = drag.current
     drag.current = null
+    target.current?.removeAttribute('data-resizing')
     setActive(false)
     if (d) onCommit(d.last)
   }

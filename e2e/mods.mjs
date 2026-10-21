@@ -27,6 +27,7 @@ try {
   const page = await app.firstWindow()
   await page.setViewportSize({ width: 1920, height: 1080 })
   await page.waitForFunction(() => !!window.operant)
+  await page.evaluate(() => window.operant.invoke('settings:set', { setupDone: true }))
   const inv = (channel, ...args) => page.evaluate(([c, a]) => window.operant.invoke(c, ...a), [channel, args])
   const until = async (label, fn, timeout) => {
     for (const end = Date.now() + timeout; Date.now() < end; await page.waitForTimeout(250)) if (await fn().catch(() => false)) return

@@ -2,6 +2,7 @@ import { useLayoutEffect, useRef } from 'react'
 import { ChevronDown, ChevronUp, Navigation, Pencil, X } from 'lucide-react'
 import type { QueuedMessage } from '@shared/claude-chat'
 import { queuePreview } from '@shared/chat-queue'
+import { useFlip } from '@/components/ui/use-flip'
 
 interface Props {
   queue: QueuedMessage[]
@@ -26,6 +27,8 @@ function enter(el: HTMLElement | null): void {
 // The messages held until Claude's turn ends, above the chat box: edit, reorder, send now, remove.
 export function QueueStrip({ queue, sendBlocked, onEdit, onMove, onSend, onRemove }: Props) {
   const box = useRef<HTMLDivElement>(null)
+  const list = useRef<HTMLUListElement>(null)
+  useFlip(list)
   const refocus = useRef<{ id: string; act: 'up' | 'down' } | null>(null)
   // A moved row is re-inserted, which drops keyboard focus: put it back on the same arrow (or the other at the ends).
   useLayoutEffect(() => {
@@ -43,12 +46,12 @@ export function QueueStrip({ queue, sendBlocked, onEdit, onMove, onSend, onRemov
   return (
     <div ref={box} role="region" aria-label="Queued messages" className="bg-accent/50 mx-auto mb-1.5 max-w-[720px] rounded-[18px] p-1.5">
       <div className="text-muted-foreground px-2 pt-0.5 pb-1 text-[13px]">{queue.length} queued</div>
-      <ul className="max-h-40 overflow-y-auto">
+      <ul ref={list} className="max-h-40 overflow-y-auto">
         {queue.map((m, i) => {
           const n = i + 1
           const label = queuePreview(m.text)
           return (
-            <li key={m.id} ref={enter} className="hover:bg-accent flex items-center gap-0.5 rounded-xl py-0.5 pr-1 pl-2">
+            <li key={m.id} ref={enter} data-flip={m.id} className="hover:bg-accent flex items-center gap-0.5 rounded-xl py-0.5 pr-1 pl-2">
               <span className="min-w-0 flex-1 truncate text-[13px]">{label}</span>
               {m.imageCount > 0 && <span className="text-muted-foreground shrink-0 px-1 text-[12px]">{m.imageCount === 1 ? '1 image' : `${m.imageCount} images`}</span>}
               <button type="button" aria-label={`Edit queued message ${n}`} title="Edit: put it back in the box" onClick={() => onEdit(m.id)} className={`${btn} w-6`}>

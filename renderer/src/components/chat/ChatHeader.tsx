@@ -1,5 +1,6 @@
 import { tileState } from '@shared/claude-chat'
 import type { ScratchView } from '@shared/types'
+import { SlidingThumb } from '@/components/ui/sliding-thumb'
 import { cn } from '@/lib/utils'
 import { ContextButton } from './ContextPopover'
 import { useChatState } from './useChat'
@@ -54,13 +55,14 @@ export function ViewSwitch({ view, blockedReason, onChange }: { view: ScratchVie
       disabled={view !== v && !!blockedReason}
       title={view !== v ? (blockedReason ?? undefined) : undefined}
       onClick={() => view !== v && onChange(v)}
-      className={cn('rounded-full px-[11px] py-px text-[13px] disabled:cursor-not-allowed disabled:opacity-50', view === v ? 'bg-card text-foreground' : 'text-muted-foreground hover:text-foreground')}
+      className={cn('m-press relative rounded-full px-[11px] py-px text-[13px] disabled:cursor-not-allowed disabled:opacity-50', view === v ? 'text-foreground' : 'text-muted-foreground hover:text-foreground')}
     >
       {label}
     </button>
   )
   return (
-    <div role="group" aria-label="View" className="bg-accent flex rounded-full p-0.5">
+    <div role="group" aria-label="View" className="bg-accent relative flex rounded-full p-0.5">
+      <SlidingThumb selector='[aria-pressed="true"]' className="bg-card rounded-full" />
       {opt('chat', 'Chat')}
       {opt('terminal', 'Terminal')}
     </div>

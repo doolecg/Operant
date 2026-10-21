@@ -238,6 +238,15 @@
   --m-select: 170ms;
   --m-tab: 340ms;
   --m-enter: 340ms;
+  --m-pop: 280ms;
+  --m-tip: 200ms;
+  --m-dialog: 420ms;
+  --m-toast: 480ms;
+  --m-exit: 240ms;
+  /* Damped springs sampled once: soft k230 c25.6 (0.7% overshoot), toast k240 c20 (7%), snap k380 c32 (1%). */
+  --m-spring-soft: linear(0, .0469, .1552, .2889, .4256, .5522, .6623, .7536, .8265, .8826, .9244, .9546, .9756, .9896, .9984, 1.0035, 1.0061, 1.0071, 1.007, 1.0064, 1.0055, 1.0045, 1.0035, 1.0027, 1);
+  --m-spring-toast: linear(0, .07, .2309, .4246, .6128, .7734, .8972, .9834, 1.0363, 1.0627, 1.0703, 1.0657, 1.0545, 1.0409, 1.0277, 1.0163, 1.0075, 1.0013, .9975, .9956, .9951, .9954, .9961, .9971, 1);
+  --m-spring-snap: linear(0, .0472, .1567, .2926, .4319, .5611, .6733, .7661, .8397, .8958, .9371, .9663, .986, .9985, 1.0059, 1.0096, 1.0109, 1.0107, 1.0097, 1.0082, 1.0067, 1.0052, 1.0039, 1.0029, 1);
 }
 @media (prefers-reduced-motion: reduce) {
   :root {
@@ -249,8 +258,33 @@
 }
 
 @keyframes m-fade-slide {
-  from { opacity: 0; transform: translateY(var(--m-y, 10px)) scale(.98); filter: blur(4px); }
+  from { opacity: 0; transform: translate(var(--m-x, 0), var(--m-y, 10px)) scale(.98); filter: blur(4px); }
   to { opacity: 1; transform: none; filter: none; }
+}
+/* Surfaces (menus, popovers, dialogs, toasts) enter as two animations so a spring can overshoot the movement without pushing opacity or blur out of range. */
+@keyframes m-fx-in {
+  from { opacity: 0; filter: blur(4px); }
+}
+@keyframes m-move-in {
+  from { transform: translate(var(--m-x, 0), var(--m-y, 10px)) scale(.98); }
+}
+@keyframes m-out {
+  to { opacity: 0; transform: translate(var(--m-x, 0), var(--m-y, 10px)) scale(.98); }
+}
+@keyframes m-fade-in {
+  from { opacity: 0; }
+}
+@keyframes m-fade-out {
+  to { opacity: 0; }
+}
+/* A panel that mounts grows from nothing; the clip hides the squeezed content while it grows and then lets the resize handle show. */
+@keyframes m-panel-in-x {
+  from { width: 0; min-width: 0; opacity: 0; clip-path: inset(0); }
+  to { clip-path: inset(-6px); }
+}
+@keyframes m-panel-in-y {
+  from { flex-basis: 0%; opacity: 0; clip-path: inset(0); }
+  to { clip-path: inset(-6px); }
 }
 @keyframes m-breathe {
   0%, 100% { opacity: .78; }
@@ -278,7 +312,66 @@
 @layer components {
   /* Buttons and rows: a quick press, an eased colour change, a soft focus ring. */
   .m-press {
-    transition: transform var(--m-select) var(--m-ease), background-color var(--m-hover) var(--m-ease), color var(--m-hover) var(--m-ease);
+    transition: transform var(--m-select) var(--m-ease), background-color var(--m-hover) var(--m-ease), color var(--m-hover) var(--m-ease), border-color var(--m-hover) var(--m-ease), opacity var(--m-hover) var(--m-ease), box-shadow var(--m-hover) var(--m-ease);
+  }
+  /* Rows with no press scale (menu items, tab triggers): only the eased colour change. */
+  .m-row {
+    transition: background-color var(--m-hover) var(--m-ease), color var(--m-hover) var(--m-ease);
+  }
+  /* Radix surfaces: fade, blur and slide in from the trigger's edge (data-side), settle with an ease, leave faster. */
+  .m-surface {
+    animation: m-fx-in var(--m-fx, var(--m-pop)) var(--m-ease) backwards, m-move-in var(--m-t, var(--m-pop)) var(--m-curve, var(--m-ease)) backwards;
+  }
+  .m-surface[data-side='top'] { --m-x: 0px; --m-y: 8px; }
+  .m-surface[data-side='bottom'] { --m-x: 0px; --m-y: -8px; }
+  .m-surface[data-side='left'] { --m-x: 8px; --m-y: 0px; }
+  .m-surface[data-side='right'] { --m-x: -8px; --m-y: 0px; }
+  .m-surface[data-state='closed'] {
+    animation: m-out var(--m-exit) var(--m-ease) forwards;
+  }
+  .m-tip {
+    --m-t: var(--m-tip);
+    --m-fx: var(--m-tip);
+  }
+  .m-tip[data-state='closed'] {
+    --m-exit: 120ms;
+  }
+  .m-dialog {
+    --m-t: var(--m-dialog);
+    --m-fx: var(--m-exit);
+    --m-curve: var(--m-spring-soft);
+  }
+  .m-toast {
+    --m-t: var(--m-toast);
+    --m-fx: var(--m-exit);
+    --m-curve: var(--m-spring-toast);
+  }
+  .m-overlay {
+    animation: m-fade-in var(--m-exit) var(--m-ease) backwards;
+  }
+  .m-overlay[data-state='closed'] {
+    animation: m-fade-out var(--m-exit) var(--m-ease) forwards;
+  }
+  /* Panels: their size changes ease, except while a resize handle is being dragged. */
+  .m-panel {
+    transition: width var(--m-tab) var(--m-ease), flex-basis var(--m-tab) var(--m-ease);
+  }
+  .m-panel[data-resizing] {
+    transition: none;
+  }
+  .m-panel-in-x {
+    animation: m-panel-in-x var(--m-tab) var(--m-ease) backwards;
+  }
+  .m-panel-in-y {
+    animation: m-panel-in-y var(--m-tab) var(--m-ease) backwards;
+  }
+  /* The selection indicator under the active item of a segmented control (SlidingThumb). */
+  .m-thumb {
+    position: absolute;
+    top: 0;
+    left: 0;
+    pointer-events: none;
+    transition: transform var(--m-select) var(--m-ease), width var(--m-select) var(--m-ease), height var(--m-select) var(--m-ease);
   }
   .m-press:active:not(:disabled) {
     transform: scale(.96);
@@ -304,6 +397,11 @@
 }
 @media (prefers-reduced-motion: reduce) {
   .m-enter, .m-breathe, .m-pulse { animation: none; }
+  .m-press:active:not(:disabled) { transform: none; }
+  .m-surface, .m-surface[data-state='closed'], .m-overlay, .m-overlay[data-state='closed'], .m-panel-in-x, .m-panel-in-y { animation-duration: 80ms; animation-timing-function: linear; }
+  .m-surface, .m-panel-in-x, .m-panel-in-y { animation-name: m-fade-in; }
+  .m-surface[data-state='closed'] { animation-name: m-fade-out; }
+  .m-panel { transition-duration: 80ms; }
 }
 
 .m-drill-in { animation: m-drill-in 480ms cubic-bezier(.16, 1, .3, 1) backwards; }

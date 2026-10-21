@@ -58,7 +58,7 @@ export function ClaudeModsHost({ tileId, crewId, chat }: { tileId: number; crewI
       ref={panel}
       aria-label={`Claude Mods: ${mod.title} panel`}
       data-testid="subagent-panel"
-      className="bg-card relative my-1.5 mr-1.5 flex min-h-0 shrink-0 flex-col overflow-hidden rounded-2xl border text-xs shadow-xs dark:shadow-none"
+      className="m-panel bg-card relative my-1.5 mr-1.5 flex min-h-0 shrink-0 flex-col overflow-hidden rounded-2xl border text-xs shadow-xs dark:shadow-none"
       style={{ width: collapsed ? 44 : width }}
     >
       {!collapsed && (

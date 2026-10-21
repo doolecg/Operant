@@ -1,13 +1,14 @@
 import { ChevronDown } from 'lucide-react'
 import type { KeyboardEvent } from 'react'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
+import { SlidingThumb } from '@/components/ui/sliding-thumb'
 import { cn } from '@/lib/utils'
 
 export type Mode = 'terminal' | 'memory'
 export const MODES: Mode[] = ['terminal', 'memory']
 export const MODE_LABEL: Record<Mode, string> = { terminal: 'Terminal', memory: 'Memory' }
 
-// Terminal | Memory as a pill track; the active pill is filled with the accent and grows wider with a springy ease.
+// Terminal | Memory as a pill track; a single accent pill slides under the active label.
 // Left and right arrow keys move between the pills. `menu` swaps the track for a dropdown when the bar is too narrow.
 export function ViewSwitcher({ mode, onMode, menu, badges }: { mode: Mode; onMode: (m: Mode) => void; menu: boolean; badges?: Partial<Record<Mode, number>> }) {
   if (menu) {
@@ -39,7 +40,8 @@ export function ViewSwitcher({ mode, onMode, menu, badges }: { mode: Mode; onMod
     e.currentTarget.querySelector<HTMLButtonElement>(`[data-mode="${next}"]`)?.focus()
   }
   return (
-    <div role="group" aria-label="Dashboard mode" onKeyDown={onKey} className="bg-foreground/5 flex shrink-0 items-center gap-1 rounded-full p-[3px]">
+    <div role="group" aria-label="Dashboard mode" onKeyDown={onKey} className="bg-foreground/5 relative flex shrink-0 items-center gap-1 rounded-full p-[3px]">
+      <SlidingThumb selector='[aria-pressed="true"]' className="rounded-full bg-[#d97757]" />
       {MODES.map((m) => (
         <button
           key={m}
@@ -49,8 +51,8 @@ export function ViewSwitcher({ mode, onMode, menu, badges }: { mode: Mode; onMod
           tabIndex={m === mode ? 0 : -1}
           onClick={() => onMode(m)}
           className={cn(
-            'h-[22px] rounded-full text-xs outline-none transition-[padding,background-color,color] duration-[350ms] ease-[cubic-bezier(.05,.9,.1,1.05)] focus-visible:ring-[3px] focus-visible:ring-ring/50',
-            m === mode ? 'bg-[#d97757] px-4 font-semibold text-[#1f1208]' : 'text-muted-foreground hover:text-foreground px-2.5',
+            'm-press relative h-[22px] rounded-full px-3 text-xs outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50',
+            m === mode ? 'font-semibold text-[#1f1208]' : 'text-muted-foreground hover:text-foreground',
           )}
         >
           {MODE_LABEL[m]}

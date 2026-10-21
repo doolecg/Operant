@@ -8,6 +8,7 @@ import { STAGES, STAGE_KEYS, canEditFiles } from "@shared/presets";
 import { PresetEditor } from "@/components/presets/PresetEditor";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { SlidingThumb } from "@/components/ui/sliding-thumb";
 import {
   Card,
   CardAction,
@@ -200,18 +201,17 @@ export function PresetsSection() {
           <div
             role="group"
             aria-label={`CLI for ${info.name}`}
-            className="bg-muted mr-1 inline-flex rounded-md p-0.5"
+            className="bg-muted relative mr-1 inline-flex rounded-md p-0.5"
           >
+            <SlidingThumb selector='[aria-pressed="true"]' className="bg-background rounded-md" />
             {(["claude", "opencode"] as Cli[]).map((c) => (
               <button
                 key={c}
                 type="button"
                 aria-pressed={cli === c}
                 onClick={() => setCliByStage((s) => ({ ...s, [key]: c }))}
-                className={`rounded-md px-2 py-1 text-xs ${
-                  cli === c
-                    ? "bg-background font-medium shadow-sm"
-                    : "text-muted-foreground"
+                className={`m-press relative rounded-md px-2 py-1 text-xs ${
+                  cli === c ? "font-medium" : "text-muted-foreground"
                 }`}
               >
                 {CLI_LABEL[c]}

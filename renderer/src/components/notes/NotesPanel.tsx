@@ -266,7 +266,7 @@ export function NotesPanel({ crewId, onCollapse }: { crewId: number | null; onCo
       ref={aside}
       aria-label="Notes"
       style={{ width: panel.width || NOTES_DEFAULT, minWidth: NOTES_MIN, maxWidth: NOTES_MAX }}
-      className={cn('bg-card relative m-1.5 mr-0 flex shrink-0 flex-col rounded-2xl border shadow-xs dark:shadow-none', onCollapse && 'absolute inset-y-0 left-0 z-40 shadow-lg')}
+      className={cn('m-panel bg-card relative m-1.5 mr-0 flex shrink-0 flex-col rounded-2xl border shadow-xs dark:shadow-none', onCollapse && 'absolute inset-y-0 left-0 z-40 shadow-lg')}
     >
       <ResizeHandle
         target={aside}

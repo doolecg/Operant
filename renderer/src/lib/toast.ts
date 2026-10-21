@@ -5,6 +5,8 @@ export interface Toast {
   id: number
   text: string
   error: boolean
+  // Set while the exit animation plays.
+  leaving?: boolean
 }
 
 let toasts: Toast[] = []
@@ -13,8 +15,13 @@ const listeners = new Set<() => void>()
 const emit = () => listeners.forEach((l) => l())
 
 export function dismissToast(id: number): void {
-  toasts = toasts.filter((t) => t.id !== id)
+  if (!toasts.some((t) => t.id === id && !t.leaving)) return
+  toasts = toasts.map((t) => (t.id === id ? { ...t, leaving: true } : t))
   emit()
+  setTimeout(() => {
+    toasts = toasts.filter((t) => t.id !== id)
+    emit()
+  }, 240)
 }
 
 // A short message in the corner; it clears itself (errors stay longer).

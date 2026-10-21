@@ -26,6 +26,7 @@ const app = await electron.launch({ args: ['.'], env })
 try {
   const page = await app.firstWindow()
   await page.waitForFunction(() => !!window.operant)
+  await page.evaluate(() => window.operant.invoke('settings:set', { setupDone: true }))
   const inv = (channel, ...args) => page.evaluate(([c, a]) => window.operant.invoke(c, ...a), [channel, args])
   const win = (op, size) =>
     app.evaluate(({ BrowserWindow }, [o, s]) => {

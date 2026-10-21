@@ -45,7 +45,7 @@ try {
   await page.getByText('Welcome to Operant 3').waitFor()
   await page.evaluate(async (folder) => {
     const o = window.operant
-    await o.invoke('settings:set', { uiScale: 1 })
+    await o.invoke('settings:set', { setupDone: true, uiScale: 1 })
     await o.invoke('crews:create', { name: 'shop', folder })
   }, project)
   await page.locator('[data-crew-row]').getByText('shop', { exact: true }).click({ position: { x: 4, y: 4 } })

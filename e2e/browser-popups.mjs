@@ -34,6 +34,7 @@ try {
   for (const st of [app.process().stdout, app.process().stderr]) st?.on('data', (c) => (output += String(c)))
   const page = await app.firstWindow()
   await page.waitForFunction(() => !!window.operant)
+  await page.evaluate(() => window.operant.invoke('settings:set', { setupDone: true }))
   const inv = (c, ...a) => page.evaluate(([ch, args]) => window.operant.invoke(ch, ...args), [c, a])
   const contents = () => app.evaluate(({ webContents }) => webContents.getAllWebContents().map((w) => ({ id: w.id, url: w.getURL() })))
   const run = (id, code) => app.evaluate(({ webContents }, [i, c]) => webContents.fromId(i).executeJavaScript(c, true), [id, code])

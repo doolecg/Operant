@@ -79,7 +79,7 @@ export function ConsoleDrawer({ lines, processes, onClear, onStop, onClose }: Pr
       aria-label="Console"
       data-testid="console-drawer"
       style={{ flexBasis: `${height}%` }}
-      className="bg-card relative mx-1.5 mb-1.5 flex min-h-0 shrink-0 flex-col rounded-2xl border shadow-xs dark:shadow-none"
+      className="m-panel m-panel-in-y bg-card relative mx-1.5 mb-1.5 flex min-h-0 shrink-0 flex-col rounded-2xl border shadow-xs dark:shadow-none"
     >
       <DrawerResizeHandle root={root} label="Resize console" storageKey={HEIGHT} onHeight={setHeight} />
       <div className="flex shrink-0 flex-wrap items-center gap-2 border-b px-3 py-1.5">

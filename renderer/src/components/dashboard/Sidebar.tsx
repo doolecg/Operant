@@ -24,6 +24,7 @@ import { Button } from '@/components/ui/button'
 import { ContextMenu, ContextMenuTrigger } from '@/components/ui/context-menu'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
 import { ResizeHandle } from '@/components/ui/resize-handle'
+import { useFlip } from '@/components/ui/use-flip'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { bridge } from '@/lib/bridge'
 import { CLI_SHORT, cliBlocked } from '@/lib/capabilities'
@@ -164,6 +165,7 @@ export function Sidebar({ crews: allCrews, selected, onSelect, onNewCrew, action
   const panel = usePanelWidth('sidebarWidth')
   const aside = useRef<HTMLElement>(null)
   const tree = useRef<HTMLDivElement>(null)
+  useFlip(tree)
 
   const [dragId, setDragId] = useState<Drag | null>(null)
   // The drag in flight, readable at once by the events that follow the drag start (state lags a render).
@@ -349,6 +351,7 @@ export function Sidebar({ crews: allCrews, selected, onSelect, onNewCrew, action
             aria-selected={isSelected}
             draggable
             data-crew-row={crew.id}
+            data-flip={`p${crew.id}`}
             data-nav-current={isCurrent && focused ? 'true' : undefined}
             data-nav-label={`project:${crew.name}`}
             data-waiting={waiting?.has(crew.id) ? 'true' : undefined}
@@ -468,6 +471,7 @@ export function Sidebar({ crews: allCrews, selected, onSelect, onNewCrew, action
       <section key={g.id} aria-label={`Group ${g.name}`} data-group={g.id}>
         <div
           draggable={renaming !== g.id}
+          data-flip={`g${g.id}`}
           data-nav-current={isCurrent && focused ? 'true' : undefined}
           data-nav-label={`group:${g.name}`}
           role="treeitem"
@@ -583,7 +587,7 @@ export function Sidebar({ crews: allCrews, selected, onSelect, onNewCrew, action
       ref={aside}
       aria-label="Projects"
       style={{ width: panel.width || `min(${PANEL_DEFAULT}px, 35vw)`, minWidth: `min(${PANEL_MIN}px, 35vw)`, maxWidth: `min(${PANEL_MAX}px, 50vw)` }}
-      className="bg-card relative m-1.5 mr-0 flex shrink-0 flex-col rounded-2xl border shadow-xs dark:shadow-none"
+      className="m-panel m-panel-in-x bg-card relative m-1.5 mr-0 flex shrink-0 flex-col rounded-2xl border shadow-xs dark:shadow-none"
     >
       <ResizeHandle
         target={aside}

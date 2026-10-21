@@ -3,6 +3,7 @@ import { X } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { ScrollArea } from '@/components/ui/scroll-area'
+import { SlidingThumb } from '@/components/ui/sliding-thumb'
 import { hiddenSections } from '@shared/install'
 import { useAppInfo, useInstallStatus, useSettings } from '@/lib/queries'
 import { cn } from '@/lib/utils'
@@ -101,7 +102,8 @@ export function SettingsPage({ initialSection, onClose }: { initialSection?: str
               </optgroup>
             ))}
           </select>
-          <nav aria-label="Settings pages" className="hidden min-h-0 flex-1 overflow-y-auto min-[900px]:block">
+          <nav aria-label="Settings pages" className="relative hidden min-h-0 flex-1 overflow-y-auto min-[900px]:block">
+            <SlidingThumb selector='[aria-current="page"]' className="bg-accent rounded-md" />
             {categories.map((c) => (
               <div key={c.label} className="mb-4">
                 <p className="text-foreground/80 px-2.5 pb-1 text-xs font-bold">{c.label}</p>
@@ -116,8 +118,8 @@ export function SettingsPage({ initialSection, onClose }: { initialSection?: str
                         aria-current={active ? 'page' : undefined}
                         onClick={() => openPage(p)}
                         className={cn(
-                          'w-full rounded-md px-2.5 py-1.5 text-left text-sm transition-colors',
-                          active ? 'bg-accent text-accent-foreground' : 'text-muted-foreground hover:bg-accent/50 hover:text-foreground',
+                          'm-row relative w-full rounded-md px-2.5 py-1.5 text-left text-sm',
+                          active ? 'text-accent-foreground' : 'text-muted-foreground hover:bg-accent/50 hover:text-foreground',
                         )}
                       >
                         {p.label}

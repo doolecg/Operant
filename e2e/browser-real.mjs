@@ -57,6 +57,7 @@ try {
   const page = await app.firstWindow()
   await page.setViewportSize({ width: 1920, height: 1080 })
   await page.waitForFunction(() => !!window.operant)
+  await page.evaluate(() => window.operant.invoke('settings:set', { setupDone: true }))
   const inv = (c, ...a) => page.evaluate(([ch, args]) => window.operant.invoke(ch, ...args), [c, a])
   await inv('settings:set', { mainCli: 'claude', browser: { homeUrl: `${base}/`, autonomy: 'full' } })
   const crew = await inv('crews:create', { name: 'alpha', folder: cwd })

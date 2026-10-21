@@ -28,6 +28,7 @@ try {
   app = await electron.launch({ args: ['.'], env })
   const page = await app.firstWindow()
   await page.waitForFunction(() => !!window.operant)
+  await page.evaluate(() => window.operant.invoke('settings:set', { setupDone: true }))
   const inv = (c, ...a) => page.evaluate(([c, a]) => window.operant.invoke(c, ...a), [c, a])
   const win = (fn) => app.evaluate(({ BrowserWindow }, f) => new Function('w', `return (${f})(w)`)(BrowserWindow.getAllWindows()[0]), fn.toString())
   await page.getByText('Welcome to Operant 3').waitFor()

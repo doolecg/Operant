@@ -44,7 +44,7 @@ export function TerminalDrawer({ tabs, active, onSelect, onClose, onNewShell, on
       aria-label="Terminals"
       data-testid="terminal-drawer"
       style={{ flexBasis: `${height}%` }}
-      className="bg-card relative mx-1.5 mb-1.5 flex min-h-0 shrink-0 flex-col rounded-2xl border shadow-xs dark:shadow-none"
+      className="m-panel bg-card relative mx-1.5 mb-1.5 flex min-h-0 shrink-0 flex-col rounded-2xl border shadow-xs dark:shadow-none"
     >
       <DrawerResizeHandle root={root} label="Resize terminals" storageKey={HEIGHT} onHeight={setHeight} />
       <div className="flex shrink-0 items-center gap-1 border-b px-2 py-1">

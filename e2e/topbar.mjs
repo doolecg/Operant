@@ -50,7 +50,7 @@ try {
   await page.locator('[data-crew-row]').getByText('shop', { exact: true }).click({ position: { x: 4, y: 4 } })
   await page.getByRole('heading', { name: 'shop' }).waitFor({ state: 'attached' })
 
-  await page.evaluate(() => window.operant.invoke('settings:set', { uiScale: 1, topBar: { mediaSize: 'compact' } }))
+  await page.evaluate(() => window.operant.invoke('settings:set', { setupDone: true, uiScale: 1, topBar: { mediaSize: 'compact' } }))
   const bar = page.getByRole('group', { name: 'Media controls' })
   await bar.waitFor()
   await bar.getByText('Midnight City').waitFor()
