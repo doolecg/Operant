@@ -53,6 +53,14 @@ The Engineering Mode and Subagent Factory Mode skill packs (`plugin/engineering`
 
 Each installer ships `LICENSE.txt` and `THIRD_PARTY_NOTICES.txt` (the licenses of every package bundled with the app) in the `licenses` folder of the app's resources, alongside Electron's and Chromium's licenses. Settings, General, License opens that folder.
 
+## Disclaimer
+
+This software is provided "as is", without warranty of any kind, as set out in the [LICENSE](LICENSE). To the extent permitted by law, the authors are not liable for any loss or damage from using it, including lost data, lost work or damage to files or projects. Nothing here limits liability that cannot be limited by law, such as for death or personal injury caused by negligence.
+
+Back up your work before using it. You use it at your own risk.
+
+Claude Code, OpenCode and the other AI tools Operant starts send your prompts and the files they read to their own services under your account and their terms. Operant does not control that. Not affiliated with or endorsed by Anthropic. AI output can be wrong; check it before relying on it.
+
 ## Credits
 
 Inspired by [OpenRig](https://github.com/mvschwarz/openrig) and [Paperclip](https://github.com/paperclipai/paperclip). Built with [CodeGraph](https://github.com/colbymchenry/codegraph) and [shadcn/ui](https://github.com/shadcn-ui/ui).
