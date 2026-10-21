@@ -65,7 +65,7 @@ export const ChangedFilesCard = memo(function ChangedFilesCard({ files, small }:
     })
 
   return (
-    <section aria-label="Changed files" className={cn('m-enter m-enter-row bg-muted/50 rounded-xl p-1.5 text-[13px]', small && 'text-xs')} data-chat="changed-files">
+    <section aria-label="Changed files" className={cn('m-enter m-enter-row surface rounded-xl p-1.5 text-[13px]', small && 'text-xs')} data-chat="changed-files">
       <div className="flex items-center gap-2.5 py-1 pr-1 pl-2">
         <span className="text-foreground font-medium">{changedFilesTitle(files.length)}</span>
         <Counts added={total.added} removed={total.removed} />

@@ -33,7 +33,7 @@ export function ContextCard({
   const v = contextView(status, compactAt)
   if (!v) {
     return (
-      <section aria-label="Context" className={cn('bg-card rounded-2xl border p-3 text-xs', className)}>
+      <section aria-label="Context" className={cn('surface p-3 text-xs', className)}>
         <h3 className="font-medium">◆ context</h3>
         <p className="text-muted-foreground mt-1">No context reported yet.</p>
       </section>
@@ -42,7 +42,7 @@ export function ContextCard({
   const pct = Math.round(v.pct)
   const tone = pct >= danger ? 'text-red-400 border-red-400/40' : pct >= warn ? 'text-amber-400 border-amber-400/40' : 'text-muted-foreground'
   return (
-    <section aria-label="Context" className={cn('bg-card rounded-2xl border p-3 text-xs', className)}>
+    <section aria-label="Context" className={cn('surface p-3 text-xs', className)}>
       <header className="flex items-center justify-between gap-2">
         <h3 className="font-medium">◆ context</h3>
         <span className="text-muted-foreground truncate font-mono text-[10px]">

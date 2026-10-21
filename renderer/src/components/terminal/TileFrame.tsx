@@ -75,7 +75,7 @@ export function TileFrame({ id, title, badge, icon, heading, subtitle, status, f
       onPointerDown={onFocus}
       style={style}
       className={cn(
-        'bg-card absolute flex flex-col overflow-hidden rounded-2xl border shadow-xs dark:shadow-none',
+        'surface-edge bg-card absolute flex flex-col overflow-hidden rounded-[18px]',
         dragging ? 'transition-[border-color]' : 'transition-[left,top,width,height,border-color,opacity] duration-150',
         moving && 'opacity-60',
         dropTarget && 'ring-primary ring-2',

@@ -18,7 +18,7 @@ export function Toaster() {
           data-state={t.leaving ? 'closed' : 'open'}
           role={t.error ? 'alert' : 'status'}
           className={cn(
-            'm-surface m-toast bg-popover text-popover-foreground pointer-events-auto flex items-start gap-2 rounded-xl border p-3 text-sm shadow-lg',
+            'm-surface m-toast bg-popover surface-edge text-popover-foreground pointer-events-auto flex items-start gap-2 rounded-xl p-3 text-sm',
             t.error && 'border-destructive/60',
           )}
         >

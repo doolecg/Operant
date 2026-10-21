@@ -8,8 +8,9 @@ export function encodeProjectDir(cwd: string): string {
   return cwd.replace(/[^a-zA-Z0-9]/g, '-')
 }
 
-// Claude Code encodes its real working directory, so resolve 8.3 short names (C:\Users\ABCDEF~1)
-// and symlinks first or the folder name won't match.
+// Claude Code encodes the working directory it was started in: usually the real path, but an 8.3 short name
+// (C:\Users\ABCDEF~1) is kept as given. Prefer the resolved path and fall back to the path as given when only that
+// folder exists.
 export function transcriptProjectDir(cwd: string, env?: PathEnv): string {
   let real = cwd
   try {
@@ -17,7 +18,10 @@ export function transcriptProjectDir(cwd: string, env?: PathEnv): string {
   } catch {
     /* folder missing: fall back to the path as given */
   }
-  return join(claudeProjectsDir(env), encodeProjectDir(real))
+  const projects = claudeProjectsDir(env)
+  const resolved = join(projects, encodeProjectDir(real))
+  const asGiven = join(projects, encodeProjectDir(cwd))
+  return asGiven !== resolved && !existsSync(resolved) && existsSync(asGiven) ? asGiven : resolved
 }
 
 export function transcriptPath(cwd: string, sessionId: string, env?: PathEnv): string {

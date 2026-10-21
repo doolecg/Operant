@@ -65,7 +65,7 @@ function ProviderCard({ p }: { p: ProviderStatus }) {
   const { money } = useMoney()
   const noData = p.windows.length === 0 && p.rows.length === 0 && p.balance == null
   return (
-    <section aria-label={`${p.name} usage`} className="bg-card space-y-2 rounded-lg border px-3.5 py-3">
+    <section aria-label={`${p.name} usage`} className="surface space-y-2 rounded-lg px-3.5 py-3">
       <div className="flex flex-wrap items-center gap-2">
         <h4 className="text-sm font-medium">{p.name}</h4>
         <Badge variant={p.state === 'error' ? 'destructive' : 'outline'}>{STATE_LABEL[p.state]}</Badge>

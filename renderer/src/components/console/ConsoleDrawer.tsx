@@ -79,10 +79,10 @@ export function ConsoleDrawer({ lines, processes, onClear, onStop, onClose }: Pr
       aria-label="Console"
       data-testid="console-drawer"
       style={{ flexBasis: `${height}%` }}
-      className="m-panel m-panel-in-y bg-card relative mx-1.5 mb-1.5 flex min-h-0 shrink-0 flex-col rounded-2xl border shadow-xs dark:shadow-none"
+      className="m-panel m-panel-in-y surface relative mx-1.5 mb-1.5 flex min-h-0 shrink-0 flex-col"
     >
       <DrawerResizeHandle root={root} label="Resize console" storageKey={HEIGHT} onHeight={setHeight} />
-      <div className="flex shrink-0 flex-wrap items-center gap-2 border-b px-3 py-1.5">
+      <div className="surface-line flex shrink-0 flex-wrap items-center gap-2 border-b px-3 py-1.5">
         <span className="text-sm font-medium">Console</span>
         <div role="tablist" aria-label="Source" className="bg-muted flex flex-wrap rounded-lg p-0.5">
           {tab('all', 'All')}
@@ -118,7 +118,7 @@ export function ConsoleDrawer({ lines, processes, onClear, onStop, onClose }: Pr
       </div>
 
       {processes.length > 0 && (
-        <ul aria-label="Running processes" className="flex shrink-0 flex-wrap gap-x-4 gap-y-1 border-b px-3 py-1 text-xs">
+        <ul aria-label="Running processes" className="surface-line flex shrink-0 flex-wrap gap-x-4 gap-y-1 border-b px-3 py-1 text-xs">
           {processes.map((p) => (
             <li key={p.pid} className="flex min-w-0 items-center gap-1.5">
               <span className="size-1.5 shrink-0 rounded-full bg-emerald-400" aria-hidden />

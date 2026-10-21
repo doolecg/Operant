@@ -32,7 +32,7 @@ export function LearningStatusPanel({ crewId, onShowDrafts }: { crewId: number |
         <ErrorLine error={status.error ?? save.error} />
         {s && learn && (
           <>
-            <div className="flex items-center justify-between gap-4 rounded-md border p-3">
+            <div className="surface-line flex items-center justify-between gap-4 rounded-md border p-3">
               <div aria-label="Last learn run" role="group">
                 <div className="text-sm font-medium">
                   Learning is {s.enabled ? 'on' : 'off'}
@@ -65,7 +65,7 @@ export function LearningStatusPanel({ crewId, onShowDrafts }: { crewId: number |
                 const st = s.stores.find((x) => x.store === id)
                 if (!st) return null
                 return (
-                  <li key={id} className="space-y-1.5 rounded-md border p-3" data-store={id}>
+                  <li key={id} className="surface-line space-y-1.5 rounded-md border p-3" data-store={id}>
                     <div className="flex items-center justify-between gap-2">
                       <span className="text-sm font-medium">{STORE_LABEL[id]}</span>
                       <Switch aria-label={`${STORE_LABEL[id]} on or off`} checked={learn[id]} onCheckedChange={(v) => toggle({ [id]: v })} />
@@ -105,7 +105,7 @@ export function LearningStatusPanel({ crewId, onShowDrafts }: { crewId: number |
                 <div className="text-sm font-medium">Waiting for review</div>
                 <ul className="space-y-1.5">
                   {(pending.data ?? []).slice(0, 5).map((l) => (
-                    <li key={l.id} className="flex items-center gap-2 rounded-md border p-2 text-xs">
+                    <li key={l.id} className="surface-line flex items-center gap-2 rounded-md border p-2 text-xs">
                       <span className="min-w-0 flex-1 truncate">{l.text}</span>
                       <Button size="sm" aria-label={`Activate lesson ${l.id}`} disabled={setStatus.isPending} onClick={() => setStatus.mutate([l.id, 'active'])}>
                         Activate

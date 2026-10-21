@@ -19,7 +19,7 @@ export function TotalsCards({ totals, trend }: { totals: UsageTotals; trend?: Us
     <section aria-label="Usage totals" className="space-y-1.5">
       <dl className="grid grid-cols-2 gap-2 sm:grid-cols-3 xl:grid-cols-5">
         {cards.map((c) => (
-          <div key={c.label} className="bg-card rounded-lg border px-3 py-2" title={c.title}>
+          <div key={c.label} className="surface rounded-lg px-3 py-2" title={c.title}>
             <dt className="text-muted-foreground flex items-center gap-1.5 text-[11px]">
               {c.color && <span className="size-2 rounded-sm" style={{ backgroundColor: c.color }} aria-hidden />}
               {c.label}
@@ -61,7 +61,7 @@ export function UsageTable({
   const { money } = useMoney()
   if (rows.length === 0) return <p className="text-muted-foreground px-1 text-xs">No usage matches these filters.</p>
   return (
-    <div className="bg-card overflow-x-auto rounded-lg border">
+    <div className="surface overflow-x-auto rounded-lg">
       <table className="w-full text-[11px]">
         <caption className="sr-only">{caption}</caption>
         <thead className="text-muted-foreground border-b">

@@ -37,7 +37,7 @@ export function TaskList({ state }: { state: ChatState }) {
 
   return (
     <div className="mx-auto w-full max-w-[720px] px-5 pb-2" data-chat="task-list">
-      <section aria-label="To-do list" className="border-border bg-card flex flex-col gap-2 rounded-xl border px-3 py-2 text-[13px]">
+      <section aria-label="To-do list" className="surface flex flex-col gap-2 rounded-xl px-3 py-2 text-[13px]">
         <button
           type="button"
           aria-expanded={open}

@@ -75,7 +75,7 @@ function PreviewView({ p, applied }: { p: ImportPreview; applied: boolean }) {
       {p.skipped.length > 0 && (
         <section aria-label="Skipped rows" className="space-y-1">
           <h4 className="text-xs font-medium">Skipped ({p.skipped.length})</h4>
-          <ul className="bg-muted/30 max-h-40 divide-y overflow-y-auto rounded-md border text-[11px]">
+          <ul className="surface-line bg-muted/30 max-h-40 divide-y overflow-y-auto rounded-md border text-[11px]">
             {p.skipped.map((r, i) => (
               <li key={i} className="flex gap-2 px-2 py-1">
                 <Badge variant="outline">{r.kind}</Badge>

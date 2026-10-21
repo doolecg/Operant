@@ -333,7 +333,7 @@ export function PresetsSection() {
           <>
             <section className="space-y-2">
               <h3 className="text-sm font-medium">Built-in stages</h3>
-              <ul className="divide-y rounded-md border">
+              <ul className="surface-line divide-y rounded-md border">
                 {stages.map((k) => stageRow(k))}
               </ul>
             </section>
@@ -346,7 +346,7 @@ export function PresetsSection() {
                   start from its settings.
                 </p>
               ) : (
-                <ul className="divide-y rounded-md border">
+                <ul className="surface-line divide-y rounded-md border">
                   {mine.map((p) => (
                     <li
                       key={p.id}

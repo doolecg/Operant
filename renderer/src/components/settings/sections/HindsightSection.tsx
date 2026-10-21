@@ -215,7 +215,7 @@ export function HindsightSection() {
             </p>
           )}
 
-          <div role="radiogroup" aria-label="Hosting mode" className="divide-y rounded-md border">
+          <div role="radiogroup" aria-label="Hosting mode" className="surface-line divide-y rounded-md border">
             {MODES.map((m) => (
               <label key={m.id} className="flex cursor-pointer items-start gap-3 p-3">
                 <input

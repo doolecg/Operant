@@ -250,7 +250,7 @@ export function BrowserTile({ crewId, popout = false }: { crewId: number; popout
             className={cn('h-7 text-xs', secure && secure !== 'unknown' && 'pl-6')}
           />
           {suggestions.length > 0 && (
-            <div role="group" aria-label="Address suggestions" className="bg-popover text-popover-foreground absolute top-full right-0 left-0 z-20 mt-1 overflow-hidden rounded-xl border p-1 shadow-md">
+            <div role="group" aria-label="Address suggestions" className="bg-popover surface-edge text-popover-foreground absolute top-full right-0 left-0 z-20 mt-1 overflow-hidden rounded-xl p-1">
               {suggestions.map((h, i) => (
                 <button
                   key={h.url}

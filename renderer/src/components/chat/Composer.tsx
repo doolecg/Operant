@@ -20,7 +20,7 @@ import { CommandMenu } from './CommandMenu'
 import { LearnPill } from './ComposerPills'
 import { QueueStrip } from './QueueStrip'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
-import { chatActions } from './useChat'
+import { chatActions, onComposerRestore } from './useChat'
 import { altEnterTarget, editRefusal, planSteer } from '@shared/chat-queue'
 
 interface Attachment {
@@ -280,6 +280,18 @@ export function Composer({ scratchId, state, launchEffort, tileModel, disabled, 
     setImages((x) => [...(m.images ?? []).map((i) => ({ ...i, preview: `data:${i.mediaType};base64,${i.base64}` })), ...x])
     area.current?.focus()
   }
+
+  // Edit from here: the rewound message returns above whatever is already in the box (same as Edit on a queued message).
+  useEffect(
+    () =>
+      onComposerRestore(scratchId, (m) => {
+        setText((t) => (t.trim() ? `${m.text}\n\n${t}` : m.text))
+        setImages((x) => [...(m.images ?? []).map((i) => ({ ...i, preview: `data:${i.mediaType};base64,${i.base64}` })), ...x])
+        area.current?.focus()
+      }),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [scratchId],
+  )
 
   const accept = (i: number) => {
     const h = hits[i]

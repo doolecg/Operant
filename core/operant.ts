@@ -1835,11 +1835,13 @@ export class Operant extends EventEmitter<PushEvents> {
           cwd: scratch.cwd,
           transcriptFile: this.transcriptFile(scratch.cwd, sessionId),
           ...(eventsDir ? { statusFile: join(eventsDir, `status-${sessionId}.json`) } : {}),
-          launch: (resume) => this.chatLaunch(id, sessionId, resume),
+          launch: (resume, sid) => this.chatLaunch(id, sid, resume),
+          filesFor: (sid) => ({ transcriptFile: this.transcriptFile(scratch.cwd, sid), ...(eventsDir ? { statusFile: join(eventsDir, `status-${sid}.json`) } : {}) }),
+          onSession: (sid) => this.store.updateScratch(id, { sessionId: sid }),
           emit,
           ...(this.chatSpawn ? { spawn: this.chatSpawn } : {}),
           now: this.now,
-          onStart: () => this.onChatStart(id, sessionId),
+          onStart: (sid) => this.onChatStart(id, sid),
           onWaiting: (w) => (w ? this.claudeAgents?.setWaiting(id, w) : this.claudeAgents?.clearWaiting(id)),
           onExit: (info) => this.onChatExit(id, info),
           effort: scratch.effort || null,
@@ -2039,6 +2041,17 @@ export class Operant extends EventEmitter<PushEvents> {
         const s = live(scratchId)
         s.restart()
         return s.snapshot()
+      },
+      'chat:rewind': async (scratchId, userItemId, revertFiles) => {
+        if (typeof userItemId !== 'string' || !userItemId) throw bad('A message id is needed')
+        const s = live(scratchId)
+        // The process ends and starts again on a new session: not a closed tile.
+        this.switching.add(scratchId)
+        try {
+          return await s.rewind(userItemId, revertFiles === true)
+        } finally {
+          this.switching.delete(scratchId)
+        }
       },
       'chat:files': (scratchId, query) => listChatFiles(this.requireScratch(scratchId).cwd, typeof query === 'string' ? query.slice(0, 200) : ''),
     }

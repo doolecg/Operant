@@ -325,9 +325,9 @@ export function App() {
 
         <main className="flex min-w-0 flex-1 flex-col overflow-hidden">
           {page === 'settings' ? (
-            <div className="bg-card min-h-0 flex-1 m-1.5 overflow-hidden rounded-2xl border shadow-xs dark:shadow-none"><SettingsPage initialSection={settingsSection} onClose={() => setPage('dashboard')} /></div>
+            <div className="surface min-h-0 flex-1 m-1.5 overflow-hidden"><SettingsPage initialSection={settingsSection} onClose={() => setPage('dashboard')} /></div>
           ) : crews.data && !playgroundSeen && crews.data.every((c) => c.kind === 'playground') ? (
-            <div className="bg-card min-h-0 flex-1 m-1.5 overflow-hidden rounded-2xl border shadow-xs dark:shadow-none"><Welcome onNewCrew={() => setNewCrew(true)} /></div>
+            <div className="surface min-h-0 flex-1 m-1.5 overflow-hidden"><Welcome onNewCrew={() => setNewCrew(true)} /></div>
           ) : (
             <div className="min-h-0 flex-1">
               {crewId != null && (

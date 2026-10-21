@@ -573,7 +573,7 @@ export function Sidebar({ crews: allCrews, selected, onSelect, onNewCrew, action
           </div>
         </div>
         {!g.collapsed && (
-          <div className="border-border/60 ml-5 space-y-px border-l pt-px pl-1">
+          <div className="surface-line ml-5 space-y-px border-l pt-px pl-1">
             {members.map(crewRow)}
             {members.length === 0 && <p className="text-muted-foreground px-3 py-1 text-xs">Empty. Drag a project here.</p>}
           </div>
@@ -587,7 +587,7 @@ export function Sidebar({ crews: allCrews, selected, onSelect, onNewCrew, action
       ref={aside}
       aria-label="Projects"
       style={{ width: panel.width || `min(${PANEL_DEFAULT}px, 35vw)`, minWidth: `min(${PANEL_MIN}px, 35vw)`, maxWidth: `min(${PANEL_MAX}px, 50vw)` }}
-      className="m-panel m-panel-in-x bg-card relative m-1.5 mr-0 flex shrink-0 flex-col rounded-2xl border shadow-xs dark:shadow-none"
+      className="m-panel m-panel-in-x surface relative m-1.5 mr-0 flex shrink-0 flex-col"
     >
       <ResizeHandle
         target={aside}
@@ -616,7 +616,7 @@ export function Sidebar({ crews: allCrews, selected, onSelect, onNewCrew, action
       </div>
 
       {playground && (
-        <div role="group" aria-label="Playground" className="shrink-0 border-b px-1.5 pb-1.5">
+        <div role="group" aria-label="Playground" className="surface-line shrink-0 border-b px-1.5 pb-1.5">
           {playgroundRow(playground)}
         </div>
       )}
@@ -652,9 +652,9 @@ export function Sidebar({ crews: allCrews, selected, onSelect, onNewCrew, action
         </div>
       </ScrollArea>
 
-      <div className="space-y-2 border-t p-2">
+      <div className="surface-line space-y-2 border-t p-2">
         {update.data?.state === 'ready' && (
-          <div className="bg-card space-y-2 rounded-xl border p-2.5">
+          <div className="surface-line space-y-2 rounded-xl border p-2.5">
             <p className="text-xs">Operant {update.data.version} is ready.</p>
             <Button size="sm" className="h-7 w-full" onClick={() => void bridge().invoke('update:install')}>
               <Download className="size-3.5" /> Restart to update

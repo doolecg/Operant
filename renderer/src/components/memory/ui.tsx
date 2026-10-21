@@ -28,5 +28,5 @@ export function StatusBadge({ status }: { status: LessonStatus }) {
 }
 
 export function Empty({ children }: { children: ReactNode }) {
-  return <p className="text-muted-foreground rounded-md border border-dashed p-6 text-center text-sm">{children}</p>
+  return <p className="surface-line text-muted-foreground rounded-md border border-dashed p-6 text-center text-sm">{children}</p>
 }

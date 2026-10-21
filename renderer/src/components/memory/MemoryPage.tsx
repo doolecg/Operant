@@ -36,7 +36,7 @@ function HindsightTab({ crewId, search }: { crewId: number | null; search: strin
   const r = entries.data
   return (
     <div className="space-y-3">
-      <p className="text-muted-foreground rounded-md border border-dashed p-3 text-xs">
+      <p className="surface-line text-muted-foreground rounded-md border border-dashed p-3 text-xs">
         Entries already written to Hindsight cannot be edited or deleted from here: Hindsight offers no call for it. Editing or deleting a lesson here changes only
         Operant&apos;s record and the personal memory file.
       </p>
@@ -47,7 +47,7 @@ function HindsightTab({ crewId, search }: { crewId: number | null; search: strin
       {r?.ok && (r.items.length === 0 ? <Empty>Hindsight has no matching entries for this project.</Empty> : (
         <ul className="space-y-2" aria-label="Hindsight entries">
           {r.items.map((t, i) => (
-            <li key={i} className="rounded-md border p-3 text-sm whitespace-pre-wrap">
+            <li key={i} className="surface-line rounded-md border p-3 text-sm whitespace-pre-wrap">
               {t}
             </li>
           ))}
@@ -75,7 +75,7 @@ function MemoryTab({ crewId, search }: { crewId: number | null; search: string }
       ) : (
         <ul className="space-y-2" aria-label="Personal memory files">
           {list.map((f) => (
-            <li key={f.file} className="space-y-1 rounded-md border p-3">
+            <li key={f.file} className="surface-line space-y-1 rounded-md border p-3">
               <div className="flex flex-wrap items-center gap-2">
                 <span className="text-sm font-medium">{f.name || f.file}</span>
                 <Badge variant="outline">{f.type || 'note'}</Badge>

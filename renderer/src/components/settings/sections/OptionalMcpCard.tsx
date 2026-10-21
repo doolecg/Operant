@@ -221,7 +221,7 @@ export function OptionalMcpCard({ crewId, all = false }: { crewId: number | null
         ) : (
           // Git and Playwright need uv / Node: hidden until their runtime is there (the Install page installs them).
           (entries.data ?? []).filter((e) => all || e.runtime.ok || !HIDE_WITHOUT_RUNTIME.includes(e.id) || e.status !== 'not-added').map((e) => (
-            <div key={e.id} className="space-y-2 rounded-md border p-3">
+            <div key={e.id} className="surface-line space-y-2 rounded-md border p-3">
               <div className="flex flex-wrap items-center gap-2">
                 <span className="font-medium">{e.name}</span>
                 <Badge variant={e.status === 'not-added' ? 'outline' : 'secondary'}>{STATUS_LABEL[e.status]}</Badge>

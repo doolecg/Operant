@@ -203,7 +203,7 @@ function CustomEditor({ customs, onChange, currentThemeId }: { customs: CustomTh
         </div>
 
         {customs.length > 0 && (
-          <ul className="divide-y rounded-md border" data-testid="custom-list">
+          <ul className="surface-line divide-y rounded-md border" data-testid="custom-list">
             {customs.map((t) => (
               <li key={t.id} className="flex items-center gap-2 px-3 py-2" data-testid={`custom-item-${t.id}`}>
                 <span className="min-w-0 flex-1 truncate text-sm">{t.name}</span>

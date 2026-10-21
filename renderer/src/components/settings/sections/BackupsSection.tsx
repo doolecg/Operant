@@ -84,7 +84,7 @@ export function BackupsSection() {
         ) : list.length === 0 ? (
           <p className="text-muted-foreground text-sm">No backups yet.</p>
         ) : (
-          <ul className="divide-y rounded-md border">
+          <ul className="surface-line divide-y rounded-md border">
             {list.map((b) => (
               <li key={b.name} className="flex items-center justify-between gap-4 px-3 py-2.5">
                 <div className="min-w-0">

@@ -7,6 +7,7 @@ import {
   type ChatHistoryPage,
   type ChatItem,
   type ChatOp,
+  type ChatRewindResult,
   type ChatSendInput,
   type ChatState,
   type ContextUsage,
@@ -19,7 +20,8 @@ import { ChatMapper, mapTranscript } from './claude-chat-map'
 import { assertFakeClaude } from './model-run'
 import { KeepWarm, type KeepWarmPersisted } from './keepwarm'
 import { PING_PROMPT, parseKeepWarm } from '../shared/keepwarm'
-import { killTree, spawnHidden } from './proc'
+import { killTree, runHidden, spawnHidden } from './proc'
+import { findRewindPoint, promptUuidByText } from '../shared/chat-rewind'
 
 // One Claude Code process per Chat tile: `claude -p --input-format stream-json --output-format stream-json ...` (flags
 // from buildChatLaunch). Operant writes user and control messages to its stdin and maps the JSON lines on its stdout
@@ -77,6 +79,13 @@ export function cmdArg(arg: string): string {
   if (UNQUOTABLE.test(arg)) throw new Error(`argument cannot be passed through the shell: ${arg.slice(0, 40)}`)
   if (arg !== '' && SAFE.test(arg)) return arg
   return `"${arg}"`
+}
+
+const REWIND_FILES_MS = 60_000
+
+const realRunClaude: NonNullable<ChatSessionDeps['runClaude']> = (spec, timeoutMs) => {
+  assertFakeClaude()
+  return runHidden(spec.shell ? cmdArg(spec.file) : spec.file, spec.shell ? spec.args.map(cmdArg) : spec.args, { cwd: spec.cwd, env: spec.env, shell: spec.shell, timeoutMs, source: 'claude-run' })
 }
 
 export const realChatSpawn: ChatSpawn = (spec) => {
@@ -145,8 +154,14 @@ export interface ChatSessionDeps {
   transcriptFile: string
   // status-<session>.json in the events folder: what the status line writes for the TUI.
   statusFile?: string
-  // Builds the spawn spec; resume is true when the session already has a transcript or a process ran before.
-  launch: (resume: boolean) => ChatLaunchSpec
+  // Builds the spawn spec for `sessionId`; resume is true when the session already has a transcript or a process ran before.
+  launch: (resume: boolean, sessionId: string) => ChatLaunchSpec
+  // The transcript and status file of another session of this tile (a rewind starts a new session).
+  filesFor?: (sessionId: string) => { transcriptFile: string; statusFile?: string }
+  // A rewind moved the tile to a new session id.
+  onSession?: (sessionId: string) => void
+  // Runs `claude --rewind-files` to completion (tests pass a fake).
+  runClaude?: (spec: ChatSpawnSpec, timeoutMs: number) => Promise<{ code: number | null; stdout: string; stderr: string }>
   emit: (ops: ChatOp[]) => void
   // The tile waits for a prompt (null: no longer).
   onWaiting?: (w: { type: string; message: string } | null) => void
@@ -158,7 +173,7 @@ export interface ChatSessionDeps {
   clearTimer?: (h: unknown) => void
   log?: (line: string) => void
   // Called after each successful spawn (Operant attaches the usage feed and the Agents panel here).
-  onStart?: () => void
+  onStart?: (sessionId: string) => void
   // Initial values for the pickers (the tile's saved settings).
   effort?: string | null
   bypassAllowed?: boolean
@@ -204,6 +219,11 @@ export class ChatSession {
   private disposed = false
   private stopWaiters: Array<() => void> = []
   private held: HeldMessage[] = []
+  private sessionId: string
+  private transcriptFile: string
+  private statusFile: string | undefined
+  // After a rewind: the new session is a fork of `from` cut after the entry `at` until its own transcript exists.
+  private fork: { from: string; at: string } | null = null
   // Stop was pressed: the turn that ends because of it does not start the next held message.
   private holdAfterStop = false
   private readonly now: () => number
@@ -216,6 +236,9 @@ export class ChatSession {
     this.setTimer = deps.setTimer ?? ((fn, ms) => setTimeout(fn, ms))
     this.clearTimer = deps.clearTimer ?? ((h) => clearTimeout(h as NodeJS.Timeout))
     this.spawn = deps.spawn ?? realChatSpawn
+    this.sessionId = deps.sessionId
+    this.transcriptFile = deps.transcriptFile
+    this.statusFile = deps.statusFile
     this.mapper = new ChatMapper({ scratchId: deps.scratchId, now: this.now })
     this.mapper.setSession(deps.sessionId)
     if (deps.effort !== undefined) this.mapper.setEffort(deps.effort)
@@ -286,7 +309,7 @@ export class ChatSession {
     if (this.history) return
     let text = ''
     try {
-      text = hasFile(this.deps.transcriptFile) ? readFileSync(this.deps.transcriptFile, 'utf8') : ''
+      text = hasFile(this.transcript()) ? readFileSync(this.transcript(), 'utf8') : ''
     } catch {
       text = ''
     }
@@ -316,7 +339,7 @@ export class ChatSession {
 
   // A sub-agent's conversation from its sidechain file <session>/subagents/agent-<id>.jsonl.
   agentHistory(toolUseId: string): ChatItem[] {
-    const dir = join(dirname(this.deps.transcriptFile), this.deps.sessionId, 'subagents')
+    const dir = join(dirname(this.transcript()), this.sessionId, 'subagents')
     const item = this.mapper.state.items.find((i): i is SubagentItem => i.kind === 'subagent' && i.id === toolUseId)
     let file = item?.agentId ? join(dir, `agent-${item.agentId}.jsonl`) : ''
     if (!file || !hasFile(file)) {
@@ -348,10 +371,13 @@ export class ChatSession {
   start(resume?: boolean): void {
     if (this.child || this.disposed) return
     this.loadHistory()
-    const useResume = resume ?? hasFile(this.deps.transcriptFile)
+    if (this.fork && hasFile(this.transcript())) this.fork = null
+    const fork = this.fork
+    const useResume = fork ? true : (resume ?? hasFile(this.transcript()))
     let spec: ChatLaunchSpec
     try {
-      spec = this.deps.launch(useResume)
+      spec = this.deps.launch(useResume, fork ? fork.from : this.sessionId)
+      if (fork && !spec.blocked) spec = { ...spec, args: [...spec.args, '--resume-session-at', fork.at, '--fork-session', '--session-id', this.sessionId] }
     } catch (e) {
       this.push(this.mapper.setProcess('blocked'))
       this.push(this.mapper.noteNotice({ source: 'error', tone: 'error', text: e instanceof Error ? e.message : String(e), actions: ['terminal'] }))
@@ -377,7 +403,7 @@ export class ChatSession {
       return
     }
     this.child = child
-    this.deps.onStart?.()
+    this.deps.onStart?.(this.sessionId)
     child.stdin?.on?.('error', () => {})
     child.stdout?.on('data', (b) => this.onStdout(String(b)))
     child.stderr?.on('data', (b) => {
@@ -540,6 +566,77 @@ export class ChatSession {
     })
   }
 
+  // Looked up on every use: Claude Code files a session under its own spelling of the folder, which is only known once the
+  // file exists (an 8.3 short path differs from the resolved one).
+  private transcript(): string {
+    return this.deps.filesFor?.(this.sessionId).transcriptFile ?? this.transcriptFile
+  }
+
+  private readTranscript(): Array<Record<string, unknown>> {
+    let text = ''
+    try {
+      text = hasFile(this.transcript()) ? readFileSync(this.transcript(), 'utf8') : ''
+    } catch {
+      return []
+    }
+    const out: Array<Record<string, unknown>> = []
+    for (const line of text.split('\n')) {
+      try {
+        const o: unknown = line.trim() ? JSON.parse(line) : null
+        if (o && typeof o === 'object' && !Array.isArray(o)) out.push(o as Record<string, unknown>)
+      } catch {
+        // a partly written line
+      }
+    }
+    return out
+  }
+
+  // "Edit from here": the conversation goes back to before the user message `itemId` (a new session forked from the entry
+  // before it), optionally after Claude Code restored the files its edit tools changed. Returns the message for the chat
+  // box. Throws, with nothing changed, when the message is not in the transcript or the file revert fails.
+  async rewind(itemId: string, revertFiles: boolean): Promise<ChatRewindResult> {
+    if (this.disposed || !this.deps.filesFor) throw new Error('This tile cannot be rewound')
+    if (this.mapper.hasPending()) throw new Error('Claude is waiting for your answer: answer it or stop the turn before editing from here')
+    const items = this.mapper.items
+    const at = items.findIndex((i) => i.id === itemId)
+    const item = items[at]
+    if (item?.kind !== 'user' || item.parent !== null || item.queued) throw new Error('Only a message Claude has already read can be edited from here')
+    const entries = this.readTranscript()
+    const same = (i: ChatItem) => i.kind === 'user' && i.parent === null && !i.queued && i.text.trim() === item.text.trim()
+    const uuid = entries.some((e) => e.uuid === itemId) ? itemId : promptUuidByText(entries, item.text, items.slice(at + 1).filter(same).length)
+    const point = uuid ? findRewindPoint(entries, uuid) : null
+    if (!uuid || !point) throw new Error('Claude Code has not saved this message in its transcript, so the chat cannot go back to it')
+
+    const wasRunning = this.child !== null
+    if (this.mapper.turnRunning) this.interrupt()
+    await this.stop()
+    if (revertFiles) {
+      const spec = this.deps.launch(true, this.sessionId)
+      const r = spec.blocked ? null : await (this.deps.runClaude ?? realRunClaude)({ ...spec, args: ['-p', '--resume', this.sessionId, '--rewind-files', uuid] }, REWIND_FILES_MS)
+      if (!r || r.code !== 0) {
+        if (wasRunning) this.start()
+        const last = r ? `${r.stderr}\n${r.stdout}`.trim().split(/\r?\n/).filter(Boolean).pop() : spec.blocked
+        throw new Error(last || 'Claude Code did not restore the files in time')
+      }
+    }
+
+    const from = this.sessionId
+    const to = randomUUID()
+    const files = this.deps.filesFor(to)
+    this.sessionId = to
+    this.transcriptFile = files.transcriptFile
+    this.statusFile = files.statusFile
+    this.fork = point.keepUuid ? { from, at: point.keepUuid } : null
+    if (this.history) {
+      const h = this.history.findIndex((i) => i.id === itemId)
+      if (h >= 0) this.history.length = h
+    }
+    this.push([...this.mapper.truncateFrom(itemId), ...this.mapper.setSession(to)])
+    this.deps.onSession?.(to)
+    if (wasRunning) this.start(point.keepUuid ? undefined : false)
+    return { text: point.text, images: point.images }
+  }
+
   // Stops everything and drops the timers; the session is not used again.
   async dispose(): Promise<void> {
     await this.stop()
@@ -594,7 +691,7 @@ export class ChatSession {
   private writeUser(uuid: string, text: string, images: HeldMessage['images'], priority?: 'now'): boolean {
     const content: unknown[] = [...images.map((i) => ({ type: 'image', source: { type: 'base64', media_type: i.mediaType, data: i.base64 } }))]
     if (text) content.push({ type: 'text', text })
-    return this.write({ type: 'user', uuid, ...(priority ? { priority } : {}), message: { role: 'user', content }, parent_tool_use_id: null, session_id: this.deps.sessionId })
+    return this.write({ type: 'user', uuid, ...(priority ? { priority } : {}), message: { role: 'user', content }, parent_tool_use_id: null, session_id: this.sessionId })
   }
 
   private deliver(m: HeldMessage, how: 'idle' | 'now' | 'next' = 'idle'): void {
@@ -657,7 +754,7 @@ export class ChatSession {
   private sendPing(): boolean {
     if (!this.child) return false
     this.push(this.mapper.notePing(PING_PROMPT))
-    return this.write({ type: 'user', message: { role: 'user', content: [{ type: 'text', text: PING_PROMPT }] }, parent_tool_use_id: null, session_id: this.deps.sessionId })
+    return this.write({ type: 'user', message: { role: 'user', content: [{ type: 'text', text: PING_PROMPT }] }, parent_tool_use_id: null, session_id: this.sessionId })
   }
 
   interrupt(): void {
@@ -729,7 +826,7 @@ export class ChatSession {
       return
     }
     this.mapper.noteCommand('/effort')
-    this.write({ type: 'user', message: { role: 'user', content: [{ type: 'text', text: `/effort ${level}` }] }, parent_tool_use_id: null, session_id: this.deps.sessionId })
+    this.write({ type: 'user', message: { role: 'user', content: [{ type: 'text', text: `/effort ${level}` }] }, parent_tool_use_id: null, session_id: this.sessionId })
     this.push(this.mapper.setEffort(level))
   }
 
@@ -756,7 +853,7 @@ export class ChatSession {
   }
 
   private priorStatus(): { costUsd: number; durationMs: number } {
-    const f = this.deps.statusFile
+    const f = this.statusFile
     if (!f || !hasFile(f)) return { costUsd: 0, durationMs: 0 }
     try {
       const j = JSON.parse(readFileSync(f, 'utf8')) as { cost?: { total_cost_usd?: number; total_duration_ms?: number } }
@@ -767,7 +864,7 @@ export class ChatSession {
   }
 
   private scheduleStatus(): void {
-    if (!this.deps.statusFile || this.statusTimer !== null) return
+    if (!this.statusFile || this.statusTimer !== null) return
     this.statusTimer = this.setTimer(() => {
       this.statusTimer = null
       this.writeStatus()
@@ -788,7 +885,7 @@ export class ChatSession {
     if (!s.model && !s.usage && s.costUsd === null) return null
     return {
       ts: this.now(),
-      session_id: this.deps.sessionId,
+      session_id: this.sessionId,
       ...(s.model ? { model: { id: s.model, display_name: s.modelDisplayName ?? s.model } } : {}),
       context_window: {
         ...(s.windowTokens ? { context_window_size: s.windowTokens } : {}),
@@ -803,7 +900,7 @@ export class ChatSession {
   }
 
   private writeStatus(): void {
-    const f = this.deps.statusFile
+    const f = this.statusFile
     if (!f) return
     const payload = this.statusPayload()
     if (!payload) return

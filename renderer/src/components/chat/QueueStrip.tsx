@@ -44,7 +44,7 @@ export function QueueStrip({ queue, sendBlocked, onEdit, onMove, onSend, onRemov
     onMove(id, act === 'up' ? -1 : 1)
   }
   return (
-    <div ref={box} role="region" aria-label="Queued messages" className="bg-accent/50 mx-auto mb-1.5 max-w-[720px] rounded-[18px] p-1.5">
+    <div ref={box} role="region" aria-label="Queued messages" className="surface mx-auto mb-1.5 max-w-[720px] p-1.5">
       <div className="text-muted-foreground px-2 pt-0.5 pb-1 text-[13px]">{queue.length} queued</div>
       <ul ref={list} className="max-h-40 overflow-y-auto">
         {queue.map((m, i) => {

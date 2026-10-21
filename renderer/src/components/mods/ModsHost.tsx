@@ -58,7 +58,7 @@ export function ModsHost({ tileId, crewId, chat }: { tileId: number; crewId: num
       ref={panel}
       aria-label={`Mods: ${mod.title} panel`}
       data-testid="subagent-panel"
-      className="m-panel bg-card relative my-1.5 mr-1.5 flex min-h-0 shrink-0 flex-col overflow-hidden rounded-2xl border text-xs shadow-xs dark:shadow-none"
+      className="m-panel surface relative my-1.5 mr-1.5 flex min-h-0 shrink-0 flex-col overflow-hidden text-xs"
       style={{ width: collapsed ? 44 : width }}
     >
       {!collapsed && (

@@ -157,7 +157,7 @@ export function UsagePage({
           <>
             <TotalsCards totals={data.totals} trend={data.trend} />
 
-            <section aria-label="Spend trend" className="bg-card space-y-2 rounded-lg border px-3 py-2.5">
+            <section aria-label="Spend trend" className="surface space-y-2 rounded-lg px-3 py-2.5">
               <h3 className="text-sm font-medium">Spend per {seriesQuery.bucket}</h3>
               <TrendChart points={series.data?.points ?? []} split={splitBy != null} />
             </section>
@@ -192,7 +192,7 @@ export function UsagePage({
         <ProvidersSection />
 
         <Collapsible title="Budgets" defaultOpen>
-          <div className="bg-card rounded-lg border px-3.5 py-3">
+          <div className="surface rounded-lg px-3.5 py-3">
             <BudgetsEditor />
           </div>
         </Collapsible>

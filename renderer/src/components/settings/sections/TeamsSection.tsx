@@ -201,7 +201,7 @@ function ImportDialog({ preview, onClose }: { preview: TeamImportPreview; onClos
           <DialogDescription>{adds === 0 ? 'Nothing in this file would be added.' : `${adds} team${adds === 1 ? '' : 's'} will be added to yours.`}</DialogDescription>
         </DialogHeader>
         <DialogBody>
-          <ul className="divide-y rounded-md border text-sm">
+          <ul className="surface-line divide-y rounded-md border text-sm">
             {preview.entries.map((e, i) => (
               <li key={i} className="flex items-center justify-between gap-3 px-3 py-2">
                 <span className="min-w-0 truncate">
@@ -306,7 +306,7 @@ export function TeamsSection() {
           ) : list.length === 0 ? (
             <p className="text-muted-foreground text-sm">No teams. Create one to write down guidance for a group of agents.</p>
           ) : (
-            <ul className="divide-y rounded-md border">
+            <ul className="surface-line divide-y rounded-md border">
               {list.map((t) => (
                 <TeamRow key={t.id} team={t} onEdit={setEditing} onDelete={setDeleting} onError={(m) => setError(m || null)} />
               ))}

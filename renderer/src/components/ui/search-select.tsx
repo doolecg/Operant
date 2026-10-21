@@ -56,7 +56,7 @@ export function SearchSelect({ options, value, onValueChange, placeholder, class
       <PopoverPrimitive.Trigger
         aria-label={rest['aria-label']}
         className={cn(
-          'border-input dark:bg-input/30 focus-visible:border-ring focus-visible:ring-ring/50 flex h-9 w-fit items-center justify-between gap-2 rounded-lg border bg-transparent px-3 py-2 text-sm whitespace-nowrap shadow-xs outline-none focus-visible:ring-[3px]',
+          'border-input surface-edge dark:bg-input/30 focus-visible:border-ring focus-visible:ring-ring/50 flex h-9 w-fit items-center justify-between gap-2 rounded-lg border bg-transparent px-3 py-2 text-sm whitespace-nowrap outline-none focus-visible:ring-[3px]',
           className,
         )}
       >
@@ -68,9 +68,9 @@ export function SearchSelect({ options, value, onValueChange, placeholder, class
           align="start"
           sideOffset={4}
           collisionPadding={8}
-          className="bg-popover text-popover-foreground z-50 flex max-h-(--radix-popover-content-available-height) w-[30rem] min-w-(--radix-popover-trigger-width) max-w-[calc(100vw-1rem)] flex-col overflow-hidden rounded-xl border shadow-md"
+          className="bg-popover text-popover-foreground z-50 flex max-h-(--radix-popover-content-available-height) w-[30rem] min-w-(--radix-popover-trigger-width) max-w-[calc(100vw-1rem)] flex-col overflow-hidden rounded-xl surface-edge"
         >
-          <div className="flex shrink-0 items-center border-b">
+          <div className="surface-line flex shrink-0 items-center border-b">
             <input
               autoFocus
               role="combobox"

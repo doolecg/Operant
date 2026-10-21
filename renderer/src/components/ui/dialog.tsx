@@ -69,7 +69,7 @@ function DialogContent({
       <DialogPrimitive.Content
         data-slot="dialog-content"
         className={cn(
-          "fixed top-[50%] left-[50%] z-50 flex max-h-[min(92vh,calc(100%-2rem))] w-[calc(100%-2rem)] translate-x-[-50%] translate-y-[-50%] flex-col overflow-hidden rounded-2xl border bg-popover p-0 shadow-xl outline-none [&>form]:contents m-surface m-dialog",
+          "fixed top-[50%] left-[50%] z-50 flex max-h-[min(92vh,calc(100%-2rem))] w-[calc(100%-2rem)] translate-x-[-50%] translate-y-[-50%] flex-col overflow-hidden surface p-0 text-popover-foreground outline-none [&>form]:contents m-surface m-dialog",
           SIZES[size],
           className
         )}
@@ -123,7 +123,7 @@ function DialogFooter({
     <div
       data-slot="dialog-footer"
       className={cn(
-        "flex shrink-0 flex-row flex-wrap justify-end gap-2 border-t bg-background px-6 py-4",
+        "flex shrink-0 flex-row flex-wrap justify-end gap-2 border-t surface-line bg-background px-6 py-4",
         className
       )}
       {...props}

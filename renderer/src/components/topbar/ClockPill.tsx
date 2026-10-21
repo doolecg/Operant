@@ -7,7 +7,7 @@ const WEEKDAYS = ['Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa', 'Su']
 function Calendar({ now }: { now: Date }) {
   const grid = monthGrid(now)
   return (
-    <div role="dialog" aria-label="Calendar" className="bg-popover text-popover-foreground absolute right-0 top-full z-50 mt-1 w-56 rounded-xl border p-2 text-xs shadow-lg">
+    <div role="dialog" aria-label="Calendar" className="bg-popover surface-edge text-popover-foreground absolute right-0 top-full z-50 mt-1 w-56 rounded-xl p-2 text-xs">
       <div className="mb-1 flex justify-between font-medium">
         <span>{now.toLocaleDateString(undefined, { month: 'long', year: 'numeric' })}</span>
         <span className="text-muted-foreground">week {isoWeek(now)}</span>

@@ -57,7 +57,7 @@ export function TilePopoutPage({ req }: { req: TilePopoutRequest }) {
           </Button>
         </div>
       </div>
-      <div className="bg-card min-h-0 flex-1 overflow-hidden rounded-2xl border">
+      <div className="surface-edge bg-card min-h-0 flex-1 overflow-hidden rounded-[18px]">
         {view === undefined ? null : chat ? (
           <div className="relative h-full min-h-0">
             <ChatView scratchId={scratchId} launchEffort={effort} tileModel={row?.model ?? ''} onTerminal={() => void switchView('terminal')} threadTitle={req.title} />

@@ -25,7 +25,7 @@ interface Props {
 const ItemView = memo(function ItemView({ scratchId, item, onOpenAgent, onTerminal, small, prompts }: Omit<Props, 'items'> & { item: ChatItem }) {
   switch (item.kind) {
     case 'user':
-      return <UserBubble item={item} small={small} />
+      return <UserBubble item={item} small={small} {...(prompts !== false && !small && item.parent === null ? { editFrom: scratchId } : {})} />
     case 'text':
       return <AssistantText item={item} small={small} />
     case 'thinking':

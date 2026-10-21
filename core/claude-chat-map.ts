@@ -321,6 +321,18 @@ export class ChatMapper {
     return this.drain()
   }
 
+  // A rewind: the item and every item after it are dropped.
+  truncateFrom(id: string): ChatOp[] {
+    const at = this.state.items.findIndex((i) => i.id === id)
+    if (at < 0) return []
+    for (const it of this.state.items.splice(at)) {
+      this.byId.delete(it.id)
+      this.out.push({ op: 'remove', id: it.id })
+    }
+    for (const [uuid, itemId] of this.byUuid) if (!this.byId.has(itemId)) this.byUuid.delete(uuid)
+    return this.drain()
+  }
+
   // The owner pressed Stop and Claude Code did not answer in time: end the turn locally.
   noteInterruptForced(): ChatOp[] {
     this.markInterrupted()

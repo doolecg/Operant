@@ -5,6 +5,7 @@ import { decodeIpcError } from '@shared/ipc'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
 import { ImageModal } from '@/components/chat/ImageModal'
 import { call } from '@/lib/queries'
+import { SECTION } from '../PanelRow'
 import { ACTION_LABEL, artifactsOf, capArtifacts, type Artifact, type ArtifactAction, type ArtifactKind } from './artifacts'
 
 const ICON: Record<ArtifactKind, typeof File> = { image: ImageIcon, html: Globe, markdown: FileText, pdf: FileText, document: FileText, file: File, url: Globe }
@@ -27,21 +28,21 @@ function ArtifactRow({ artifact, crewId, onImage }: { artifact: Artifact; crewId
   const Icon = ICON[artifact.kind]
   const primary = artifact.actions[0]!
   return (
-    <li className="min-w-0 text-xs" title={artifact.target}>
-      <div className="flex min-w-0 items-center gap-1.5">
-        <Icon aria-hidden className="text-muted-foreground size-3.5 shrink-0" />
+    <li className="hover:bg-accent m-row min-w-0 rounded-[10px] px-1 py-1.5 text-xs" title={artifact.target}>
+      <div className="flex min-w-0 items-center gap-3">
+        <Icon aria-hidden className="text-muted-foreground size-4 shrink-0" />
         <button
           type="button"
           aria-label={`${ACTION_LABEL[primary]}: ${artifact.name}`}
           onClick={() => run(primary)}
           className="hover:text-primary focus-visible:ring-ring flex min-w-0 flex-1 cursor-pointer items-center rounded-sm text-left underline-offset-2 outline-none hover:underline focus-visible:ring-2"
         >
-          <span className="min-w-0 truncate font-mono text-[11px]">{artifact.name}</span>
+          <span className="min-w-0 truncate font-mono text-[12px] font-medium">{artifact.name}</span>
         </button>
-        <span className="text-muted-foreground shrink-0 text-[10px]">{KIND_LABEL[artifact.kind]}</span>
+        <span className="text-muted-foreground shrink-0 text-[11px]">{KIND_LABEL[artifact.kind]}</span>
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <button type="button" aria-label={`Actions for ${artifact.name}`} className="text-muted-foreground hover:bg-accent hover:text-foreground focus-visible:ring-ring grid size-5 shrink-0 place-items-center rounded-full outline-none focus-visible:ring-2">
+            <button type="button" aria-label={`Actions for ${artifact.name}`} className="text-muted-foreground hover:text-foreground focus-visible:ring-ring grid size-5 shrink-0 place-items-center rounded-full outline-none focus-visible:ring-2">
               <MoreHorizontal aria-hidden className="size-3.5" />
             </button>
           </DropdownMenuTrigger>
@@ -55,7 +56,7 @@ function ArtifactRow({ artifact, crewId, onImage }: { artifact: Artifact; crewId
         </DropdownMenu>
       </div>
       {error && (
-        <div role="alert" className="text-destructive mt-0.5 pl-5 text-[11px]">
+        <div role="alert" className="text-destructive mt-0.5 pl-7 text-[11px]">
           {error}
         </div>
       )}
@@ -73,15 +74,15 @@ export function ArtifactsList({ items, crewId }: { items: ChatItem[]; crewId: nu
   if (all.length === 0) return null
   return (
     <>
-      <div className="border-border mt-2.5 border-t pt-2.5">
-        <div className="text-muted-foreground mb-1.5 text-[10px] font-semibold tracking-[0.08em] uppercase">Artifacts</div>
-        <ul className="flex flex-col gap-1.5" aria-label="Artifacts this session made">
+      <div className={SECTION}>
+        <div className="text-muted-foreground px-1 pt-1 pb-1.5 text-[13px] font-medium">Artifacts</div>
+        <ul className="flex flex-col gap-0.5" aria-label="Artifacts this session made">
           {shown.map((a) => (
             <ArtifactRow key={a.key} artifact={a} crewId={crewId} onImage={(im) => setImage({ image: im, at: Date.now() })} />
           ))}
         </ul>
         {all.length > 5 && (
-          <button type="button" aria-expanded={showAll} onClick={() => setShowAll((v) => !v)} className="text-muted-foreground hover:text-foreground focus-visible:ring-ring mt-1.5 rounded-sm text-[11px] outline-none hover:underline focus-visible:ring-2">
+          <button type="button" aria-expanded={showAll} onClick={() => setShowAll((v) => !v)} className="text-muted-foreground hover:text-foreground focus-visible:ring-ring mt-1.5 ml-1 rounded-sm text-[11px] outline-none hover:underline focus-visible:ring-2">
             {showAll ? 'Show fewer' : `Show all ${all.length} (+${more} more)`}
           </button>
         )}

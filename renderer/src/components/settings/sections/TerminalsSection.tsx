@@ -108,7 +108,7 @@ export function TerminalsSection() {
             (['claude', 'opencode'] as const).map((id) => {
               const cap = caps.data[id]
               return (
-                <div key={id} className="space-y-2 rounded-md border p-3 text-sm">
+                <div key={id} className="surface-line space-y-2 rounded-md border p-3 text-sm">
                   <div className="flex items-center justify-between gap-2">
                     <span className="font-medium">{CLI_NAME[id]}</span>
                     {cap.installed ? (

@@ -266,7 +266,7 @@ export function NotesPanel({ crewId, onCollapse }: { crewId: number | null; onCo
       ref={aside}
       aria-label="Notes"
       style={{ width: panel.width || NOTES_DEFAULT, minWidth: NOTES_MIN, maxWidth: NOTES_MAX }}
-      className={cn('m-panel bg-card relative m-1.5 mr-0 flex shrink-0 flex-col rounded-2xl border shadow-xs dark:shadow-none', onCollapse && 'absolute inset-y-0 left-0 z-40 shadow-lg')}
+      className={cn('m-panel surface relative m-1.5 mr-0 flex shrink-0 flex-col', onCollapse && 'absolute inset-y-0 left-0 z-40')}
     >
       <ResizeHandle
         target={aside}
@@ -326,7 +326,7 @@ export function NotesPanel({ crewId, onCollapse }: { crewId: number | null; onCo
 // The narrow terminal area's stand-in for the panel.
 export function NotesRail({ onExpand }: { onExpand: () => void }) {
   return (
-    <aside aria-label="Notes" style={{ width: NOTES_RAIL }} className="bg-card m-1.5 mr-0 flex shrink-0 flex-col items-center rounded-2xl border py-1.5 shadow-xs dark:shadow-none">
+    <aside aria-label="Notes" style={{ width: NOTES_RAIL }} className="surface m-1.5 mr-0 flex shrink-0 flex-col items-center py-1.5">
       <Button variant="ghost" size="icon-sm" aria-label="Expand Notes panel" title="Expand Notes panel" onClick={onExpand}>
         <PanelLeftOpen />
       </Button>

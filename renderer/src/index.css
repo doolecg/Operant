@@ -78,6 +78,21 @@
   --color-zinc-400: #71717a;
 }
 
+/* Card surfaces: a solid fill one step off the ground, a 1px border and a faint inset highlight on the top edge. All
+   relative to the theme's --background, so every theme gets the same look. Solid fill, flat, nothing see-through. */
+:root {
+  --surface: color-mix(in srgb, var(--background) 92%, white);
+  --surface-border: color-mix(in srgb, var(--surface) 86%, white);
+  --surface-line: color-mix(in srgb, var(--surface) 83%, var(--primary));
+  --surface-highlight: rgb(255 255 255 / 0.05);
+}
+:root[data-scheme='light'] {
+  --surface: color-mix(in srgb, var(--background) 96%, black);
+  --surface-border: color-mix(in srgb, var(--surface) 88%, black);
+  --surface-line: color-mix(in srgb, var(--surface) 90%, var(--primary));
+  --surface-highlight: rgb(255 255 255 / 0.6);
+}
+
 @theme inline {
   --radius-sm: calc(var(--radius) - 4px);
   --radius-md: calc(var(--radius) - 2px);
@@ -310,6 +325,23 @@
 }
 
 @layer components {
+  /* Card surface. Components may override the radius (rounded-*). Inside a .surface, rows are divided with .surface-line, not nested boxes. */
+  .surface {
+    background: var(--surface);
+    border: 1px solid var(--surface-border);
+    box-shadow: inset 0 1px 0 var(--surface-highlight);
+    border-radius: 18px;
+  }
+  .surface-line,
+  .surface .divide-y > *,
+  .surface.divide-y > * {
+    border-color: var(--surface-line);
+  }
+  /* Border and top highlight only, for things that keep their own fill (popovers, inputs). */
+  .surface-edge {
+    border: 1px solid var(--surface-border);
+    box-shadow: inset 0 1px 0 var(--surface-highlight);
+  }
   /* Buttons and rows: a quick press, an eased colour change, a soft focus ring. */
   .m-press {
     transition: transform var(--m-select) var(--m-ease), background-color var(--m-hover) var(--m-ease), color var(--m-hover) var(--m-ease), border-color var(--m-hover) var(--m-ease), opacity var(--m-hover) var(--m-ease), box-shadow var(--m-hover) var(--m-ease);

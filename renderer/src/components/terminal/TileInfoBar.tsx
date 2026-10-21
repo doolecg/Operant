@@ -95,7 +95,7 @@ export function TileInfoBar({ tile, crew }: { tile: TerminalTab; crew: Crew | un
   const tone = pct === null ? '' : pct >= danger ? 'bg-red-500' : pct >= warn ? 'bg-amber-400' : 'bg-primary'
 
   return (
-    <div aria-label="Tile info" className="text-muted-foreground flex min-h-7 shrink-0 flex-wrap items-center gap-x-3 gap-y-0.5 overflow-hidden border-b px-3 pb-1 font-mono text-[11px] whitespace-nowrap">
+    <div aria-label="Tile info" className="surface-line text-muted-foreground flex min-h-7 shrink-0 flex-wrap items-center gap-x-3 gap-y-0.5 overflow-hidden border-b px-3 pb-1 font-mono text-[11px] whitespace-nowrap">
       <Item label="Model">{claude ? (status?.model ?? NA) : NA}</Item>
       <Item label="Context" title={claude ? undefined : 'Context is not reported by OpenCode'}>
         {claude ? (

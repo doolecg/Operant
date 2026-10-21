@@ -3,7 +3,7 @@ import { cn } from "cn"
 import { ContextMenu as ContextMenuPrimitive } from "radix-ui"
 
 const surface =
-  "z-50 min-w-[8rem] overflow-x-hidden rounded-xl border bg-popover p-1 text-popover-foreground shadow-md m-surface origin-(--radix-context-menu-content-transform-origin)"
+  "z-50 min-w-[8rem] overflow-x-hidden rounded-xl bg-popover surface-edge p-1 text-popover-foreground m-surface origin-(--radix-context-menu-content-transform-origin)"
 const row =
   "m-row relative flex cursor-default items-center gap-2 rounded-lg px-2 py-1.5 text-sm outline-hidden select-none focus:bg-accent focus:text-accent-foreground data-[disabled]:pointer-events-none data-[disabled]:opacity-50 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4 [&_svg:not([class*='text-'])]:text-muted-foreground"
 

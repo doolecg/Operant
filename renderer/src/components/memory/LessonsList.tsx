@@ -126,7 +126,7 @@ function MergeDialog({ lessons, onClose, onDone }: { lessons: Lesson[]; onClose:
         <DialogBody>
           <div role="radiogroup" aria-label="Lesson to keep" className="space-y-2">
           {lessons.map((l) => (
-            <label key={l.id} className="flex cursor-pointer items-start gap-2 rounded-md border p-2 text-sm">
+            <label key={l.id} className="surface-line flex cursor-pointer items-start gap-2 rounded-md border p-2 text-sm">
               <input type="radio" name="keep" checked={keep === l.id} onChange={() => setKeep(l.id)} aria-label={`Keep lesson ${l.id}`} className="mt-1" />
               <span>
                 <span className="text-muted-foreground font-mono text-xs">#{l.id}</span> {l.text}
@@ -185,7 +185,7 @@ function LessonRow({
   const err = setStatus.error ?? move.error
   const targets = LEARN_STORES.filter((s) => !lesson.stores.includes(s))
   return (
-    <li className="space-y-2 rounded-md border p-3" data-lesson={lesson.id}>
+    <li className="surface-line space-y-2 rounded-md border p-3" data-lesson={lesson.id}>
       <div className="flex items-start gap-3">
         <input type="checkbox" checked={selected} onChange={(e) => onSelect(e.target.checked)} aria-label={`Select lesson ${lesson.id}`} className="mt-1" />
         <div className="min-w-0 flex-1 space-y-1.5">

@@ -516,6 +516,11 @@ export type ChatDecision =
   // ExitPlanMode: approve (optionally switching to accept-edits) or keep planning.
   | { kind: 'plan'; approve: 'approve' | 'approve-edits' | 'keep'; message?: string }
 
+export interface ChatRewindResult {
+  text: string
+  images: Array<{ mediaType: string; base64: string }>
+}
+
 export interface ChatHistoryPage {
   items: ChatItem[]
   // Index in the transcript's item list of the first item returned; 0 means nothing earlier.
@@ -560,6 +565,11 @@ export interface ChatApi {
   'chat:restart': (scratchId: number) => ChatState
   // @file suggestions: git ls-files (or a bounded walk) in the tile's folder, fuzzy filtered, at most 20.
   'chat:files': (scratchId: number, query: string) => Promise<string[]>
+  // "Edit from here": the conversation goes back to before the user message `userItemId` and its text and images are
+  // returned for the chat box. `revertFiles` also undoes the edits Claude's edit tools made since (not shell commands;
+  // only sessions started with file checkpointing). Refused (CONFLICT) while a prompt waits; an error (nothing changed) when
+  // the transcript has no such message or the file revert fails.
+  'chat:rewind': (scratchId: number, userItemId: string, revertFiles: boolean) => Promise<ChatRewindResult>
   // Chat <-> Terminal on the same session. Refused (CONFLICT) while a turn runs or a prompt is pending.
   'scratch:setView': (scratchId: number, view: ScratchView) => Promise<ScratchStatus>
 }
@@ -582,6 +592,7 @@ export const CHAT_CHANNELS = [
   'chat:agentHistory',
   'chat:restart',
   'chat:files',
+  'chat:rewind',
   'scratch:setView',
 ] as const satisfies ReadonlyArray<keyof ChatApi>
 

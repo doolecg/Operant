@@ -484,5 +484,6 @@ export function buildChatLaunch(scratch: ScratchTerminal, ctx: LaunchContext, op
   if (opts.preset?.permissionMode === 'bypassPermissions') add('--allow-dangerously-skip-permissions')
   // Chat starts in Auto mode unless a preset sets its own.
   if (!base.args.includes('--permission-mode')) add('--permission-mode', 'auto')
-  return { ...base, args: [...stream, ...base.args] }
+  // File snapshots at each user message: "Edit from here" can then revert the files (claude --rewind-files).
+  return { ...base, args: [...stream, ...base.args], env: { ...base.env, CLAUDE_CODE_ENABLE_SDK_FILE_CHECKPOINTING: '1' } }
 }

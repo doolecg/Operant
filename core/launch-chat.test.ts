@@ -69,6 +69,10 @@ describe('buildChatLaunch', () => {
     expect(buildChatLaunch(tile(), ctx).env).not.toHaveProperty('OPERANT_FACTORY')
   })
 
+  it('turns on file checkpointing so Edit from here can revert files', () => {
+    expect(buildChatLaunch(tile(), ctx).env.CLAUDE_CODE_ENABLE_SDK_FILE_CHECKPOINTING).toBe('1')
+  })
+
   it('adds --allow-dangerously-skip-permissions only for a bypass preset', () => {
     const preset = { id: 3, permissionMode: 'bypassPermissions', tools: '', allow: [], deny: [], cacheTtl: 'auto', contextCap: 0, roleText: null } as unknown as Preset
     expect(buildChatLaunch(tile(), ctx, { preset }).args).toContain('--allow-dangerously-skip-permissions')

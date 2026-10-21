@@ -21,6 +21,8 @@ import { cn } from '@/lib/utils'
 import { agentRowFor, agentTitle, agentTldr, firstLines, formatDuration, isToolRunning, kTokens, noticeChipIcon, toolIconKey, tokensSuffix, toolRowParts, type AgentDot, type ChipIcon, type ToolIconKey } from './chatHelpers'
 import { useClock } from './clock'
 import { ImageModal } from './ImageModal'
+import { RewindDialog } from './RewindDialog'
+import { useChatWaiting } from './useChat'
 
 const TOOL_ICONS: Record<ToolIconKey, LucideIcon> = {
   memory: BrainCircuit,
@@ -97,8 +99,12 @@ function Pre({ text, className }: { text: string; className?: string }) {
 
 // ---------------------------------------------------------------- messages
 
-export const UserBubble = memo(function UserBubble({ item, small }: { item: UserItem; small?: boolean }) {
+// `editFrom`: the tile's id, which offers "Edit from here" on this message (not for sub-agent prompts or the small Agents view).
+export const UserBubble = memo(function UserBubble({ item, small, editFrom }: { item: UserItem; small?: boolean; editFrom?: number }) {
   const [shown, setShown] = useState<number | null>(null)
+  const [rewinding, setRewinding] = useState(false)
+  const waiting = useChatWaiting(editFrom ?? null)
+  const canEdit = editFrom !== undefined && !item.queued && !waiting
   const many = item.images.length > 1
   return (
     <div className="group/user flex min-w-0 flex-col items-end gap-1" style={{ maxWidth: small ? '92%' : '76%' }}>
@@ -125,6 +131,18 @@ export const UserBubble = memo(function UserBubble({ item, small }: { item: User
       <div className="text-muted-foreground flex h-4 items-center gap-2 text-xs">
         {item.queued ? <span>Queued</span> : item.seen && <span>Seen</span>}
         <CopyTextButton text={item.text} label="Copy" ariaLabel="Copy message" className="opacity-0 group-focus-within/user:opacity-100 group-hover/user:opacity-100" />
+        {canEdit && (
+          <button
+            type="button"
+            aria-label="Edit from here"
+            title="Edit from here"
+            onClick={() => setRewinding(true)}
+            className="m-press hover:bg-accent hover:text-foreground rounded-md p-1 opacity-0 group-focus-within/user:opacity-100 group-hover/user:opacity-100"
+          >
+            <Pencil className="size-3" />
+          </button>
+        )}
+        {rewinding && <RewindDialog scratchId={editFrom!} itemId={item.id} onClose={() => setRewinding(false)} />}
       </div>
     </div>
   )

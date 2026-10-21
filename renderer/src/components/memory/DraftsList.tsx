@@ -84,7 +84,7 @@ function DraftRow({ draft, crewName, onEdit, onDelete }: { draft: SkillDraft; cr
   const pending = draft.status === 'pending'
   const review = needsReview(draft.body)
   return (
-    <li className="space-y-2 rounded-md border p-3" data-draft={draft.id}>
+    <li className="surface-line space-y-2 rounded-md border p-3" data-draft={draft.id}>
       <div className="flex flex-wrap items-center gap-2">
         <span className="font-mono text-sm">{draft.name}</span>
         <Badge variant={pending ? 'secondary' : 'outline'}>{draft.status}</Badge>

@@ -59,7 +59,7 @@ export function ServersPopover({ onOpened }: { onOpened: (crewId: number) => voi
         <TooltipContent>Servers running from your tiles</TooltipContent>
       </Tooltip>
       <PopoverContent side="top" className="w-96" aria-label="Running servers">
-        <div className="flex items-center gap-1 border-b px-3 py-2">
+        <div className="surface-line flex items-center gap-1 border-b px-3 py-2">
           <span className="mr-auto text-sm font-medium">Servers</span>
           <Button variant="ghost" size="icon-sm" aria-label="Refresh servers" title="Refresh" disabled={servers.isFetching} onClick={() => void servers.refetch()}>
             <RefreshCw className={servers.isFetching ? 'animate-spin' : undefined} />
@@ -76,7 +76,7 @@ export function ServersPopover({ onOpened }: { onOpened: (crewId: number) => voi
               <section key={crewId} aria-label={g.name} className="space-y-1.5">
                 <h3 className="text-muted-foreground text-[10.5px] font-semibold tracking-[.09em] uppercase">{g.name}</h3>
                 {g.rows.map((s) => (
-                  <div key={s.key} className="bg-card space-y-1.5 rounded-lg border p-2">
+                  <div key={s.key} className="surface space-y-1.5 rounded-lg p-2">
                     <div className="flex items-baseline gap-2">
                       <span className="truncate font-mono text-xs">{s.url}</span>
                       <span className="text-muted-foreground ml-auto shrink-0 text-xs">port {s.port}</span>

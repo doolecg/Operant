@@ -7,6 +7,7 @@ import { learnOutcomeText, type LearnStatus } from '@shared/learn'
 import { cn } from '@/lib/utils'
 import { useChatState } from '@/components/chat/useChat'
 import { call, useGitInfo, useLearnStatus, useRepoStatus } from '@/lib/queries'
+import { PanelRow, SECTION } from '../PanelRow'
 import { ArtifactsList } from './ArtifactsList'
 import { legendFiles,rightNowHeadline, touchedFiles, type TouchedFile } from './rightNow'
 
@@ -72,17 +73,19 @@ export function RightNowCard({ tileId, crewId, chat }: { tileId: number; crewId:
   if (!showHeadline && !git) return null
   const changes = git?.changes ?? 0
   return (
-    <section aria-label="Right now" className="border-border bg-card m-2 mb-0 shrink-0 rounded-[14px] border p-3.5 shadow-xs dark:shadow-none">
+    <section aria-label="Right now" className="shrink-0">
       {chat && rn && (
-        <>
-          <div className="flex items-start gap-3">
-            <span aria-hidden className="bg-muted text-primary grid size-9 shrink-0 place-items-center rounded-full text-[17px] leading-none">
-              ✳
-            </span>
-            <div className="min-w-0 flex-1">
-              <div className="text-muted-foreground text-[10px] font-semibold tracking-[0.08em] uppercase">Right now</div>
-              <div className="truncate text-[15px] leading-snug font-bold">{rn.headline}</div>
-              <div className="text-muted-foreground truncate text-xs">
+        <div className={SECTION}>
+          <PanelRow
+            className="py-2"
+            icon={
+              <span aria-hidden className="text-primary text-[17px] leading-none">
+                ✳
+              </span>
+            }
+            label={rn.headline}
+            sub={
+              <>
                 {rn.subline}
                 {rn.diff && (
                   <>
@@ -90,33 +93,39 @@ export function RightNowCard({ tileId, crewId, chat }: { tileId: number; crewId:
                     <span className="text-success font-medium">+{rn.diff.added}</span> <span className="text-destructive font-medium">−{rn.diff.removed}</span>
                   </>
                 )}
-              </div>
-            </div>
-          </div>
-          <div className="border-border mt-3 border-t" />
-        </>
+              </>
+            }
+          />
+        </div>
       )}
-      {git && (
-        <div className={cn('flex items-center gap-2 text-xs', chat && rn ? 'mt-3' : undefined)}>
-          <GitBranch aria-hidden className="text-info size-3.5 shrink-0" />
-          <span className="min-w-0 truncate font-mono text-[13px] font-bold">{git.branch}</span>
-          <span className="flex-1" />
-          {changes > 0 ? (
-            <span className="text-warning shrink-0 font-medium">{changes} changed</span>
-          ) : (
-            <span className="text-muted-foreground shrink-0">clean, nothing changed</span>
+      {(git || learn?.enabled) && (
+        <div className={SECTION}>
+          {git && (
+            <PanelRow
+              icon={<GitBranch aria-hidden className="text-info size-4" />}
+              label={<span className="font-mono">{git.branch}</span>}
+              trailing={
+                changes > 0 ? (
+                  <span className="text-warning shrink-0 text-xs font-medium">{changes} changed</span>
+                ) : (
+                  <span className="text-muted-foreground shrink-0 text-xs">clean, nothing changed</span>
+                )
+              }
+            />
+          )}
+          {learn?.enabled && (
+            <PanelRow
+              role="status"
+              aria-label="Learning now"
+              icon={learn.running ? <Loader2 aria-hidden className="text-primary size-4 animate-spin" /> : <Brain aria-hidden className="text-muted-foreground size-4" />}
+              label={learnLine(learn)}
+            />
           )}
         </div>
       )}
-      {learn?.enabled && (
-        <div role="status" aria-label="Learning now" className={cn('flex items-center gap-2 text-xs', chat && rn ? 'border-border mt-3 border-t pt-3' : 'mt-3')}>
-          {learn.running ? <Loader2 aria-hidden className="text-primary size-3.5 shrink-0 animate-spin" /> : <Brain aria-hidden className="text-muted-foreground size-3.5 shrink-0" />}
-          <span className="min-w-0 flex-1 truncate">{learnLine(learn)}</span>
-        </div>
-      )}
       {chat && rn && (
-        <>
-          <ul className="text-muted-foreground mt-3 flex flex-wrap gap-x-3.5 gap-y-1 text-[11px]" aria-label="Colour key">
+        <div className={SECTION}>
+          <ul className="text-muted-foreground flex flex-wrap gap-x-3.5 gap-y-1 px-1 py-1.5 text-[11px]" aria-label="Colour key">
             <li className="flex items-center gap-1.5">
               <i aria-hidden className={cn('size-[7px] rounded-full', READ_DOT)} />
               Claude read
@@ -131,16 +140,16 @@ export function RightNowCard({ tileId, crewId, chat }: { tileId: number; crewId:
             </li>
           </ul>
           {legend.shown.length > 0 && (
-            <ul className="border-border mt-2.5 flex flex-col gap-1.5 border-t pt-2.5" aria-label="Files this session touched">
+            <ul className="mt-1.5 flex flex-col gap-2 px-1 py-1.5" aria-label="Files this session touched">
               {legend.shown.map((f) => (
                 <FileRow key={f.path} file={f} crewId={crewId} />
               ))}
               {legend.more > 0 && <li className="text-muted-foreground text-[11px]">+{legend.more} more</li>}
             </ul>
           )}
-          <ArtifactsList items={items} crewId={crewId} />
-        </>
+        </div>
       )}
+      {chat && rn && <ArtifactsList items={items} crewId={crewId} />}
     </section>
   )
 }

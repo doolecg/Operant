@@ -1,8 +1,8 @@
-import { appendFileSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from 'node:fs'
+import { appendFileSync, mkdirSync, mkdtempSync, realpathSync, rmSync, symlinkSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
-import { encodeProjectDir, JsonlTail, parseLine, transcriptPath } from './transcripts'
+import { encodeProjectDir, JsonlTail, parseLine, transcriptPath, transcriptProjectDir } from './transcripts'
 
 const assistant = (id: string, usage: object, model = 'claude-opus-5-5') =>
   JSON.stringify({ type: 'assistant', timestamp: '2026-09-30T10:00:00.000Z', message: { id, model, usage } })
@@ -114,5 +114,25 @@ describe('transcripts', () => {
       writeFileSync(file, 'x\n')
       expect(tail.read()).toEqual(['x'])
     })
+  })
+})
+
+describe('transcriptProjectDir short paths', () => {
+  it('uses the folder named after the path as given when only that one exists', () => {
+    const root = mkdtempSync(join(tmpdir(), 'operant-tp-'))
+    try {
+      const real = join(root, 'real')
+      const cwd = join(root, 'link')
+      mkdirSync(real)
+      symlinkSync(real, cwd, 'junction')
+      const env = { platform: process.platform, home: root, env: { CLAUDE_CONFIG_DIR: join(root, 'claude') } }
+      const asGiven = join(root, 'claude', 'projects', encodeProjectDir(cwd))
+      mkdirSync(asGiven, { recursive: true })
+      expect(transcriptProjectDir(cwd, env)).toBe(asGiven)
+      mkdirSync(join(root, 'claude', 'projects', encodeProjectDir(realpathSync.native(cwd))))
+      expect(transcriptProjectDir(cwd, env)).toBe(join(root, 'claude', 'projects', encodeProjectDir(realpathSync.native(cwd))))
+    } finally {
+      rmSync(root, { recursive: true, force: true })
+    }
   })
 })

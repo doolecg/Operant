@@ -68,7 +68,7 @@ export function ActivityMenu({ crewId }: { crewId: number | null }) {
         <TooltipContent>Activity and notices</TooltipContent>
       </Tooltip>
       <DropdownMenuContent align="end" aria-label="Activity" className="w-[min(380px,90vw)] p-0">
-        <div className="flex items-center justify-between gap-2 border-b px-3 py-2">
+        <div className="surface-line flex items-center justify-between gap-2 border-b px-3 py-2">
           <h3 className="text-sm font-medium">Activity</h3>
           <Button
             variant="ghost"

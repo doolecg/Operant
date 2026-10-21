@@ -15,7 +15,7 @@ export function AgentBar({ agent, parentTitle, onOpenParent }: { agent: Subagent
     row.dot === 'running' ? `Working${ms !== null ? ` ${formatDuration(ms)}` : ''}` : row.dot === 'waiting' ? 'Waiting for you' : row.dot === 'done' ? `Done${ms !== null ? ` in ${formatDuration(ms)}` : ''}` : row.dot === 'failed' ? 'Failed' : 'Stopped'
   return (
     <div className="mx-auto w-full max-w-[720px] shrink-0 px-5 pb-3">
-      <div role="group" aria-label="Agent status" className="bg-card flex items-center gap-3 rounded-[16px] px-4 py-2.5 text-[13px]">
+      <div role="group" aria-label="Agent status" className="surface flex items-center gap-3 px-4 py-2.5 text-[13px]">
         <div className="flex min-w-0 flex-1 items-center gap-3">
           {model && <span className="shrink-0 font-medium">{model}</span>}
           {agent.effort && <span className="text-muted-foreground shrink-0 capitalize">{agent.effort}</span>}

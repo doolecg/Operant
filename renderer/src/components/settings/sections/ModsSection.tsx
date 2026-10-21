@@ -41,7 +41,7 @@ export function ModsSection() {
           Mods only run in Claude Code tiles. OpenCode tiles do not load them.
         </p>
       )}
-      <div className="bg-muted/50 rounded-2xl px-5 py-2">
+      <div className="surface divide-y px-5 py-2">
         {ORDER.map((id) => {
           const title = MODS.find((x) => x.id === id)?.title ?? LABELS[id]
           const plugin = id === 'promptEnhancer' || id === 'ideaShelf' || id === 'folderTracker' || id === 'plainEnglish'
@@ -82,7 +82,7 @@ export function ModsSection() {
       <p className="text-muted-foreground px-1 text-xs">Operant's status line replaces your own inside Operant Claude tiles.</p>
       <h3 className="px-1 pt-2 text-sm font-medium">Engineering</h3>
       <p className="text-muted-foreground px-1 text-xs">Turn the two modes on per project with the switches in the top bar.</p>
-      <div className="bg-muted/50 rounded-2xl px-5 py-2">
+      <div className="surface px-5 py-2">
         <Row label="Engineering pack" hint="The skills the two modes use. Your copy lives in the Operant data folder; edit it freely. Reset puts the built-in version back and keeps a backup of your edits.">
           <div className="flex gap-2">
             <Button variant="ghost" onClick={() => call('engineering:openFolder').catch((e) => toast(decodeIpcError(e).message, true))}>

@@ -1,11 +1,12 @@
-import { useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react'
-import { Check, ChevronDown, ChevronLeft, MessageSquareText, Square, X } from 'lucide-react'
+import { useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react'
+import { Check, ChevronDown, ChevronLeft, MessageSquareText, MoreHorizontal, Square, X } from 'lucide-react'
 import { decodeIpcError } from '@shared/ipc'
 import { itemsOf, type ChatItem, type SubagentItem } from '@shared/claude-chat'
 import type { ClaudeSubagent } from '@shared/mods'
 import { cn } from '@/lib/utils'
 import { bridge } from '@/lib/bridge'
 import { ConfirmDialog } from '@/components/ui/confirm-dialog'
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
 import { PixelBar, meterTone } from '@/components/ui/pixel-bar'
 import { ConversationList } from '@/components/chat/ConversationList'
 import { UserBubble } from '@/components/chat/ItemViews'
@@ -17,6 +18,7 @@ import { Critter } from './agents/Critter'
 import { RightNowCard } from './agents/RightNowCard'
 import { useAgentItems } from './agents/useAgentItems'
 import { cardTime, critterFor, effortInfo, loadCleared, loadStatusOpen, mcpSummary, mcpTiles, metricsOf, money, progressOf, saveCleared, saveStatusOpen, sessionRows, shortModel, skillSummary, skillTiles, stopPlan, summarize, viewFor, type AgentView, type EffortTone, type McpTile, type McpTone } from './agents/agentView'
+import { SECTION } from './PanelRow'
 import type { ModProps } from './registry'
 
 const TONE: Record<EffortTone, { text: string }> = {
@@ -63,8 +65,8 @@ function AgentRow({ row, now, onOpen, onClear, onStop, stopTitle }: { row: Agent
     bar = <PixelBar className={barClass} fraction={frac} tone={meterTone(prog.pct, 75, 90)} label={prog.label ? `Progress ${prog.label}` : `Context ${Math.round(prog.pct)}% used`} />
   }
   return (
-    <li className="border-border group/row relative border-b last:border-b-0">
-      <button type="button" onClick={onOpen} className={cn('hover:bg-accent flex w-full items-start gap-2.5 rounded-[10px] px-2.5 py-2.5 text-left', onStop && 'pr-8')}>
+    <li className="group/row relative">
+      <button type="button" onClick={onOpen} className={cn('hover:bg-accent m-press flex w-full items-start gap-3 rounded-[10px] px-3 py-3 text-left', onStop && 'pr-8')}>
         <Critter hat={critter.hat} tint={critter.tint} bob={open} />
         <span className="min-w-0 flex-1">
           <span className="flex items-center gap-2">
@@ -98,7 +100,7 @@ function AgentRow({ row, now, onOpen, onClear, onStop, stopTitle }: { row: Agent
           onClick={onStop}
           aria-label={`Stop ${row.description}`}
           title={stopTitle ?? 'Stop this subagent'}
-          className="text-muted-foreground hover:bg-accent hover:text-destructive bg-card absolute top-1.5 right-1.5 grid size-5 place-items-center rounded-full"
+          className="text-muted-foreground hover:bg-muted hover:text-destructive absolute top-2 right-2 grid size-5 place-items-center rounded-full"
         >
           <Square className="size-2.5 fill-current" />
         </button>
@@ -109,33 +111,12 @@ function AgentRow({ row, now, onOpen, onClear, onStop, stopTitle }: { row: Agent
           onClick={onClear}
           aria-label={`Clear ${row.description}`}
           title="Clear"
-          className="text-muted-foreground hover:bg-accent hover:text-foreground bg-card absolute top-1.5 right-1.5 hidden size-5 place-items-center rounded-full group-hover/row:grid focus-visible:grid"
+          className="text-muted-foreground hover:bg-muted hover:text-foreground absolute top-2 right-2 hidden size-5 place-items-center rounded-full group-hover/row:grid focus-visible:grid"
         >
           <X className="size-3" />
         </button>
       )}
     </li>
-  )
-}
-
-function Card({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="border-border bg-card min-w-0 flex-1 rounded-[12px] border px-3 py-2">
-      <div className="truncate text-[15px] leading-tight font-bold tabular-nums">{value}</div>
-      <div className="text-muted-foreground text-[11px]">{label}</div>
-    </div>
-  )
-}
-
-function Group({ label, count, open, onToggle, children }: { label: string; count: number; open: boolean; onToggle: () => void; children: ReactNode }) {
-  return (
-    <section className="mt-2">
-      <button type="button" onClick={onToggle} aria-expanded={open} className="text-muted-foreground hover:text-foreground flex items-center gap-1 px-2.5 py-1 text-xs font-medium">
-        <ChevronDown className={cn('size-3.5 transition-transform', !open && '-rotate-90')} aria-hidden />
-        {label} · {count}
-      </button>
-      {open && <ul aria-label={label}>{children}</ul>}
-    </section>
   )
 }
 
@@ -156,13 +137,16 @@ function AgentList({ tileId, views, now, onOpen, onStop }: { tileId: number; vie
   const { cleared, clear } = useCleared(tileId)
   const [stopError, setStopError] = useState<string | null>(null)
   const [confirmStop, setConfirmStop] = useState<{ id: string; title: string; body: string } | null>(null)
-  const [runningOpen, setRunningOpen] = useState(true)
-  const [doneOpen, setDoneOpen] = useState(true)
   const visible = views.filter((v) => !cleared.has(v.id))
   const running = visible.filter((v) => v.dot === 'running' || v.dot === 'waiting')
   const finished = visible.filter((v) => v.dot !== 'running' && v.dot !== 'waiting')
   const sum = summarize(visible, now)
-  const allOpen = runningOpen && doneOpen
+  // The shelf of finished agents starts closed and opens when an agent runs; after that it stays as the user left it.
+  const [shelfOpen, setShelfOpen] = useState(false)
+  const anyRunning = running.length > 0
+  useEffect(() => {
+    if (anyRunning) setShelfOpen(true)
+  }, [anyRunning])
   const runStop = (scope: 'one' | 'turn', id: string) => {
     setStopError(null)
     onStop(scope, id).catch((e) => setStopError(decodeIpcError(e).message))
@@ -173,9 +157,9 @@ function AgentList({ tileId, views, now, onOpen, onStop }: { tileId: number; vie
     else runStop(plan.scope, r.id)
   }
   return (
-    <div className="p-2">
+    <div className="shrink-0">
       {stopError && (
-        <p role="alert" className="text-destructive px-2.5 pb-1 text-xs">
+        <p role="alert" className="text-destructive surface-line border-t px-4 py-2 text-xs">
           {stopError}
         </p>
       )}
@@ -192,43 +176,53 @@ function AgentList({ tileId, views, now, onOpen, onStop }: { tileId: number; vie
         onCancel={() => setConfirmStop(null)}
       />
       {visible.length === 0 ? (
-        <p className="text-muted-foreground px-2 py-2 text-[13px]">{views.length > 0 ? 'All agents cleared.' : 'No agents in this session yet.'}</p>
+        <p className={cn(SECTION, 'text-muted-foreground py-3 text-[13px]')}>{views.length > 0 ? 'All agents cleared.' : 'No agents in this session yet.'}</p>
       ) : (
         <>
-          <div className="flex gap-2 px-1">
-            <Card label="Cost" value={sum.cost !== null ? money(sum.cost) : '—'} />
-            <Card label="Tokens" value={sum.tokens !== null ? kTokens(sum.tokens) : '—'} />
-            <Card label="Time" value={sum.ms !== null ? cardTime(sum.ms) : '—'} />
-          </div>
-          <div className="text-muted-foreground flex items-center justify-between px-2.5 pt-2 text-xs">
-            <button
-              type="button"
-              onClick={() => {
-                setRunningOpen(!allOpen)
-                setDoneOpen(!allOpen)
-              }}
-              className="hover:text-foreground underline-offset-2 hover:underline"
-            >
-              {allOpen ? 'Collapse' : 'Expand'}
-            </button>
-            <button type="button" disabled={finished.length === 0} onClick={() => clear(finished.map((f) => f.id))} className="hover:text-foreground underline-offset-2 hover:underline disabled:opacity-40 disabled:hover:no-underline">
-              Clear finished
-            </button>
-          </div>
-          {running.length > 0 && (
-            <Group label="Running" count={running.length} open={runningOpen} onToggle={() => setRunningOpen((o) => !o)}>
-              {running.map((r) => (
-                <AgentRow key={r.id} row={r} now={now} onOpen={() => onOpen(r.id)} onStop={() => requestStop(r)} stopTitle={stopPlan(r.canStopOne, 0).title} />
-              ))}
-            </Group>
-          )}
-          {finished.length > 0 && (
-            <Group label="Finished" count={finished.length} open={doneOpen} onToggle={() => setDoneOpen((o) => !o)}>
-              {finished.map((r) => (
-                <AgentRow key={r.id} row={r} now={now} onOpen={() => onOpen(r.id)} onClear={() => clear([r.id])} />
-              ))}
-            </Group>
-          )}
+          <p className={cn(SECTION, 'text-muted-foreground truncate px-4 py-2.5 text-xs tabular-nums')}>
+            {[`${visible.length} ${visible.length === 1 ? 'agent' : 'agents'}`, sum.cost !== null ? money(sum.cost) : '—', `${sum.tokens !== null ? kTokens(sum.tokens) : '—'} tokens`, sum.ms !== null ? cardTime(sum.ms) : '—'].join('  ·  ')}
+          </p>
+          <section className={SECTION}>
+            <div className="flex items-center gap-1 px-1 pt-1 pb-1.5">
+              <span className="text-muted-foreground text-[13px] font-medium">Agents ({visible.length})</span>
+              <span className="flex-1" />
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <button type="button" aria-label="Agent actions" className="text-muted-foreground hover:bg-accent hover:text-foreground focus-visible:ring-ring grid size-6 place-items-center rounded-full outline-none focus-visible:ring-2">
+                    <MoreHorizontal aria-hidden className="size-4" />
+                  </button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  <DropdownMenuItem disabled={finished.length === 0} onSelect={() => clear(finished.map((f) => f.id))}>
+                    Clear finished
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </div>
+            {running.length > 0 && (
+              <ul aria-label="Running" className="flex flex-col gap-1">
+                {running.map((r) => (
+                  <AgentRow key={r.id} row={r} now={now} onOpen={() => onOpen(r.id)} onStop={() => requestStop(r)} stopTitle={stopPlan(r.canStopOne, 0).title} />
+                ))}
+              </ul>
+            )}
+            {finished.length > 0 && (
+              <>
+                <button type="button" onClick={() => setShelfOpen((o) => !o)} aria-expanded={shelfOpen} className="text-muted-foreground hover:bg-accent m-press mt-1 flex w-full items-center gap-3 rounded-[10px] px-1 py-2 text-[13px]">
+                  <span className="shrink-0">Previous agents ({finished.length})</span>
+                  <span aria-hidden className="h-px flex-1 bg-(--surface-line)" />
+                  <ChevronDown className={cn('size-4 shrink-0 transition-transform', !shelfOpen && '-rotate-90')} aria-hidden />
+                </button>
+                {shelfOpen && (
+                  <ul aria-label="Finished" className="m-enter flex flex-col gap-1">
+                    {finished.map((r) => (
+                      <AgentRow key={r.id} row={r} now={now} onOpen={() => onOpen(r.id)} onClear={() => clear([r.id])} />
+                    ))}
+                  </ul>
+                )}
+              </>
+            )}
+          </section>
         </>
       )}
     </div>
@@ -342,26 +336,22 @@ function HookAgents({ tileId, agents }: { tileId: number; agents: ClaudeSubagent
 const MCP_DOT: Record<McpTone, string> = { success: 'bg-success', warning: 'bg-warning', destructive: 'bg-destructive', muted: 'bg-muted-foreground/50' }
 const MCP_TEXT: Record<McpTone, string> = { success: 'text-success', warning: 'text-warning', destructive: 'text-destructive', muted: 'text-muted-foreground' }
 
-// The tile grid of MCP servers and skills: one compact tile each, the same look for both.
+// The MCP servers and skills: one row each (dot, name, state word), the same look for both. Attention only colours the dot and the word.
 function StatusTiles({ label, tiles }: { label: string; tiles: McpTile[] }) {
   return (
     <div>
-      <div className="text-muted-foreground mb-1.5 text-[11px] font-medium">{label}</div>
-      <ul className="grid grid-cols-[repeat(auto-fill,minmax(120px,1fr))] gap-1.5">
+      <div className="text-muted-foreground px-1 pt-1 pb-1.5 text-[13px] font-medium">{label}</div>
+      <ul className="flex flex-col gap-0.5">
         {tiles.map((t) => (
-          <li
-            key={t.name}
-            title={t.reason ? `${t.name} · ${t.reason}` : t.name}
-            className={cn('flex min-w-0 items-start gap-1.5 rounded-[8px] border px-2 py-1.5', t.attention ? (t.tone === 'destructive' ? 'border-destructive/30 bg-destructive/10' : 'border-warning/30 bg-warning/10') : 'border-border bg-card')}
-          >
-            <i role="img" aria-label={t.state} className={cn('mt-[4px] size-[7px] shrink-0 rounded-full', MCP_DOT[t.tone])} />
-            <span className="min-w-0 flex-1">
-              <span className="flex min-w-0 flex-col text-xs leading-tight">
-                {t.prefix && <span className="text-muted-foreground truncate text-[10px]">{t.prefix}</span>}
-                <span className="truncate font-medium">{t.short}</span>
-              </span>
-              <span className={cn('mt-0.5 block truncate text-[11px] leading-tight', MCP_TEXT[t.tone])}>{t.state}</span>
+          <li key={t.name} title={t.reason ? `${t.name} · ${t.reason}` : t.name} className="flex min-w-0 items-center gap-3 rounded-[10px] px-1 py-1.5 text-[13px]">
+            <span className="grid size-4 shrink-0 place-items-center">
+              <i role="img" aria-label={t.state} className={cn('size-[7px] rounded-full', MCP_DOT[t.tone])} />
             </span>
+            <span className="min-w-0 flex-1 truncate font-medium">
+              {t.prefix && <span className="text-muted-foreground font-normal">{t.prefix}:</span>}
+              {t.short}
+            </span>
+            <span className={cn('shrink-0 text-xs', t.attention ? MCP_TEXT[t.tone] : 'text-muted-foreground')}>{t.state}</span>
           </li>
         ))}
       </ul>
@@ -384,8 +374,8 @@ function StatusSection({ tileId, chat }: { tileId: number; chat?: boolean }) {
   const skills = useMemo(() => skillTiles(state?.items ?? []), [state?.items])
   const bad = tiles.some((t) => t.tone === 'destructive')
   return (
-    <section className="border-border bg-muted/40 m-2 mt-auto shrink-0 rounded-[12px] border">
-      <button type="button" onClick={toggle} aria-expanded={open} className="flex w-full items-center gap-1.5 px-3 py-2 text-left text-xs font-semibold">
+    <section className="surface-line mt-auto shrink-0 border-t">
+      <button type="button" onClick={toggle} aria-expanded={open} className="hover:bg-accent m-press flex w-full items-center gap-1.5 px-4 py-3 text-left text-[13px] font-medium">
         <ChevronDown className={cn('text-muted-foreground size-3.5 transition-transform', !open && '-rotate-90')} aria-hidden />
         Status
         {!open && bad && <i aria-label="A server failed" className="bg-destructive size-[6px] rounded-full" />}
@@ -400,10 +390,10 @@ function StatusSection({ tileId, chat }: { tileId: number; chat?: boolean }) {
               {skills.length > 0 && <div className={servers.length > 0 ? 'mt-3' : undefined}><StatusTiles label={skillSummary(skills)} tiles={skills} /></div>}
               {session.length > 0 && (
                 <div className={servers.length > 0 || skills.length > 0 ? 'mt-3' : undefined}>
-                  <div className="text-muted-foreground mb-1 text-[11px] font-medium">Session</div>
-                  <ul className="flex flex-col gap-1.5">
+                  <div className="text-muted-foreground px-1 pt-1 pb-1.5 text-[13px] font-medium">Session</div>
+                  <ul className="flex flex-col gap-1">
                     {session.map((r, i) => (
-                      <li key={i} className="bg-card rounded-[8px] px-2 py-1.5 text-xs leading-snug">
+                      <li key={i} className="px-1 py-1.5 text-xs leading-snug">
                         <span className="text-muted-foreground block text-[11px]">{r.origin}</span>
                         {r.text}
                       </li>
@@ -425,15 +415,15 @@ function StatusSection({ tileId, chat }: { tileId: number; chat?: boolean }) {
 export function SubagentPanel({ tileId, crewId, state, chat, onCollapse }: ModProps) {
   return (
     <div className="flex min-h-0 flex-1 flex-col">
-      <div className="border-border flex h-11 shrink-0 items-center gap-2 border-b pr-2.5 pl-4">
+      <div className="flex h-11 shrink-0 items-center gap-2 pr-2.5 pl-4">
         <h3 className="text-[13px] font-semibold">Agents</h3>
         <span className="flex-1" />
         <button type="button" onClick={onCollapse} aria-label="Hide Agents panel" title="Hide" className="text-muted-foreground hover:bg-accent hover:text-foreground grid size-7 place-items-center rounded-full">
           <X className="size-3.5" />
         </button>
       </div>
-      <RightNowCard tileId={tileId} crewId={crewId} chat={!!chat} />
-      <div className="flex min-h-0 flex-1 flex-col overflow-y-auto pt-1">
+      <div className="flex min-h-0 flex-1 flex-col overflow-y-auto">
+        <RightNowCard tileId={tileId} crewId={crewId} chat={!!chat} />
         {chat ? <ChatAgents tileId={tileId} /> : <HookAgents tileId={tileId} agents={state?.subagents ?? []} />}
         <StatusSection tileId={tileId} chat={chat} />
       </div>

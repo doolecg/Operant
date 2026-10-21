@@ -85,7 +85,7 @@ export function InspectPanel(p: Props) {
   }
 
   return (
-    <section aria-label="Inspector" className="bg-card/40 flex shrink-0 flex-col border-t">
+    <section aria-label="Inspector" className="surface-line bg-card/40 flex shrink-0 flex-col border-t">
       <button
         type="button"
         aria-expanded={p.open}
@@ -162,7 +162,7 @@ function ConsoleTab({ list, onClear }: { list: readonly ConsoleEntry[]; onClear:
           Clear
         </Button>
       </div>
-      <div ref={scroll.ref} onScroll={scroll.onScroll} role="log" aria-label="Console messages" className="min-h-0 flex-1 overflow-y-auto rounded-md border font-mono text-xs">
+      <div ref={scroll.ref} onScroll={scroll.onScroll} role="log" aria-label="Console messages" className="surface-line min-h-0 flex-1 overflow-y-auto rounded-md border font-mono text-xs">
         {shown.length === 0 && <p className="text-muted-foreground p-2 font-sans">{list.length === 0 ? 'Nothing logged on this page yet.' : 'No message matches the filter.'}</p>}
         {shown.map((e, i) => (
           <div key={`${String(e.at)}-${String(i)}`} className={cn('flex gap-2 border-b px-2 py-0.5 last:border-b-0', LEVEL_STYLE[e.level], e.level === 'error' && 'bg-destructive/5', e.level === 'warn' && 'bg-amber-500/5')}>
@@ -201,12 +201,12 @@ function NetworkTab({ list, onClear }: { list: readonly NetEntry[]; onClear: () 
           Clear
         </Button>
       </div>
-      <div ref={scroll.ref} onScroll={scroll.onScroll} role="table" aria-label="Network requests" className="min-h-0 flex-1 overflow-y-auto rounded-md border text-xs">
+      <div ref={scroll.ref} onScroll={scroll.onScroll} role="table" aria-label="Network requests" className="surface-line min-h-0 flex-1 overflow-y-auto rounded-md border text-xs">
         {shown.length === 0 && <p className="text-muted-foreground p-2">{list.length === 0 ? 'No requests on this page yet.' : 'No request matches the filter.'}</p>}
         {shown.map((e) => {
           const c = statusClass(e)
           return (
-            <div key={e.id} role="row" className="hover:bg-accent/30 flex items-center gap-2 border-b px-2 py-0.5 last:border-b-0">
+            <div key={e.id} role="row" className="surface-line hover:bg-accent/30 flex items-center gap-2 border-b px-2 py-0.5 last:border-b-0">
               <span role="cell" className="w-12 shrink-0 font-mono">
                 {e.method}
               </span>
@@ -287,13 +287,13 @@ function CookiesTab(p: Props) {
           {error}
         </p>
       )}
-      <div role="table" aria-label="Cookies" className="min-h-0 flex-1 overflow-y-auto rounded-md border text-xs">
+      <div role="table" aria-label="Cookies" className="surface-line min-h-0 flex-1 overflow-y-auto rounded-md border text-xs">
         {shown.length === 0 && <p className="text-muted-foreground p-2">{p.cookies.length === 0 ? 'This project has no cookies.' : 'No cookie matches the filter.'}</p>}
         {shown.map((c) => {
           const k = cookieKey(c)
           const reveal = shownValues.has(k)
           return (
-            <div key={k} role="row" className="hover:bg-accent/30 flex items-center gap-2 border-b px-2 py-0.5 last:border-b-0">
+            <div key={k} role="row" className="surface-line hover:bg-accent/30 flex items-center gap-2 border-b px-2 py-0.5 last:border-b-0">
               <span role="cell" className="w-32 shrink-0 truncate font-mono" title={c.name}>
                 {c.name}
               </span>

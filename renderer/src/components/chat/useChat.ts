@@ -80,6 +80,26 @@ export function useChatState(scratchId: number | null): ChatState | null {
   )
 }
 
+// True while Claude waits for an answer (a permission, question or plan): "Edit from here" is not offered then. A boolean
+// snapshot, so a bubble re-renders only when it flips.
+export function useChatWaiting(scratchId: number | null): boolean {
+  const subscribe = useCallback((l: () => void) => (scratchId === null ? () => {} : subscribeTo(scratchId, l)), [scratchId])
+  return useSyncExternalStore(subscribe, () => {
+    const t = scratchId === null ? null : entries.get(scratchId)?.state?.turn
+    return !!t && (t.phase === 'waiting' || t.pendingCount > 0)
+  })
+}
+
+// "Edit from here" puts the rewound message back into the tile's chat box: the Composer registers here.
+const composers = new Map<number, (m: ChatSendInput) => void>()
+
+export function onComposerRestore(scratchId: number, take: (m: ChatSendInput) => void): () => void {
+  composers.set(scratchId, take)
+  return () => {
+    if (composers.get(scratchId) === take) composers.delete(scratchId)
+  }
+}
+
 const fail = (e: unknown) => toast(decodeIpcError(e).message, true)
 
 export const chatActions = {
@@ -109,6 +129,10 @@ export const chatActions = {
   setMode: (id: number, mode: string) => void bridge().invoke('chat:setMode', id, mode).catch(fail),
   setModel: (id: number, model: string) => bridge().invoke('chat:setModel', id, model).catch(fail),
   setEffort: (id: number, level: string) => void bridge().invoke('chat:setEffort', id, level).catch(fail),
+  // The chat goes back to before the message; its text and images go to the chat box. Throws the IPC error (the dialog shows it).
+  async rewind(id: number, userItemId: string, revertFiles: boolean): Promise<void> {
+    composers.get(id)?.(await bridge().invoke('chat:rewind', id, userItemId, revertFiles))
+  },
   async restart(id: number): Promise<void> {
     try {
       const s = await bridge().invoke('chat:restart', id)
