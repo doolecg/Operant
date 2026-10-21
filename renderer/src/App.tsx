@@ -243,6 +243,14 @@ export function App() {
       <div className="flex h-full flex-col">
       <header ref={barRef} className="bg-background/80 grid h-[38px] shrink-0 grid-cols-[minmax(auto,1fr)_auto_minmax(auto,1fr)] items-center gap-3 border-b px-3 text-xs backdrop-blur">
         <div className="flex items-center gap-3">
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <button type="button" className={iconBtn} aria-label={sidebarHidden ? 'Show project list' : 'Hide project list'} aria-pressed={!sidebarHidden} onClick={() => setLayout({ sidebarHidden: !sidebarHidden })}>
+                <PanelLeft />
+              </button>
+            </TooltipTrigger>
+            <TooltipContent side="bottom" align="start">{sidebarHidden ? 'Show project list' : 'Hide project list'} (Alt+B)</TooltipContent>
+          </Tooltip>
           <div className="flex shrink-0 items-center gap-2">
             <span aria-hidden className="text-[20px] leading-none text-[#d97757]">
               ◈
@@ -274,14 +282,6 @@ export function App() {
         <div className="flex items-center justify-end gap-1.5">
           {tb?.mediaControls && tier < 5 && <MediaBar enabled size={tb.mediaSize} tier={tier} />}
           <ActivityMenu crewId={crewId} />
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <button type="button" className={iconBtn} aria-label={sidebarHidden ? 'Show project list' : 'Hide project list'} aria-pressed={!sidebarHidden} onClick={() => setLayout({ sidebarHidden: !sidebarHidden })}>
-                <PanelLeft />
-              </button>
-            </TooltipTrigger>
-            <TooltipContent>{sidebarHidden ? 'Show project list' : 'Hide project list'} (Alt+B)</TooltipContent>
-          </Tooltip>
           <Tooltip>
             <TooltipTrigger asChild>
               <button type="button" className={iconBtn} aria-label="Settings" onClick={() => openSettingsAt()}>
