@@ -1679,11 +1679,12 @@ export class Operant extends EventEmitter<PushEvents> {
     return `scratch:${id}`
   }
 
-  private launchContext(crewId: number, crewFolder: string, sessionId: string): LaunchContext {
+  // `plain`: the tile runs just its preset, without the project's Engineering and Factory instructions (a role started from the Factory box).
+  private launchContext(crewId: number, crewFolder: string, sessionId: string, plain = false): LaunchContext {
     const platform = this.launch.platform ?? process.platform
     const cliDir = this.launch.cliDir
     const browserUrl = this.settings.browser.aiControl ? (this.browserMcp?.() ?? null) : null
-    const modes = this.projectModes(crewId)
+    const modes: ReturnType<Operant['projectModes']> = plain ? {} : this.projectModes(crewId)
     return {
       platform,
       shell: shellKind(this.settings.shell.file, platform),
@@ -1765,7 +1766,7 @@ export class Operant extends EventEmitter<PushEvents> {
       const resume = keep && (scratch.agent !== 'claude' || existsSync(this.transcriptFile(scratch.cwd, sessionId)))
       const row: ScratchTerminal = { ...scratch, sessionId }
       const preset = scratch.presetId != null ? this.store.getPreset(scratch.presetId) : null
-      const ctx = this.launchContext(scratch.crewId, crew?.folder ?? scratch.cwd, sessionId)
+      const ctx = this.launchContext(scratch.crewId, crew?.folder ?? scratch.cwd, sessionId, scratch.presetId != null)
       const launch = buildScratchLaunch(row, ctx, { preset, resume })
       this.writeFiles(launch)
       const env = this.sessionEnv(launch.env, scratchId)
@@ -1885,7 +1886,7 @@ export class Operant extends EventEmitter<PushEvents> {
     const scratch = this.store.getScratch(scratchId)
     if (!scratch) throw notFound(`Scratch terminal ${scratchId} not found`)
     const crew = this.store.getCrew(scratch.crewId)
-    const ctx = this.launchContext(scratch.crewId, crew?.folder ?? scratch.cwd, sessionId)
+    const ctx = this.launchContext(scratch.crewId, crew?.folder ?? scratch.cwd, sessionId, scratch.presetId != null)
     const launch = buildChatLaunch({ ...scratch, sessionId }, ctx, { preset: this.presetOf(scratch), resume })
     this.writeFiles(launch)
     const base = this.launch.baseEnv ?? process.env

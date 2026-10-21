@@ -72,3 +72,14 @@ export function buildPreamble(modes: ProjectModes, dirs: PackDirs): string {
   }
   return blocks.join('\n\n')
 }
+
+// The helper levels of Subagent Factory Mode, each started from the built-in preset of that name (its model, instructions and skills).
+export const FACTORY_ROLES = [
+  { key: 'leader', label: 'Leader', preset: 'plan', job: 'Plans, splits, reviews' },
+  { key: 'builder', label: 'Builder', preset: 'implement', job: 'Writes the code' },
+  { key: 'reviewer', label: 'Reviewer', preset: 'review', job: 'Checks the work' },
+  { key: 'scout', label: 'Scout', preset: 'research', job: 'Reads and reports' },
+  { key: 'tester', label: 'Tester', preset: 'test', job: 'Writes and runs tests' },
+] as const
+
+export type FactoryRole = (typeof FACTORY_ROLES)[number]

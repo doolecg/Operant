@@ -12,6 +12,7 @@ import { Toaster } from '@/components/ui/toaster'
 import { Sidebar } from '@/components/dashboard/Sidebar'
 import { TerminalView } from '@/components/terminal/TerminalView'
 import { LearningBadge, OPEN_SETTINGS_EVENT } from '@/components/memory/LearningBadge'
+import { START_ROLE_EVENT, type StartRoleDetail } from '@/components/chat/FactoryBox'
 import { ServersPopover } from '@/components/dashboard/ServersPopover'
 import { ProviderLimitBadge } from '@/components/cost/ProviderBadge'
 import { SettingsPage } from '@/components/settings/SettingsPage'
@@ -111,6 +112,17 @@ export function App() {
   const saveSettings = useSaveSettings()
   useUiScale(settings.data?.uiScale)
   const terminals = useTerminals(crews.data, settings.data?.defaultModels.claude ?? 'sonnet', settings.data?.mainCli ?? 'claude', settings.data?.defaultEfforts.claude ?? '')
+
+  // "Start" on a Factory level: a new Claude tile with just that preset.
+  useEffect(() => {
+    const start = (e: Event) => {
+      const { crewId: id, ...role } = (e as CustomEvent<StartRoleDetail>).detail
+      const target = crews.data?.find((c) => c.id === id)
+      if (target) void terminals.openTab(target, 'claude', role)
+    }
+    window.addEventListener(START_ROLE_EVENT, start)
+    return () => window.removeEventListener(START_ROLE_EVENT, start)
+  }, [crews.data, terminals.openTab])
 
   const crew = crews.data?.find((c) => c.id === crewId)
   const layout = settings.data?.layout
