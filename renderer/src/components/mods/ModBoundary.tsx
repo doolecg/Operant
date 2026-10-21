@@ -9,14 +9,14 @@ export class ModBoundary extends Component<{ title: string; children: ReactNode 
   }
 
   componentDidCatch(error: unknown) {
-    console.error(`Claude Mods: ${this.props.title} failed`, error)
+    console.error(`Mods: ${this.props.title} failed`, error)
   }
 
   render() {
     if (this.state.failed)
       return (
         <p role="alert" className="text-muted-foreground p-3 text-xs">
-          Claude Mods: {this.props.title} failed. The terminal is not affected.
+          Mods: {this.props.title} failed. The terminal is not affected.
         </p>
       )
     return this.props.children

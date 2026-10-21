@@ -1,7 +1,7 @@
 import { Notification } from 'electron'
 import type { Operant } from '../core/operant'
 import { emptyChatState, pendingPrompts, reduceChat, tileState, type ChatItem, type ChatState } from '../shared/claude-chat'
-import type { ClaudeTileState } from '../shared/claude-mods'
+import type { ClaudeTileState } from '../shared/mods'
 import { notifyCopy, shouldNotify, type NotifyKind } from '../shared/notify'
 
 // Chat tiles keep only their newest items here: the turn phase and the last reply are all the notifier needs.
@@ -85,7 +85,7 @@ export function watchClaudeTurns(operant: Operant, deps: TurnWatchDeps): TurnWat
     else if (after === 'Waiting for you' && before !== after) fire(scratchId, 'needs', waitingText(next.items))
   })
 
-  operant.on('claudeMods:state', (s: ClaudeTileState) => {
+  operant.on('claudeTile:state', (s: ClaudeTileState) => {
     const prev = phases.get(s.tileId)
     const phase = s.session.phase
     phases.set(s.tileId, phase)

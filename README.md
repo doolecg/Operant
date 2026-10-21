@@ -7,7 +7,7 @@ A home for your coding terminals. Claude Code and OpenCode side by side, with me
 ## Features
 
 - **Terminals as tiles.** Claude Code and OpenCode per project, in a Chat or Terminal view, with model and context on each tile.
-- **Claude Mods.** An Agents panel for sub-agents, a Commands menu, and an activity box for learning and memory.
+- **Mods.** An Agents panel for sub-agents, a Commands menu, and an activity box for learning and memory.
 - **Memory that sticks.** Lessons from finished sessions go to the project's Hindsight bank. Useful procedures become skills you approve once, for every session.
 - **Usage at a glance.** Plan rings for the 5-hour and weekly limits, budgets and export.
 - **Git, backups, presets and themes**, with settings applied live.

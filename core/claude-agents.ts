@@ -1,6 +1,6 @@
 import { mkdirSync, readFileSync, watch } from 'node:fs'
 import { join } from 'node:path'
-import type { ClaudePhase, ClaudeSessionState, ClaudeSessionStatus, ClaudeSubagent, ClaudeTileState, SubagentStatus, SubagentTokens } from '../shared/claude-mods'
+import type { ClaudePhase, ClaudeSessionState, ClaudeSessionStatus, ClaudeSubagent, ClaudeTileState, SubagentStatus, SubagentTokens } from '../shared/mods'
 import { isSafeSessionId, parseEventLine, parseStatusFile, type ClaudeEvent } from './claude-events'
 import { JsonlTail, parseLine, transcriptProjectDir } from './transcripts'
 
@@ -327,7 +327,7 @@ export class ClaudeAgents {
     return rec ? this.snapshot(rec) : null
   }
 
-  // Stops the watcher and forgets every tile (Claude mods were switched off, or the app is quitting). Events that
+  // Stops the watcher and forgets every tile (mods were switched off, or the app is quitting). Events that
   // still arrive from running tiles are ignored until the next begin().
   dispose(): void {
     this.closeWatcher()

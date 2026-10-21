@@ -1,13 +1,17 @@
 import { Download, Loader2, RefreshCw } from 'lucide-react'
 import { CURRENCIES, type CurrencyCode } from '@shared/currency'
+import { commandText, installItem, statusLabel } from '@shared/install'
 import type { UpdateStatus } from '@shared/types'
+import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
+import { ConfirmDialog } from '@/components/ui/confirm-dialog'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Switch } from '@/components/ui/switch'
 import { bridge } from '@/lib/bridge'
 import { timeAgo } from '@/lib/format'
-import { useSaveSettings, useSettings, useUpdateStatus } from '@/lib/queries'
+import { formatAccel } from '@/lib/keys'
+import { useAppInfo, useInstallRun, useInstallStatus, useSaveSettings, useSettings, useUpdateStatus } from '@/lib/queries'
 import { cn } from '@/lib/utils'
 import { NumberField, Row } from '../parts'
 import { UiScaleSelect } from '../UiScaleControl'
@@ -69,6 +73,66 @@ function UpdateRow({ status }: { status?: UpdateStatus }) {
         )}
       </div>
     </div>
+  )
+}
+
+function DictationCard() {
+  const settings = useSettings()
+  const save = useSaveSettings()
+  const run = useInstallRun()
+  const speech = useInstallStatus().data?.find((x) => x.id === 'dictation')
+  const platform = useAppInfo().data?.platform ?? 'win32'
+  const [confirm, setConfirm] = useState(false)
+  const [installing, setInstalling] = useState(false)
+  const [installError, setInstallError] = useState<string | null>(null)
+  const s = settings.data
+  if (!s) return null
+
+  return (
+    <>
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base">Dictation</CardTitle>
+          <CardDescription>The microphone button in the Chat composer. Speech is turned into text on this device.</CardDescription>
+        </CardHeader>
+        <CardContent className="divide-y">
+          <Row label="Enable dictation" hint="Off hides the microphone button and the dictation shortcut does nothing." info="Shows a microphone button in the Chat composer, and turns on the dictation shortcut, so you can speak instead of typing. The speech is turned into text on this device. When off, the button is hidden and the shortcut does nothing." htmlFor="dictation-enabled">
+            <Switch id="dictation-enabled" checked={s.dictation.enabled} onCheckedChange={(v) => save.mutate({ dictation: { enabled: v } })} />
+          </Row>
+          <Row label="Hold to talk" hint="On: record only while the shortcut is held down, and transcribe when you let go. Off: press once to start and again to stop." info="Off, you press the dictation shortcut once to start recording and again to stop. On, you hold the shortcut down while you talk and the words are written when you let go. Holding suits short bursts. Off is the default." htmlFor="dictation-hold">
+            <Switch id="dictation-hold" checked={s.dictation.mode === 'hold'} onCheckedChange={(v) => save.mutate({ dictation: { mode: v ? 'hold' : 'toggle' } })} />
+          </Row>
+          <Row label="Shortcut" hint="Change it in Shortcuts. A key combination or the middle, back or forward mouse button.">
+            <kbd className="bg-muted rounded px-2 py-0.5 font-mono text-xs">{formatAccel(s.keybinds.dictate)}</kbd>
+          </Row>
+          <Row label="Speech model" hint={installError ?? installItem('dictation').enables}>
+            <div className="flex items-center gap-2">
+              <Badge variant={speech?.state === 'installed' ? 'secondary' : 'outline'}>{statusLabel(speech)}</Badge>
+              <Button size="sm" variant="outline" aria-label="Install Dictation speech model" disabled={installing || speech?.state === 'installed'} onClick={() => setConfirm(true)}>
+                {installing && <Loader2 className="animate-spin" />}
+                {installing ? 'Installing' : 'Install'}
+              </Button>
+            </div>
+          </Row>
+        </CardContent>
+      </Card>
+      <ConfirmDialog
+        open={confirm}
+        title="Install Dictation speech model?"
+        description={<p>{commandText('dictation', platform)}</p>}
+        confirmLabel="Run the install"
+        testId="install-confirm"
+        onConfirm={async () => {
+          setConfirm(false)
+          setInstalling(true)
+          setInstallError(null)
+          const r = await run.mutateAsync('dictation')
+          setInstalling(false)
+          if (!r.ok) setInstallError(r.error)
+        }}
+        onCancel={() => setConfirm(false)}
+      />
+    </>
   )
 }
 
@@ -184,6 +248,8 @@ export function GeneralSection() {
           </Row>
         </CardContent>
       </Card>
+
+      <DictationCard />
 
       <Card data-testid="settings-license">
         <CardHeader>

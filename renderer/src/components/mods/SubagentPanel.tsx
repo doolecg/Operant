@@ -2,7 +2,7 @@ import { useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'reac
 import { Check, ChevronDown, ChevronLeft, MessageSquareText, Square, X } from 'lucide-react'
 import { decodeIpcError } from '@shared/ipc'
 import { itemsOf, type ChatItem, type SubagentItem } from '@shared/claude-chat'
-import type { ClaudeSubagent } from '@shared/claude-mods'
+import type { ClaudeSubagent } from '@shared/mods'
 import { cn } from '@/lib/utils'
 import { bridge } from '@/lib/bridge'
 import { ConfirmDialog } from '@/components/ui/confirm-dialog'

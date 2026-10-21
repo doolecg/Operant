@@ -1,4 +1,4 @@
-import type { ClaudeSessionStatus } from '@shared/claude-mods'
+import type { ClaudeSessionStatus } from '@shared/mods'
 
 // The context window of a Claude tile, segmented from the status line's real numbers. Segments are only those the
 // status line reports: new input, cache read, cache write and free. With no per-kind usage, the bar shows used and free.

@@ -1,163 +1,78 @@
-import { useState } from 'react'
-import { Loader2 } from 'lucide-react'
-import { Badge } from '@/components/ui/badge'
-import { Button } from '@/components/ui/button'
-import { ConfirmDialog } from '@/components/ui/confirm-dialog'
-import { commandText, installItem, statusLabel } from '@shared/install'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Switch } from '@/components/ui/switch'
-import type { ModId } from '@shared/claude-mods'
-import { CLAUDE_MODS } from '@/components/mods/registry'
-import { useAppInfo, useCapabilities, useInstallRun, useInstallStatus, useSaveSettings, useSettings } from '@/lib/queries'
-import { formatAccel } from '@/lib/keys'
+import { modEffect, type ModId, type ModRowId } from '@shared/mods'
+import { MODS } from '@/components/mods/registry'
+import { useCapabilities, useSaveSettings, useSettings } from '@/lib/queries'
 import { NumberField, Row } from '../parts'
+
+const LABELS: Record<ModRowId, string> = {
+  subagents: 'Agents panel',
+  infoBar: 'Info bar',
+  keepWarm: 'Keep warm',
+  commandMenu: 'Commands menu',
+  promptEnhancer: 'Prompt Enhancer',
+  ideaShelf: 'Idea Shelf',
+  folderTracker: 'Same-Folder Tracker',
+  plainEnglish: 'Plain English',
+}
+
+// The order of the list. The Design Picker is not here: it is not one of the mods you turn on and off.
+const ORDER: ModRowId[] = ['subagents', 'infoBar', 'keepWarm', 'commandMenu', 'promptEnhancer', 'ideaShelf', 'folderTracker', 'plainEnglish']
 
 export function ModsSection() {
   const settings = useSettings()
   const save = useSaveSettings()
   const caps = useCapabilities().data?.claude
-  const run = useInstallRun()
-  const speech = useInstallStatus().data?.find((x) => x.id === 'dictation')
-  const platform = useAppInfo().data?.platform ?? 'win32'
-  const [confirm, setConfirm] = useState(false)
-  const [installing, setInstalling] = useState(false)
-  const [installError, setInstallError] = useState<string | null>(null)
   const s = settings.data
   if (!s) return null
-  const m = s.claudeMods
-  const setMods = (patch: Partial<typeof m>) => save.mutate({ claudeMods: patch })
+  const m = s.mods
+  const setMods = (patch: Partial<typeof m>) => save.mutate({ mods: patch })
 
   return (
     <>
       {s.mainCli === 'opencode' && (
         <p className="text-muted-foreground text-xs" role="note">
-          Claude mods only run in Claude Code tiles. OpenCode tiles do not load them.
+          Mods only run in Claude Code tiles. OpenCode tiles do not load them.
         </p>
       )}
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base">Claude Mods</CardTitle>
-          <CardDescription>
-            Mods for Claude Code tiles. Operant's Agents panel sits beside the terminal. The other mods are native Claude Code mods: Operant loads
-            each enabled one into Claude Code when a tile starts. Changes apply to tiles started from now on.
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="divide-y">
-          <Row label="Claude Mods" hint="Turns Claude Mods on or off for every Claude tile." info="The master switch for the Claude Code mods (the Agents panel and the native mods). Off turns them all off at once, whatever their own switches say. The Chat view features below are separate and are not affected. Changes apply to tiles started from now on." htmlFor="mods-enabled">
-            <Switch id="mods-enabled" checked={m.enabled} onCheckedChange={(v) => setMods({ enabled: v })} />
-          </Row>
-          <p className="text-muted-foreground py-3 text-xs">Operant's status line replaces your own inside Operant Claude tiles.</p>
-        </CardContent>
-      </Card>
-
-      {CLAUDE_MODS.map((mod) => {
-        const chat = mod.kind === 'chat'
-        const on = chat ? (mod.id === 'commandMenu' ? m.commandMenu : m.keepWarm) : m.mods[mod.id as ModId]
-        const Icon = mod.icon
-        const unavailable = mod.kind === 'panel' && caps && !caps.subagentEvents && mod.id === 'subagents'
-        return (
-          <Card key={mod.id}>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2 text-base">
-                <Icon className="text-muted-foreground size-4" aria-hidden />
-                {mod.title}
-              </CardTitle>
-              <CardDescription>{mod.description}</CardDescription>
-            </CardHeader>
-            <CardContent className="divide-y">
-              <Row
-                label={`Enable ${mod.title}`}
-                hint={
-                  unavailable
-                    ? 'Unavailable: this Claude Code install does not send sub-agent events.'
-                    : chat
-                      ? mod.id === 'commandMenu'
-                        ? 'An Operant feature of the Chat view, not a Claude Code mod. Off hides the Commands button.'
-                        : 'An Operant feature of the Chat view, not a Claude Code mod. Off hides /keepwarm and stops any active keep-warm.'
-                      : mod.kind === 'panel'
-                        ? "Operant's own panel. Uses Operant's hook events; no model calls."
-                        : 'A native Claude Code mod (plugin/mods/' + mod.id + '). Loaded into Claude Code when a tile starts.'
-                }
-                info={
-                  mod.id === 'keepWarm'
-                    ? 'Keeps the prompt cache warm while a chat tile is idle, so your next message is cheaper and faster. Each ping uses a few tokens. Off hides /keepwarm and stops any active keep-warm. It is on by default.'
-                    : mod.id === 'commandMenu'
-                      ? "Shows the Commands button in the Chat view, listing Claude Code's slash commands. Turn it off if you want a cleaner composer. It is a Chat view feature, so it does not depend on the master Claude Mods switch."
-                      : mod.kind === 'panel'
-                        ? "Shows or hides the Agents panel beside Claude tiles. It only reads Claude Code's activity events and makes no model calls, so it costs nothing. Applies to tiles started from now on."
-                        : `Turns ${mod.title} on or off. When on, Operant loads it into Claude Code each time a Claude tile starts, so tiles already running keep their current setting. It needs the master Claude Mods switch to be on.`
-                }
-                htmlFor={`mod-${mod.id}`}
-              >
-                <Switch id={`mod-${mod.id}`} checked={on} disabled={(!chat && !m.enabled) || !!unavailable} onCheckedChange={(v) => (chat ? setMods(mod.id === 'commandMenu' ? { commandMenu: v } : { keepWarm: v }) : setMods({ mods: { ...m.mods, [mod.id as ModId]: v } }))} />
+      <div className="bg-muted/50 rounded-2xl px-5 py-2">
+        {ORDER.map((id) => {
+          const title = MODS.find((x) => x.id === id)?.title ?? LABELS[id]
+          const plugin = id === 'promptEnhancer' || id === 'ideaShelf' || id === 'folderTracker' || id === 'plainEnglish'
+          const unavailable = id === 'subagents' && !!caps && !caps.subagentEvents
+          const on = id === 'infoBar' ? s.infoBar : id === 'keepWarm' ? m.keepWarm : id === 'commandMenu' ? m.commandMenu : m.mods[id as ModId]
+          const paused = (id === 'subagents' || plugin) && !m.enabled
+          const set = (v: boolean) =>
+            id === 'infoBar' ? save.mutate({ infoBar: v }) : id === 'keepWarm' ? setMods({ keepWarm: v }) : id === 'commandMenu' ? setMods({ commandMenu: v }) : setMods({ mods: { ...m.mods, [id as ModId]: v } })
+          const hint = unavailable ? 'Unavailable: this Claude Code install does not send sub-agent events.' : plugin ? `${modEffect(id)} Applies to new tiles.` : modEffect(id)
+          return (
+            <div key={id}>
+              <Row label={LABELS[id]} hint={hint} htmlFor={id === 'infoBar' ? 'info-bar' : `mod-${id}`}>
+                <Switch
+                  id={id === 'infoBar' ? 'info-bar' : `mod-${id}`}
+                  aria-label={id === 'infoBar' ? 'Show the info bar' : `Enable ${title}`}
+                  checked={on}
+                  disabled={paused || unavailable}
+                  onCheckedChange={set}
+                />
               </Row>
-            </CardContent>
-          </Card>
-        )
-      })}
-
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base">Dictation</CardTitle>
-          <CardDescription>The microphone button in the Chat composer. Speech is turned into text on this device.</CardDescription>
-        </CardHeader>
-        <CardContent className="divide-y">
-          <Row label="Enable dictation" hint="Off hides the microphone button and the dictation shortcut does nothing." info="Shows a microphone button in the Chat composer, and turns on the dictation shortcut, so you can speak instead of typing. The speech is turned into text on this device. When off, the button is hidden and the shortcut does nothing." htmlFor="dictation-enabled">
-            <Switch id="dictation-enabled" checked={s.dictation.enabled} onCheckedChange={(v) => save.mutate({ dictation: { enabled: v } })} />
-          </Row>
-          <Row label="Hold to talk" hint="On: record only while the shortcut is held down, and transcribe when you let go. Off: press once to start and again to stop." info="Off, you press the dictation shortcut once to start recording and again to stop. On, you hold the shortcut down while you talk and the words are written when you let go. Holding suits short bursts. Off is the default." htmlFor="dictation-hold">
-            <Switch id="dictation-hold" checked={s.dictation.mode === 'hold'} onCheckedChange={(v) => save.mutate({ dictation: { mode: v ? 'hold' : 'toggle' } })} />
-          </Row>
-          <Row label="Shortcut" hint="Change it in Shortcuts. A key combination or the middle, back or forward mouse button.">
-            <kbd className="bg-muted rounded px-2 py-0.5 font-mono text-xs">{formatAccel(s.keybinds.dictate)}</kbd>
-          </Row>
-          <Row label="Speech model" hint={installError ?? installItem('dictation').enables}>
-            <div className="flex items-center gap-2">
-              <Badge variant={speech?.state === 'installed' ? 'secondary' : 'outline'}>{statusLabel(speech)}</Badge>
-              <Button size="sm" variant="outline" aria-label="Install Dictation speech model" disabled={installing || speech?.state === 'installed'} onClick={() => setConfirm(true)}>
-                {installing && <Loader2 className="animate-spin" />}
-                {installing ? 'Installing' : 'Install'}
-              </Button>
+              {id === 'infoBar' && s.infoBar && (
+                <div className="m-enter m-enter-row ml-4 pb-1">
+                  <Row label="Context warning" hint="The context bar turns amber from this percent (1 to 100)." htmlFor="context-warn">
+                    <NumberField id="context-warn" value={s.contextWarnPct} min={1} max={100} onCommit={(n) => save.mutate({ contextWarnPct: n })} />
+                  </Row>
+                  <Row label="Context danger" hint="The context bar turns red from this percent (1 to 100)." htmlFor="context-danger">
+                    <NumberField id="context-danger" value={s.contextDangerPct} min={1} max={100} onCommit={(n) => save.mutate({ contextDangerPct: n })} />
+                  </Row>
+                </div>
+              )}
             </div>
-          </Row>
-        </CardContent>
-      </Card>
-      <ConfirmDialog
-        open={confirm}
-        title="Install Dictation speech model?"
-        description={<p>{commandText('dictation', platform)}</p>}
-        confirmLabel="Run the install"
-        testId="install-confirm"
-        onConfirm={async () => {
-          setConfirm(false)
-          setInstalling(true)
-          setInstallError(null)
-          const r = await run.mutateAsync('dictation')
-          setInstalling(false)
-          if (!r.ok) setInstallError(r.error)
-        }}
-        onCancel={() => setConfirm(false)}
-      />
-
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base">Tile info bar</CardTitle>
-          <CardDescription>
-            The thin row under each terminal tile: model, context, tokens, cost, folder and branch. A value Operant cannot observe shows as n/a.
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="divide-y">
-          <Row label="Show the info bar" info="Shows a thin bar at the top of each tile with the model, how full the context is, the project folder, the git branch and the cost so far. Turn it off for more room. It is on by default." htmlFor="info-bar">
-            <Switch id="info-bar" checked={s.infoBar} onCheckedChange={(v) => save.mutate({ infoBar: v })} />
-          </Row>
-          <Row label="Context warning" hint="The context bar turns amber from this percent (1 to 100)." info="The context is the memory Claude has used in this conversation, as a percentage of its limit. From this percentage the context bar and ring turn amber as a warning to wrap up or compact. Use 1 to 100. The default is 60." htmlFor="context-warn">
-            <NumberField id="context-warn" value={s.contextWarnPct} min={1} max={100} onCommit={(n) => save.mutate({ contextWarnPct: n })} />
-          </Row>
-          <Row label="Context danger" hint="The context bar turns red from this percent (1 to 100)." info="From this percentage the context bar and ring turn red, meaning Claude is close to running out of room and may start forgetting earlier details. Use 1 to 100, and keep it above the warning level. The default is 85." htmlFor="context-danger">
-            <NumberField id="context-danger" value={s.contextDangerPct} min={1} max={100} onCommit={(n) => save.mutate({ contextDangerPct: n })} />
-          </Row>
-        </CardContent>
-      </Card>
+          )
+        })}
+        <Row label="Pause all mods" hint="Turns off the Agents panel and the Claude Code mods at once. The info bar, Keep warm and Commands menu are not affected." htmlFor="mods-enabled">
+          <Switch id="mods-enabled" aria-label="Pause all mods" checked={!m.enabled} onCheckedChange={(v) => setMods({ enabled: !v })} />
+        </Row>
+      </div>
+      <p className="text-muted-foreground px-1 text-xs">Operant's status line replaces your own inside Operant Claude tiles.</p>
     </>
   )
 }

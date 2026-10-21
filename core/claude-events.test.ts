@@ -3,9 +3,9 @@ import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync
 import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
-import { MOD_DEFAULT_ENABLED, type ModId } from '../shared/claude-mods'
+import { MOD_DEFAULT_ENABLED, type ModId } from '../shared/mods'
 import { recallFile } from './session-recall'
-import { claudeModsConfig, modsCommand, parseEventLine, parseStatusFile } from './claude-events'
+import { hooksConfig, modsCommand, parseEventLine, parseStatusFile } from './claude-events'
 
 const SCRIPT = resolve(process.cwd(), 'scripts', 'op-event.mjs')
 const SID = '11111111-2222-4333-8444-555555555555'
@@ -19,13 +19,13 @@ afterEach(() => {
 
 const mods = (on: Partial<Record<ModId, boolean>> = {}) => ({ ...MOD_DEFAULT_ENABLED, ...on })
 
-describe('Claude mods config', () => {
-  it('is null when Claude mods are off', () => {
-    expect(claudeModsConfig(paths, { enabled: false, mods: mods({ subagents: true }), keepWarm: true, commandMenu: true })).toBeNull()
+describe('Mods hooks config', () => {
+  it('is null when mods are off', () => {
+    expect(hooksConfig(paths, { enabled: false, mods: mods({ subagents: true }), keepWarm: true, commandMenu: true })).toBeNull()
   })
 
   it('registers the session and sub-agent events, and the Agent matcher, while the subagents mod is on', () => {
-    const cfg = claudeModsConfig(paths, { enabled: true, mods: mods({ subagents: true }), keepWarm: true, commandMenu: true })!
+    const cfg = hooksConfig(paths, { enabled: true, mods: mods({ subagents: true }), keepWarm: true, commandMenu: true })!
     expect(Object.keys(cfg.hooks).sort()).toEqual(['Notification', 'PostToolUse', 'PreToolUse', 'SessionEnd', 'SessionStart', 'Stop', 'SubagentStart', 'SubagentStop', 'UserPromptSubmit'])
     expect(cfg.hooks.PreToolUse).toEqual([{ matcher: 'Agent', hooks: [{ type: 'command', command: expect.any(String) }] }])
     expect(cfg.hooks.SessionStart).toEqual([{ hooks: [{ type: 'command', command: expect.any(String) }] }])
@@ -33,7 +33,7 @@ describe('Claude mods config', () => {
   })
 
   it('registers no hooks for the native mods alone, but keeps the status line', () => {
-    const cfg = claudeModsConfig(paths, { enabled: true, mods: mods({ subagents: false, folderTracker: true }), keepWarm: true, commandMenu: true })!
+    const cfg = hooksConfig(paths, { enabled: true, mods: mods({ subagents: false, folderTracker: true }), keepWarm: true, commandMenu: true })!
     expect(cfg.hooks).toEqual({})
     expect(cfg.statusLine.command).toContain(' status ')
   })
@@ -44,7 +44,7 @@ describe('Claude mods config', () => {
       'ELECTRON_RUN_AS_NODE=1 "C:/Program Files/Operant 3/Operant 3.exe" "C:/app/scripts/op-event.mjs" hook "C:/Users/Dayle Frost/AppData/Roaming/Operant2/events"',
     )
     expect(modsCommand({ ...paths, eventsDir: 'C:/a$b' }, 'hook')).toBeNull()
-    expect(claudeModsConfig({ ...paths, script: 'C:/x"y.mjs' }, { enabled: true, mods: mods({ subagents: true }), keepWarm: true, commandMenu: true })).toBeNull()
+    expect(hooksConfig({ ...paths, script: 'C:/x"y.mjs' }, { enabled: true, mods: mods({ subagents: true }), keepWarm: true, commandMenu: true })).toBeNull()
   })
 })
 
@@ -85,12 +85,12 @@ describe('event and status parsing', () => {
   })
 })
 
-describe('claudeModsConfig recall hook', () => {
+describe('hooksConfig recall hook', () => {
   it('adds a second SessionStart hook only when session-start recall is on', () => {
-    const on = claudeModsConfig(paths, { enabled: true, mods: mods({ subagents: false }), keepWarm: true, commandMenu: true }, true)!
+    const on = hooksConfig(paths, { enabled: true, mods: mods({ subagents: false }), keepWarm: true, commandMenu: true }, true)!
     expect(on.hooks.SessionStart).toHaveLength(1)
     expect(JSON.stringify(on.hooks.SessionStart)).toContain(' recall ')
-    const off = claudeModsConfig(paths, { enabled: true, mods: mods({ subagents: false }), keepWarm: true, commandMenu: true })!
+    const off = hooksConfig(paths, { enabled: true, mods: mods({ subagents: false }), keepWarm: true, commandMenu: true })!
     expect(off.hooks.SessionStart).toBeUndefined()
   })
 })

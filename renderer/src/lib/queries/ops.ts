@@ -34,12 +34,12 @@ export function useRefreshCapabilities() {
 }
 
 // A Claude Code tile's state (sub-agents, status line). The tile id is the scratch terminal's id.
-export const claudeTileKey = (tileId: number) => ['claudeMods', tileId] as const
+export const claudeTileKey = (tileId: number) => ['claudeTile', tileId] as const
 export const useClaudeTileState = (tileId: number | null) =>
-  useQuery({ queryKey: claudeTileKey(tileId ?? -1), queryFn: () => call('claudeMods:get', tileId!), enabled: tileId != null })
+  useQuery({ queryKey: claudeTileKey(tileId ?? -1), queryFn: () => call('claudeTile:get', tileId!), enabled: tileId != null })
 
 registerLive((b, qc) => [
-  b.on('claudeMods:state', (s) => qc.setQueryData(claudeTileKey(s.tileId), s)),
+  b.on('claudeTile:state', (s) => qc.setQueryData(claudeTileKey(s.tileId), s)),
   b.on('settings', () => void qc.invalidateQueries({ queryKey: ['aux'] })),
 ])
 

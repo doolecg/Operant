@@ -69,9 +69,9 @@ import { isNoteColor } from '../shared/notes'
 import { JsonlTail, parseLine, transcriptPath } from './transcripts'
 import { CapabilityProber, systemProbeDeps, type ProbeDeps } from './capabilities'
 import { ClaudeAgents } from './claude-agents'
-import { claudeModsConfig, type ModsPaths } from './claude-events'
+import { hooksConfig, type ModsPaths } from './claude-events'
 import { openCodeDbPath } from './opencode-usage'
-import { enabledMods, type CapabilityReport, type ClaudeTileState } from '../shared/claude-mods'
+import { enabledMods, type CapabilityReport, type ClaudeTileState } from '../shared/mods'
 import { inheritedEnv, type SessionKey, type SessionManager } from './sessions'
 import { listServers } from './servers'
 import { looksLikeServerStart, type TileRoot } from '../shared/servers'
@@ -143,8 +143,8 @@ export interface OperantOptions {
   pluginDir: string
   // Where backups are written (the app passes <userData>/backups); the default is a folder under the temp dir.
   backupDir?: string
-  // Where the Claude Code hooks write and which script they run; absent turns Claude mods off.
-  claudeMods?: ModsPaths
+  // Where the Claude Code hooks write and which script they run; absent turns mods off.
+  hooks?: ModsPaths
   // plugin/mods in the repo (dev) or in resources (packaged): one folder per native mod.
   modPluginsDir?: string
   // The CLI probe (tests pass a fake); the real one runs `claude --version` and `opencode --version`.
@@ -297,7 +297,7 @@ export class Operant extends EventEmitter<PushEvents> {
   private readonly now: () => number
   private readonly transcriptFile: (cwd: string, sessionId: string) => string
   private readonly launch: LaunchOptions
-  private readonly claudeModsPaths: ModsPaths | null
+  private readonly hookPaths: ModsPaths | null
   private readonly claudeAgents: ClaudeAgents | null
   private readonly modPluginsDir: string | null
   private readonly prober: CapabilityProber
@@ -348,15 +348,15 @@ export class Operant extends EventEmitter<PushEvents> {
     this.now = opts.now ?? Date.now
     this.transcriptFile = opts.transcriptFile ?? ((cwd, id) => transcriptPath(cwd, id))
     this.launch = opts.launch ?? {}
-    this.claudeModsPaths = opts.claudeMods ?? null
+    this.hookPaths = opts.hooks ?? null
     this.modPluginsDir = opts.modPluginsDir ?? null
-    this.claudeAgents = opts.claudeMods
+    this.claudeAgents = opts.hooks
       ? new ClaudeAgents({
-          eventsDir: opts.claudeMods.eventsDir,
+          eventsDir: opts.hooks.eventsDir,
           now: this.now,
           emit: (state) => {
             this.noteTurn(this.modsPhase, state.tileId, state.session.phase)
-            this.emit('claudeMods:state', state)
+            this.emit('claudeTile:state', state)
           },
         })
       : null
@@ -991,12 +991,12 @@ export class Operant extends EventEmitter<PushEvents> {
     return text.slice(0, 20_000)
   }
 
-  private capabilityHandlers(): Group<'capabilities'> & Group<'claudeMods'> & Group<'claude'> {
+  private capabilityHandlers(): Group<'capabilities'> & Group<'claudeTile'> & Group<'claude'> {
     return {
       'capabilities:get': (): Promise<CapabilityReport> => this.prober.get(),
       'capabilities:refresh': (): Promise<CapabilityReport> => this.prober.refresh(),
       'claude:doctor': () => this.claudeDoctor(),
-      'claudeMods:get': (tileId): ClaudeTileState | null => this.claudeAgents?.get(tileId) ?? null,
+      'claudeTile:get': (tileId): ClaudeTileState | null => this.claudeAgents?.get(tileId) ?? null,
     }
   }
 
@@ -1005,7 +1005,7 @@ export class Operant extends EventEmitter<PushEvents> {
   private modPluginDirs(): string[] {
     if (!this.modPluginsDir) return []
     const dirs: string[] = []
-    for (const id of enabledMods(this.settings.claudeMods.mods)) {
+    for (const id of enabledMods(this.settings.mods.mods)) {
       if (id === 'subagents') continue
       const dir = join(this.modPluginsDir, id)
       if (existsSync(dir)) dirs.push(dir)
@@ -1444,16 +1444,16 @@ export class Operant extends EventEmitter<PushEvents> {
   private applySettings(): void {
     const { file, args } = this.settings.shell
     this.sessions.setShell(file ? { file, args: args.split(/\s+/).filter(Boolean) } : null)
-    this.sessions.setSoftPrompt(this.settings.terminal.softPrompt && this.claudeModsPaths ? dirname(this.claudeModsPaths.eventsDir) : null)
+    this.sessions.setSoftPrompt(this.settings.terminal.softPrompt && this.hookPaths ? dirname(this.hookPaths.eventsDir) : null)
     setSharedBanks(this.settings.hindsight.mode !== 'local')
-    if (!this.settings.claudeMods.enabled) this.claudeAgents?.dispose()
-    if (!this.settings.claudeMods.keepWarm) this.chat?.stopAllKeepWarm()
+    if (!this.settings.mods.enabled) this.claudeAgents?.dispose()
+    if (!this.settings.mods.keepWarm) this.chat?.stopAllKeepWarm()
     if (this.timers.length > 0) void this.startMemory()
   }
 
   // Session-start memory files live next to the events folder, in the app data folder.
   private recallDir(): string | null {
-    return this.claudeModsPaths ? join(dirname(this.claudeModsPaths.eventsDir), 'recall') : null
+    return this.hookPaths ? join(dirname(this.hookPaths.eventsDir), 'recall') : null
   }
 
   // Whether Claude sessions get the recall hook: Hindsight switched on, recall set to session start.
@@ -1490,10 +1490,10 @@ export class Operant extends EventEmitter<PushEvents> {
     await this.refreshRecall()
   }
 
-  // The hooks and status line for Claude tiles, or undefined when Claude mods are off.
-  private claudeModsConfig(): Record<string, unknown> | undefined {
-    if (!this.claudeModsPaths) return undefined
-    return claudeModsConfig(this.claudeModsPaths, this.settings.claudeMods, this.sessionRecallOn()) ?? undefined
+  // The hooks and status line for Claude tiles, or undefined when mods are off.
+  private hooksConfig(): Record<string, unknown> | undefined {
+    if (!this.hookPaths) return undefined
+    return hooksConfig(this.hookPaths, this.settings.mods, this.sessionRecallOn()) ?? undefined
   }
 
   // The learn AI for one aux task: the learn settings, with the task's own CLI and model where it has them.
@@ -1647,8 +1647,8 @@ export class Operant extends EventEmitter<PushEvents> {
       defaultCacheTtl: this.settings.tokens.defaultCacheTtl,
       subagentCacheTtl: this.settings.tokens.subagentCacheTtl,
       pinClaudeVersion: this.settings.tokens.pinClaudeVersion,
-      mods: this.claudeModsConfig(),
-      modPlugins: this.settings.claudeMods.enabled ? this.modPluginDirs() : [],
+      mods: this.hooksConfig(),
+      modPlugins: this.settings.mods.enabled ? this.modPluginDirs() : [],
       browserMcp: browserUrl ? { url: browserUrl } : undefined,
       codegraphMcp: this.settings.learn.codegraph && onPath('codegraph', this.launch.baseEnv ?? process.env, process.platform),
       recallFile: this.recallFileFor(crewFolder),
@@ -1784,7 +1784,7 @@ export class Operant extends EventEmitter<PushEvents> {
 
   private makeChatSession(scratch: ScratchTerminal, sessionId: string): ChatSession {
     const id = scratch.id
-    const eventsDir = this.claudeModsPaths?.eventsDir
+    const eventsDir = this.hookPaths?.eventsDir
     return this.chat.ensure(
       id,
       (emit) =>
@@ -1805,7 +1805,7 @@ export class Operant extends EventEmitter<PushEvents> {
           bypassAllowed: this.presetOf(scratch)?.permissionMode === 'bypassPermissions',
           keepWarm: {
             ttlMs: () => this.cacheTtlMs(scratch),
-            enabled: () => this.settings.claudeMods.keepWarm,
+            enabled: () => this.settings.mods.keepWarm,
             budgetBlocked: () => this.aux.blocked(),
             recordUsage: (u) => this.aux.record('keepwarm', u),
             load: () => (this.store.getJson(`keepwarm.${id}`) as KeepWarmPersisted | null) ?? null,
@@ -1846,7 +1846,7 @@ export class Operant extends EventEmitter<PushEvents> {
     const scratch = this.store.getScratch(scratchId)
     if (!scratch) return
     this.attachScratch(scratchId, this.transcriptFile(scratch.cwd, sessionId), sessionId)
-    if (this.claudeModsConfig()) this.claudeAgents?.begin(scratchId, sessionId, scratch.cwd)
+    if (this.hooksConfig()) this.claudeAgents?.begin(scratchId, sessionId, scratch.cwd)
     this.log('scratch', `Tile ${scratch.title} started (Chat view)`, scratch.crewId)
   }
 

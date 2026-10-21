@@ -1,5 +1,5 @@
 import { existsSync } from 'node:fs'
-import type { CapabilityReport, CapabilityTerminal, TerminalCapabilities, UsageSource } from '../shared/claude-mods'
+import type { CapabilityReport, CapabilityTerminal, TerminalCapabilities, UsageSource } from '../shared/mods'
 import { runHidden, type RunResult } from './proc'
 import { refreshUserPath } from './userpath'
 

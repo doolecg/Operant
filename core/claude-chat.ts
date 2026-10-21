@@ -165,7 +165,7 @@ export interface ChatSessionDeps {
   // /keepwarm: the tile's cache lifetime, the aux budget and where the setting is saved (Operant passes these).
   keepWarm?: {
     ttlMs: () => number
-    // Settings > Claude Mods > Keep warm: off hides /keepwarm and stops it.
+    // Settings > Mods > Keep warm: off hides /keepwarm and stops it.
     enabled?: () => boolean
     budgetBlocked: () => string | null
     recordUsage: (u: { tokens: number; usd: number }) => void
@@ -568,7 +568,7 @@ export class ChatSession {
     const kw = images.length ? null : parseKeepWarm(text)
     if (kw) {
       if (this.deps.keepWarm?.enabled && !this.deps.keepWarm.enabled()) {
-        this.push(this.mapper.noteNotice({ source: 'keepwarm', tone: 'info', text: 'Keep warm is turned off in Settings > Claude Mods' }))
+        this.push(this.mapper.noteNotice({ source: 'keepwarm', tone: 'info', text: 'Keep warm is turned off in Settings > Mods' }))
         return
       }
       return this.keepWarm.command(kw)
@@ -901,7 +901,7 @@ export class ChatHub {
 
   // Keep warm was turned off in settings: every active keep-warm stops.
   stopAllKeepWarm(): void {
-    for (const s of this.sessions.values()) if (s.keepWarm.view()?.active) s.keepWarm.stop('turned off in Settings > Claude Mods')
+    for (const s of this.sessions.values()) if (s.keepWarm.view()?.active) s.keepWarm.stop('turned off in Settings > Mods')
   }
 
   // Stops the process but keeps the items (a closed tile reopens with its conversation).

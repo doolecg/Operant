@@ -1,4 +1,4 @@
-// Claude Mods e2e: a real Claude tile (Haiku). One short turn, sent through the Chat view, runs a sub-agent: the hook
+// Mods e2e: a real Claude tile (Haiku). One short turn, sent through the Chat view, runs a sub-agent: the hook
 // events take its row in the Agents panel to Done. Then the Terminal view resumes the session: the status line the Mods
 // wrote into --settings reports the model into the info bar, and the context card never invents numbers. (The Waiting state
 // comes from Claude's idle Notification, which fires only after a minute idle in the Terminal view; not checked here.)
@@ -36,7 +36,7 @@ try {
 
   await page.getByText('Welcome to Operant 3').waitFor()
   await inv('crews:create', { name: 'mods', folder: project })
-  await inv('settings:set', { mainCli: 'claude', claudeMods: { enabled: true, mods: { subagents: true } }, infoBar: true })
+  await inv('settings:set', { mainCli: 'claude', mods: { enabled: true, mods: { subagents: true } }, infoBar: true })
   await page.locator('[data-crew-row]').getByText('mods', { exact: true }).click({ position: { x: 4, y: 4 } })
   await page.getByRole('heading', { name: 'mods', level: 1 }).waitFor()
   await page.getByRole('group', { name: 'Dashboard mode' }).getByRole('button', { name: 'Terminal', exact: true }).click()

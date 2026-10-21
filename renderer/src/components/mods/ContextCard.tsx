@@ -1,4 +1,4 @@
-import type { ClaudeSessionStatus } from '@shared/claude-mods'
+import type { ClaudeSessionStatus } from '@shared/mods'
 import { compact } from '@/lib/format'
 import { contextView } from '@/lib/context'
 import { cn } from '@/lib/utils'

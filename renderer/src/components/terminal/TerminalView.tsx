@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { setActiveClaudeTile } from './activeClaudeTile'
-import { ClaudeModsHost } from '@/components/mods/ClaudeModsHost'
+import { ModsHost } from '@/components/mods/ModsHost'
 import { Sparkles, SquareTerminal } from 'lucide-react'
 import type { MainCli } from '@shared/settings'
 import { decodeIpcError } from '@shared/ipc'
@@ -39,7 +39,7 @@ interface Props {
   onStart: (kind: 'shell' | MainCli) => void
 }
 
-// The project's Terminal view: the tiles (the shell and agent terminals) and the Claude Mods sub-agent panel.
+// The project's Terminal view: the tiles (the shell and agent terminals) and the Mods sub-agent panel.
 export function TerminalView({ crewId, scratch, active, onCloseScratch, onStart }: Props) {
   const settings = useSettings().data
   const cli = settings?.mainCli ?? 'claude'
@@ -207,7 +207,7 @@ export function TerminalView({ crewId, scratch, active, onCloseScratch, onStart 
       </section>
 
       {claudeTile && (
-        <ClaudeModsHost key={claudeTile.scratch.scratchId} tileId={claudeTile.scratch.scratchId} crewId={crew?.id ?? null} chat={views?.[claudeTile.scratch.scratchId]?.view === 'chat'} />
+        <ModsHost key={claudeTile.scratch.scratchId} tileId={claudeTile.scratch.scratchId} crewId={crew?.id ?? null} chat={views?.[claudeTile.scratch.scratchId]?.view === 'chat'} />
       )}
     </div>
   )

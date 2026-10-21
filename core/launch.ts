@@ -81,7 +81,7 @@ export interface LaunchContext {
   operantNode?: string
   // Claude Code hooks and status line (claude-events.ts), written into a Claude tile's settings file next to its permissions.
   mods?: Record<string, unknown>
-  // The plugin folders of the enabled native Claude mods (plugin/mods/<id>), one --plugin-dir each.
+  // The plugin folders of the enabled native mods (plugin/mods/<id>), one --plugin-dir each.
   modPlugins?: string[]
   // The embedded browser's MCP endpoint. The config file holds no secret: Claude expands ${OPERANT_TOKEN} from the tile's env.
   browserMcp?: { url: string }

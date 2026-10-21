@@ -1,6 +1,6 @@
 import { useQuery } from '@tanstack/react-query'
 import { Folder, GitBranch } from 'lucide-react'
-import { runningSubagentCount, tileStatusLabel, type ClaudeSessionStatus, type TileStatusTone } from '@shared/claude-mods'
+import { runningSubagentCount, tileStatusLabel, type ClaudeSessionStatus, type TileStatusTone } from '@shared/mods'
 import type { Crew } from '@shared/types'
 import { compact } from '@/lib/format'
 import { useMoney } from '@/lib/useMoney'

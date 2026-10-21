@@ -52,7 +52,7 @@ export const SETTINGS_CATEGORIES: SettingsCategory[] = [
   {
     label: 'General',
     pages: [
-      { id: 'general', label: 'General', description: 'Interface size and updates.', keywords: 'scale zoom ui size display update version', subsections: [{ id: 'general', label: 'Display and updates' }] },
+      { id: 'general', label: 'General', description: 'Interface size and updates.', keywords: 'scale zoom ui size display update version dictation microphone speech', subsections: [{ id: 'general', label: 'Display and updates' }] },
       { id: 'appearance', label: 'Appearance', description: 'Colour themes, accent colour and terminal colours. Changes show live.', keywords: 'theme colour color accent dark light', subsections: [{ id: 'appearance', label: 'Themes and colours' }] },
       { id: 'topbar', label: 'Top bar', description: 'The Windows media controls, the clock and date, and the top bar panel buttons.', keywords: 'clock date media scale', subsections: [{ id: 'topbar', label: 'Top bar' }] },
       { id: 'shortcuts', label: 'Shortcuts', description: 'Keyboard shortcuts. Rebind any of them here.', keywords: 'keys keybind hotkey binding', subsections: [{ id: 'shortcuts', label: 'Keyboard shortcuts' }] },
@@ -78,7 +78,7 @@ export const SETTINGS_CATEGORIES: SettingsCategory[] = [
   {
     label: 'Claude & OpenCode',
     pages: [
-      { id: 'mods', label: 'Claude Mods', description: 'Operant hooks and status line for Claude Code tiles, and the sub-agent panel.', keywords: 'hooks status line subagent info bar', subsections: [{ id: 'mods', label: 'Claude Mods' }] },
+      { id: 'mods', label: 'Mods', description: 'The features of Operant you can turn off: the Agents panel, info bar, Keep warm, Commands menu and the Claude Code mods.', keywords: 'hooks status line subagent info bar keep warm commands', subsections: [{ id: 'mods', label: 'Mods' }] },
       { id: 'superpowers', label: 'Superpowers', description: 'The Superpowers skills pack that presets can use.', keywords: 'skills plugin pack', subsections: [{ id: 'superpowers', label: 'Superpowers' }] },
       { id: 'browser', label: 'Browser', description: 'The browser tile in each project, and whether the AI may drive it.', keywords: 'browser web ai control playwright cookies home page search', subsections: [{ id: 'browser', label: 'Browser' }] },
       { id: 'mcp', label: 'MCP servers', description: 'Model Context Protocol servers for Claude Code and OpenCode. Secrets stay masked.', keywords: 'mcp server tools claude opencode', subsections: [{ id: 'mcp', label: 'MCP servers' }] },

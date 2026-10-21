@@ -108,7 +108,7 @@ export function tileStatusLabel(
   return null
 }
 
-// The Claude mods. `subagents` is Operant's own panel (it reads Operant's hook events); every other mod is a native Claude
+// The mods. `subagents` is Operant's own panel (it reads Operant's hook events); every other mod is a native Claude
 // Code mod, a plugin under plugin/mods/<id> that Operant passes to Claude Code with --plugin-dir while it is enabled.
 export const MOD_IDS = ['subagents', 'promptEnhancer', 'ideaShelf', 'folderTracker', 'plainEnglish'] as const
 export type ModId = (typeof MOD_IDS)[number]
@@ -117,6 +117,24 @@ export const MOD_DEFAULT_ENABLED: Record<ModId, boolean> = Object.fromEntries(MO
 export const isModId = (v: unknown): v is ModId => typeof v === 'string' && (MOD_IDS as readonly string[]).includes(v)
 // The mods switched on in a settings map, in registry order.
 export const enabledMods = (mods: Record<ModId, boolean>): ModId[] => MOD_IDS.filter((id) => mods[id])
+
+// Every toggle on the Mods page: the mods above plus the Operant features that have their own setting (the info bar, and the Chat view's Keep warm and Commands menu).
+export const MOD_ROW_IDS = ['subagents', 'infoBar', 'keepWarm', 'commandMenu', 'promptEnhancer', 'ideaShelf', 'folderTracker', 'plainEnglish'] as const
+export type ModRowId = (typeof MOD_ROW_IDS)[number]
+
+const MOD_EFFECTS: Record<ModRowId, string> = {
+  subagents: 'Shows what Claude and its sub-agents are doing in a panel beside the tile.',
+  infoBar: 'A thin row under each tile with the model, context, tokens, cost, folder and branch.',
+  keepWarm: 'Keeps the prompt cache warm while a chat tile is idle. Start it with /keepwarm.',
+  commandMenu: "The Commands button in the Chat view lists Claude Code's slash commands.",
+  promptEnhancer: '/enhance or a leading ++ rewrites a rough prompt for you to approve before it is sent.',
+  ideaShelf: '/idea parks an idea while Claude works; /ideas edits, deletes or sends one as a prompt.',
+  folderTracker: 'Shows what another session in the same project is editing, and warns when both touch a file.',
+  plainEnglish: 'Plain-language replies, with a summary and next steps at the end.',
+}
+
+// The one-line description of what a toggle does, used as the row hint.
+export const modEffect = (id: ModRowId): string => MOD_EFFECTS[id]
 
 // The main session of a Claude tile, from the hook events the sub-agent panel gets. Derived only from events.
 export type ClaudePhase = 'idle' | 'working' | 'waiting' | 'done' | 'unknown'

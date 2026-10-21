@@ -95,8 +95,8 @@ export function Composer({ scratchId, state, launchEffort, tileModel, disabled, 
   const appSettings = useSettings().data
   const saveSettings = useSaveSettings()
   const notesOpen = appSettings?.layout.notesOpen ?? false
-  const keepWarmOn = useSettings().data?.claudeMods.keepWarm ?? true
-  const commandMenuOn = useSettings().data?.claudeMods.commandMenu ?? true
+  const keepWarmOn = useSettings().data?.mods.keepWarm ?? true
+  const commandMenuOn = useSettings().data?.mods.commandMenu ?? true
   const allCommands = withLocalCommands(state.commands, keepWarmOn)
   const [menuOpen, setMenuOpen] = useState(false)
   const [menuPick, setMenuPick] = useState<string | null>(null)

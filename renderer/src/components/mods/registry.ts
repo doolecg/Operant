@@ -1,6 +1,6 @@
 import type { ComponentType } from 'react'
 import { Bot, Command, Flame, FolderTree, Lightbulb, MessageSquareText, Sparkles, type LucideIcon } from 'lucide-react'
-import type { CapabilityReport, ClaudeTileState, ModId } from '@shared/claude-mods'
+import type { CapabilityReport, ClaudeTileState, ModId } from '@shared/mods'
 import type { Settings } from '@shared/settings'
 import { SubagentPanel } from './SubagentPanel'
 
@@ -22,7 +22,7 @@ export interface ModAvailability {
   reason?: string
 }
 
-export interface ClaudeMod {
+export interface Mod {
   // 'keepWarm' and 'commandMenu' are Operant features of the Chat view (kind 'chat'), not Claude Code mods.
   id: ModId | 'keepWarm' | 'commandMenu'
   title: string
@@ -45,7 +45,7 @@ const claudeInstalled = (caps: CapabilityReport | undefined): ModAvailability =>
   return { available: true }
 }
 
-export const CLAUDE_MODS: ClaudeMod[] = [
+export const MODS: Mod[] = [
   {
     id: 'subagents',
     title: 'Agents',

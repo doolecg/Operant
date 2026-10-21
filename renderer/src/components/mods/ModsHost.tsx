@@ -4,8 +4,8 @@ import { useCapabilities, useClaudeTileState, useSettings } from '@/lib/queries'
 import { ResizeHandle } from '@/components/ui/resize-handle'
 import { useAgentSelection } from '@/components/chat/agentSelection'
 import { ModBoundary } from './ModBoundary'
-import type { ModId } from '@shared/claude-mods'
-import { CLAUDE_MODS } from './registry'
+import type { ModId } from '@shared/mods'
+import { MODS } from './registry'
 
 const WIDTH_KEY = 'operant.subagentPanelWidth'
 const COLLAPSED_KEY = 'operant.subagentPanelCollapsed'
@@ -28,10 +28,10 @@ function writeStored(key: string, value: string) {
   }
 }
 
-// The Claude Mods panel beside a Claude tile. Only Operant's own panels live here: native mods draw inside Claude Code.
-// Hidden when Claude mods are off or no panel is enabled; a notice says why the panel cannot run. The frame (width and
+// The Mods panel beside a Claude tile. Only Operant's own panels live here: native mods draw inside Claude Code.
+// Hidden when mods are off or no panel is enabled; a notice says why the panel cannot run. The frame (width and
 // collapse, kept in localStorage) is the host's; a crash in the panel stays inside its ModBoundary.
-export function ClaudeModsHost({ tileId, crewId, chat }: { tileId: number; crewId: number | null; chat?: boolean }) {
+export function ModsHost({ tileId, crewId, chat }: { tileId: number; crewId: number | null; chat?: boolean }) {
   const settings = useSettings().data
   const caps = useCapabilities().data
   const state = useClaudeTileState(tileId).data ?? null
@@ -43,8 +43,8 @@ export function ClaudeModsHost({ tileId, crewId, chat }: { tileId: number; crewI
   useEffect(() => {
     if (opened > 0) setCollapsed(false)
   }, [opened])
-  if (!settings || !settings.claudeMods.enabled) return null
-  const mod = CLAUDE_MODS.find((m) => m.kind === 'panel' && m.component && settings.claudeMods.mods[m.id as ModId])
+  if (!settings || !settings.mods.enabled) return null
+  const mod = MODS.find((m) => m.kind === 'panel' && m.component && settings.mods.mods[m.id as ModId])
   if (!mod?.component) return null
   const Panel = mod.component
   const a = chat ? { available: true } : (mod.isAvailable?.(caps) ?? { available: true })
@@ -56,7 +56,7 @@ export function ClaudeModsHost({ tileId, crewId, chat }: { tileId: number; crewI
   return (
     <aside
       ref={panel}
-      aria-label={`Claude Mods: ${mod.title} panel`}
+      aria-label={`Mods: ${mod.title} panel`}
       data-testid="subagent-panel"
       className="m-panel bg-card relative my-1.5 mr-1.5 flex min-h-0 shrink-0 flex-col overflow-hidden rounded-2xl border text-xs shadow-xs dark:shadow-none"
       style={{ width: collapsed ? 44 : width }}

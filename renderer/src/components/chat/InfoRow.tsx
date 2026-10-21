@@ -1,6 +1,6 @@
 import { useMemo } from 'react'
 import type { ChatState, SubagentItem } from '@shared/claude-chat'
-import { runningSubagentCount } from '@shared/claude-mods'
+import { runningSubagentCount } from '@shared/mods'
 import { PixelBar, meterTone, type PixelBarTone } from '@/components/ui/pixel-bar'
 import { useProviders, useSettings } from '@/lib/queries'
 import { cn } from '@/lib/utils'

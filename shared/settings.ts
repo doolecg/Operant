@@ -6,7 +6,7 @@ import type { ClockFormat, MediaSize, TopBarSettings } from './media'
 import { DEFAULT_APPEARANCE, sanitizeAppearance, type Appearance } from './themes'
 import { DEFAULT_BROWSER_SETTINGS, type BrowserSettings } from './browser'
 import { sanitizePerCrew } from './browser-compat'
-import { MOD_DEFAULT_ENABLED, MOD_IDS, type ModId } from './claude-mods'
+import { MOD_DEFAULT_ENABLED, MOD_IDS, type ModId } from './mods'
 import { CLAUDE_EFFORTS } from './models'
 import { DEFAULT_CURRENCY, sanitizeCurrency, type CurrencySetting } from './currency'
 
@@ -45,9 +45,9 @@ export type TileLayout = 'dwindle' | 'master'
 export type MainCli = 'claude' | 'opencode'
 export type TileStrip = 'compact' | 'normal' | 'hide'
 
-// Claude Code tiles: `enabled` is the master switch (Operant's status line and the hooks the enabled mods need);
+// Mods: `enabled` is the master switch (Operant's status line and the hooks the enabled mods need);
 // `mods` switches each mod on or off. Unknown ids are dropped.
-export interface ClaudeModsSettings {
+export interface ModsSettings {
   enabled: boolean
   mods: Record<ModId, boolean>
   // /keepwarm in the Chat view (an Operant feature, not a Claude Code mod). It only ever pings after the owner runs /keepwarm.
@@ -109,8 +109,8 @@ export interface Settings {
   terminal: { copyOnSelect: boolean; fontSize: number; scrollback: number; fileLinks: boolean; dropPaths: boolean; rightClickPaste: boolean; softPrompt: boolean }
   // The tiles surface: layout kind, gap in px and the strip's size.
   tiles: { layout: TileLayout; gaps: number; strip: TileStrip }
-  // Claude Code tiles: Operant's hooks and status line (sub-agent state, context and cost), and the sub-agent panel.
-  claudeMods: ClaudeModsSettings
+  // Mods: Operant's hooks and status line for Claude Code tiles (sub-agent state, context and cost), the sub-agent panel and the Chat view features.
+  mods: ModsSettings
   // The top bar: Windows media controls and the clock and date pill. All apply live.
   topBar: TopBarSettings
   // The embedded browser: AI control (the debugging port needs a restart to turn on), home page and search URL.
@@ -217,7 +217,7 @@ export const DEFAULT_SETTINGS: Settings = {
   layout: { sidebarWidth: 0, sidebarHidden: false, notesOpen: false, notesWidth: 0 },
   terminal: { copyOnSelect: true, fontSize: 13, scrollback: 5000, fileLinks: true, dropPaths: true, rightClickPaste: true, softPrompt: true },
   tiles: { layout: 'dwindle', gaps: 6, strip: 'normal' },
-  claudeMods: { enabled: true, mods: { ...MOD_DEFAULT_ENABLED }, keepWarm: true, commandMenu: true },
+  mods: { enabled: true, mods: { ...MOD_DEFAULT_ENABLED }, keepWarm: true, commandMenu: true },
   browser: { ...DEFAULT_BROWSER_SETTINGS },
   confirm: { closeTile: true, closeApp: true },
   notify: { finished: true, needs: true },
@@ -254,7 +254,7 @@ const HTTP_URL = /^https?:\/\/[^\s]+$/i
 const HOST_RE = /^[A-Za-z0-9.:_-]{1,100}$/
 
 // Settings from before the mod registry had one `subagentPanel` switch: it becomes mods.subagents when mods has no value for it.
-export function sanitizeClaudeMods(raw: unknown): ClaudeModsSettings {
+export function sanitizeMods(raw: unknown): ModsSettings {
   const r = raw && typeof raw === 'object' && !Array.isArray(raw) ? (raw as Record<string, unknown>) : {}
   const stored = r.mods && typeof r.mods === 'object' && !Array.isArray(r.mods) ? (r.mods as Record<string, unknown>) : {}
   const mods = { ...MOD_DEFAULT_ENABLED } as Record<ModId, boolean>
@@ -306,7 +306,8 @@ export function sanitizeSettings(raw: unknown): Settings {
   const layout = r.layout ?? {}
   const term = r.terminal ?? {}
   const tiles = r.tiles ?? {}
-  const mods = r.claudeMods ?? {}
+  // `claudeMods` is the key before the rename; it is read forever, `mods` wins when both are there.
+  const mods = r.mods ?? r.claudeMods ?? {}
   const webUrl = (v: unknown, fallback: string, needsQuery = false) => {
     const u = str(v, '', 500).trim()
     return HTTP_URL.test(u) && (!needsQuery || u.includes('%s')) ? u : fallback
@@ -390,7 +391,7 @@ export function sanitizeSettings(raw: unknown): Settings {
       gaps: Math.round(num(tiles.gaps, d.tiles.gaps, 0, 40)),
       strip: tiles.strip === 'compact' || tiles.strip === 'normal' || tiles.strip === 'hide' ? tiles.strip : d.tiles.strip,
     },
-    claudeMods: sanitizeClaudeMods(mods),
+    mods: sanitizeMods(mods),
     topBar: {
       mediaControls: flag(top.mediaControls, d.topBar.mediaControls),
       mediaSize: (['compact', 'full'] as const).includes(top.mediaSize) ? (top.mediaSize as MediaSize) : d.topBar.mediaSize,

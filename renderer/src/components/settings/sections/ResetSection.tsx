@@ -33,7 +33,7 @@ const LABELS: Record<keyof Settings, string> = {
   layout: 'Layout',
   terminal: 'Terminal',
   tiles: 'Tiles',
-  claudeMods: 'Claude tile extras',
+  mods: 'Mods',
   topBar: 'Top bar',
   confirm: 'Close confirmations',
   notify: 'Notifications',

@@ -1,4 +1,4 @@
-import type { CapabilityReport, CapabilityTerminal, TerminalCapabilities, UsageSource } from '@shared/claude-mods'
+import type { CapabilityReport, CapabilityTerminal, TerminalCapabilities, UsageSource } from '@shared/mods'
 import type { MainCli } from '@shared/settings'
 
 export const MAIN_CLIS: MainCli[] = ['claude', 'opencode']

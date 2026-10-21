@@ -57,7 +57,7 @@ import type { GitChanges, GitInfo, IdeId, IdeInfo, ProjectGroup } from './projec
 import type { GitBranches, GitCommit, GitCommitDetails, GitCommitResult, GitDiff, GitDiffRequest, GitHunkRef, GitResult, GitStatus } from './git'
 import type { Settings, SettingsPatch } from './settings'
 import type { MediaState, MediaTimeline } from './media'
-import type { CapabilityReport, ClaudeTileState } from './claude-mods'
+import type { CapabilityReport, ClaudeTileState } from './mods'
 import type { RunningCounts } from './notify'
 import type { TilePopoutRequest } from './tile-popout'
 import { CHAT_CHANNELS, type ChatApi, type ChatEvents, type ChatImage } from './claude-chat'
@@ -305,7 +305,7 @@ export interface IpcApi extends ChatApi {
   // `claude doctor` as plain text: the Chat view's /doctor.
   'claude:doctor': () => Promise<string>
   // A Claude Code tile's sub-agents, status line and events state (null when the tile has none yet).
-  'claudeMods:get': (tileId: number) => ClaudeTileState | null
+  'claudeTile:get': (tileId: number) => ClaudeTileState | null
   'settings:get': () => Settings
   'settings:set': (patch: SettingsPatch) => Settings
   // "Reset section to defaults".
@@ -513,7 +513,7 @@ export interface IpcEvents {
   'console:line': ConsoleLine
   'media:state': MediaState
   // A Claude Code tile's state after each change (sub-agents, status line).
-  'claudeMods:state': ClaudeTileState
+  'claudeTile:state': ClaudeTileState
   'media:timeline': MediaTimeline | null
   'media:art': string | null
   // A Claude tile closed before the learn step ran for it: the renderer asks and answers with learn:answerClose.
@@ -718,7 +718,7 @@ export const CORE_CHANNELS: CoreChannel[] = [
   'capabilities:get',
   'capabilities:refresh',
   'claude:doctor',
-  'claudeMods:get',
+  'claudeTile:get',
   ...CHAT_CHANNELS,
   'settings:get',
   'settings:set',

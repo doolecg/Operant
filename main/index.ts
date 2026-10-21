@@ -301,7 +301,7 @@ app.whenReady().then(() => {
     sessions,
     indexes,
     pluginDir,
-    // The native Claude mods (plugin/mods/<id>), dev and packaged alike.
+    // The native mods (plugin/mods/<id>), dev and packaged alike.
     modPluginsDir: join(pluginDir, 'mods'),
     backupDir: join(app.getPath('userData'), 'backups'),
     launch: {
@@ -312,7 +312,7 @@ app.whenReady().then(() => {
       operantNode: process.execPath,
     },
     // Claude Code tiles get Operant's hooks and status line from this script (run as Node by the app binary).
-    claudeMods: {
+    hooks: {
       node: process.execPath,
       script: app.isPackaged ? join(process.resourcesPath, 'claude-mods', 'op-event.mjs') : join(app.getAppPath(), 'scripts', 'op-event.mjs'),
       eventsDir: join(app.getPath('userData'), 'events'),

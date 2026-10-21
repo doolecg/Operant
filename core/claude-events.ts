@@ -1,5 +1,5 @@
-import type { ClaudeSessionStatus } from '../shared/claude-mods'
-import type { ClaudeModsSettings } from '../shared/settings'
+import type { ClaudeSessionStatus } from '../shared/mods'
+import type { ModsSettings } from '../shared/settings'
 
 // The Claude Code hooks and status line Operant adds to the tiles it launches (passed with --settings, layered over the
 // user's own settings). scripts/op-event.mjs writes what they receive into the events folder.
@@ -39,9 +39,9 @@ export function modsCommand(paths: ModsPaths, mode: 'hook' | 'status' | 'recall'
 }
 
 // The hooks Operant's sub-agent panel reads: the session phase events and the sub-agent events. Registered only while
-// the subagents mod is on. The status line is set while Claude mods are on (the info bar and context card read it).
-// Null when Claude mods are off or a path cannot be quoted safely: the tile then starts without them.
-export function claudeModsConfig(paths: ModsPaths, settings: ClaudeModsSettings, recall = false): { hooks: Record<string, unknown[]>; statusLine: { type: 'command'; command: string } } | null {
+// the subagents mod is on. The status line is set while mods are on (the info bar and context card read it).
+// Null when mods are off or a path cannot be quoted safely: the tile then starts without them.
+export function hooksConfig(paths: ModsPaths, settings: ModsSettings, recall = false): { hooks: Record<string, unknown[]>; statusLine: { type: 'command'; command: string } } | null {
   if (!settings.enabled) return null
   const hook = modsCommand(paths, 'hook')
   const status = modsCommand(paths, 'status')

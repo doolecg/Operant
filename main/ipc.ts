@@ -208,7 +208,7 @@ export function registerIpc(
   forward('notes:changed')
   forward('budget')
   forward('settings')
-  forward('claudeMods:state')
+  forward('claudeTile:state')
   media.on('media:state', (s) => push(getWindow(), 'media:state', s))
   media.on('media:timeline', (t) => push(getWindow(), 'media:timeline', t))
   media.on('media:art', (a) => push(getWindow(), 'media:art', a))

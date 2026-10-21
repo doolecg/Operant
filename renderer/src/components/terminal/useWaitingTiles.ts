@@ -26,7 +26,7 @@ export function useWaitingTiles(): Set<number> {
       chats.set(scratchId, next)
       set(scratchId, tileState(next) === 'Waiting for you')
     })
-    const offState = b.on('claudeMods:state', (s) => {
+    const offState = b.on('claudeTile:state', (s) => {
       // A tile in the Chat view reports through chat:ops; this feed decides only for tiles with no chat state.
       if (!chats.has(s.tileId)) set(s.tileId, s.session.phase === 'waiting')
     })

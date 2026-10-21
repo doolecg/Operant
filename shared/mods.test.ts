@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { runningSubagentCount, tileStatusLabel } from './claude-mods'
+import { MOD_IDS, MOD_ROW_IDS, modEffect, runningSubagentCount, tileStatusLabel } from './mods'
 
 describe('tileStatusLabel', () => {
   it('says waiting on subagents when one runs and the main session is done', () => {
@@ -28,5 +28,19 @@ describe('tileStatusLabel', () => {
     expect(tileStatusLabel('waiting', null, 0)?.label).toBe('Waiting')
     expect(tileStatusLabel('idle', null, 0)?.label).toBe('Idle')
     expect(tileStatusLabel('unknown', null, 1)).toBeNull()
+  })
+})
+
+describe('modEffect', () => {
+  it('gives every toggle on the Mods page a one-line description', () => {
+    for (const id of MOD_ROW_IDS) {
+      const text = modEffect(id)
+      expect(text.length).toBeGreaterThan(10)
+      expect(text).not.toContain('\n')
+    }
+  })
+
+  it('covers every mod id', () => {
+    for (const id of MOD_IDS) expect(MOD_ROW_IDS).toContain(id)
   })
 })
