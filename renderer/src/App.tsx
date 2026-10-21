@@ -33,7 +33,7 @@ import { useBarTier } from '@/components/topbar/useBarTier'
 import { mediaCommand } from '@/components/topbar/useMedia'
 import { matches, matchesMouseEvent, swallowBoundMouse } from '@/lib/keys'
 import { effectiveScale, stepScale, useUiScale } from '@/lib/uiScale'
-import { useAction, useCrews, useIndexStatus, useLiveUpdates, useMoveToGroup, useSaveSettings, useSettings } from '@/lib/queries'
+import { useCodegraphAvailable, useCrews, useIndexStatus, useLiveUpdates, useMoveToGroup, useSaveSettings, useSettings } from '@/lib/queries'
 import { bridge } from '@/lib/bridge'
 import { CloseAppDialog } from '@/components/terminal/CloseAppDialog'
 import { LearnOnCloseDialog } from '@/components/memory/LearnOnCloseDialog'
@@ -107,7 +107,7 @@ export function App() {
   }, [crewId])
 
   const index = useIndexStatus(crewId)
-  const runIndex = useAction('index:run')
+  const codegraph = useCodegraphAvailable()
   const settings = useSettings()
   const saveSettings = useSaveSettings()
   useUiScale(settings.data?.uiScale)
@@ -173,6 +173,7 @@ export function App() {
     openIde: (c: Crew) => void projectActions.openIde(c),
     openFolder: (c: Crew) => void projectActions.openFolder(c),
     index: (c: Crew) => void projectActions.index(c),
+    indexMany: (cs: Crew[]) => void projectActions.indexMany(cs),
     changes: (c: Crew) => setChangesTarget(c),
     copyPath: (c: Crew) => void projectActions.copyPath(c),
     defaults: () => openSettingsAt('projects'),
@@ -194,7 +195,7 @@ export function App() {
     const dash = () => setPage('dashboard')
     const actions: Array<[string, () => void]> = [
         [binds.newCrew, () => (dash(), setNewCrew(true))],
-        [binds.indexCrew, () => crewId != null && runIndex.mutate([crewId])],
+        [binds.indexCrew, () => crew && codegraph && void projectActions.index(crew)],
         [binds.openSettings, () => setPage((v) => (v === 'settings' ? 'dashboard' : 'settings'))],
         [binds.toggleConsole, () => setConsoleOpen((v) => !v)],
         [binds.newShell, () => crew && (dash(), void terminals.openTab(crew, 'shell'))],
@@ -232,7 +233,7 @@ export function App() {
       window.removeEventListener('mousedown', onMouse)
       unswallow()
     }
-  }, [settings.data?.keybinds, settings.data?.uiScale, saveSettings, crewId, runIndex, crew, terminals.openTab, crews.data, sidebarHidden, notesOpen])
+  }, [settings.data?.keybinds, settings.data?.uiScale, saveSettings, crewId, codegraph, crew, terminals.openTab, crews.data, sidebarHidden, notesOpen])
 
   return (
     <TooltipProvider>
@@ -259,8 +260,8 @@ export function App() {
               <ProjectBlock
                 crew={crew}
                 indexed={!!index.data?.initialized}
-                indexing={!!index.data?.indexing || runIndex.isPending}
-                onIndex={() => runIndex.mutate([crew.id])}
+                indexing={!!index.data?.indexing}
+                onIndex={() => void projectActions.index(crew)}
                 onIde={() => projectMenu.openIde(crew)}
                 onShell={() => projectMenu.newShell(crew)}
                 onAgent={() => projectMenu.newCli(crew, settings.data?.mainCli ?? 'claude')}

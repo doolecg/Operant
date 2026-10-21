@@ -30,6 +30,7 @@ import { bridge } from '@/lib/bridge'
 import { CLI_SHORT, cliBlocked } from '@/lib/capabilities'
 import {
   useCapabilities,
+  useCodegraphAvailable,
   useCollapseGroup,
   useCreateGroup,
   useDeleteGroup,
@@ -161,6 +162,7 @@ export function Sidebar({ crews: allCrews, selected, onSelect, onNewCrew, action
   const ideName = ides?.find((i) => i.id === defaultIde)?.name ?? 'IDE'
   const mainCli = useSettings().data?.mainCli ?? 'claude'
   const agentBlocked = cliBlocked(useCapabilities().data, mainCli)
+  const codegraph = useCodegraphAvailable()
   const platform = bridge().platform
   const panel = usePanelWidth('sidebarWidth')
   const aside = useRef<HTMLElement>(null)
@@ -316,9 +318,7 @@ export function Sidebar({ crews: allCrews, selected, onSelect, onNewCrew, action
   }
 
   const addGroup = () => createGroup.mutate([], { onSuccess: (g) => setRenaming(g.id), onError: failed })
-  const indexAll = async () => {
-    for (const c of crews) await bridge().invoke('index:run', c.id).catch(failed)
-  }
+  const indexAll = () => void actions.indexMany(crews)
 
   const handlers: ProjectMenuHandlers = {
     ...actions,
@@ -332,9 +332,7 @@ export function Sidebar({ crews: allCrews, selected, onSelect, onNewCrew, action
     },
   }
 
-  const indexGroup = async (g: ProjectGroup) => {
-    for (const c of inGroup(g.id)) await bridge().invoke('index:run', c.id).catch(failed)
-  }
+  const indexGroup = (g: ProjectGroup) => void actions.indexMany(inGroup(g.id))
 
   const crewRow = (crew: Crew) => {
     const key = `p:${crew.id}`
@@ -395,9 +393,11 @@ export function Sidebar({ crews: allCrews, selected, onSelect, onNewCrew, action
               <span className="text-muted-foreground/70 shrink-0 font-mono text-[9px] group-hover:hidden group-focus-within:hidden">PRJ#{crew.prjNumber}</span>
             </button>
             <div data-no-nav className={cn('shrink-0 items-center', hoverOnly)}>
-              <Button variant="ghost" size="icon" className={tiny} aria-label={`Index ${crew.name} with CodeGraph`} title="Index with CodeGraph" onClick={() => actions.index(crew)}>
-                <Network className="size-3.5" />
-              </Button>
+              {codegraph && (
+                <Button variant="ghost" size="icon" className={tiny} aria-label={`Index ${crew.name} with CodeGraph`} title="Index with CodeGraph" onClick={() => actions.index(crew)}>
+                  <Network className="size-3.5" />
+                </Button>
+              )}
               <Button variant="ghost" size="icon" className={tiny} aria-label={`Open ${crew.name} in ${ideName}`} title={`Open in ${ideName}`} onClick={() => actions.openIde(crew)}>
                 <Code2 className="size-3.5" />
               </Button>
@@ -544,9 +544,11 @@ export function Sidebar({ crews: allCrews, selected, onSelect, onNewCrew, action
             {members.length}
           </span>
           <div data-no-nav className={cn('items-center', hoverOnly)} onClick={(e) => e.stopPropagation()} onDoubleClick={(e) => e.stopPropagation()}>
-            <Button variant="ghost" size="icon" className={tiny} aria-label={`Index group ${g.name}`} title="Index every project in the group" onClick={() => void indexGroup(g)} disabled={members.length === 0}>
-              <Network className="size-3.5" />
-            </Button>
+            {codegraph && (
+              <Button variant="ghost" size="icon" className={tiny} aria-label={`Index group ${g.name}`} title="Index every project in the group" onClick={() => void indexGroup(g)} disabled={members.length === 0}>
+                <Network className="size-3.5" />
+              </Button>
+            )}
             <Button variant="ghost" size="icon" className={tiny} aria-label={`Add a project to ${g.name}`} title="Add a project to this group" onClick={() => onNewCrew(g.id)}>
               <Plus className="size-3.5" />
             </Button>
@@ -607,9 +609,11 @@ export function Sidebar({ crews: allCrews, selected, onSelect, onNewCrew, action
         <Button variant="ghost" size="icon" className={headerBtn} onClick={addGroup} aria-label="New group" title="New group">
           <FolderPlus />
         </Button>
-        <Button variant="ghost" size="icon" className={headerBtn} onClick={() => void indexAll()} disabled={crews.length === 0} aria-label="Index all projects with CodeGraph" title="Index all projects with CodeGraph">
-          <Network />
-        </Button>
+        {codegraph && (
+          <Button variant="ghost" size="icon" className={headerBtn} onClick={() => void indexAll()} disabled={crews.length === 0} aria-label="Index all projects with CodeGraph" title="Index all projects with CodeGraph">
+            <Network />
+          </Button>
+        )}
         <Button variant="ghost" size="icon" className={headerBtn} onClick={() => void qc.invalidateQueries()} aria-label="Refresh projects" title="Refresh projects">
           <RefreshCw />
         </Button>

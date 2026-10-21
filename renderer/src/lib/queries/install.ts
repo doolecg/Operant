@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { decodeIpcError } from '@shared/ipc'
-import type { InstallId, InstallResult, InstallStatusItem } from '@shared/install'
+import { toolMissing, type InstallId, type InstallResult, type InstallStatusItem } from '@shared/install'
 import { speechModelInstalled } from '@/lib/speechModel'
 import { call } from './core'
 
@@ -51,3 +51,6 @@ export function useToolPath() {
     onSettled: () => Promise.all(['install', 'capabilities', 'mcp'].map((k) => qc.invalidateQueries({ queryKey: [k] }))),
   })
 }
+
+// The index buttons show unless CodeGraph is known to be missing (unknown never hides).
+export const useCodegraphAvailable = () => !toolMissing(useInstallStatus().data, 'codegraph')
