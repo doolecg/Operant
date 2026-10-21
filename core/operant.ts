@@ -71,7 +71,7 @@ import { CapabilityProber, systemProbeDeps, type ProbeDeps } from './capabilitie
 import { ClaudeAgents } from './claude-agents'
 import { hooksConfig, type ModsPaths } from './claude-events'
 import { packStatus, resetPack } from './engineering'
-import { readTaskStages, watchTasks } from './task-stage'
+import { readTask, watchTasks } from './task-stage'
 import { buildPreamble } from '../shared/engineering'
 import { openCodeDbPath } from './opencode-usage'
 import { enabledMods, type CapabilityReport, type ClaudeTileState } from '../shared/mods'
@@ -1025,7 +1025,12 @@ export class Operant extends EventEmitter<PushEvents> {
       'engineering:stages': (crewId) => {
         const crew = this.requireCrew(crewId)
         if (!this.taskWatchers.has(crewId)) this.taskWatchers.set(crewId, watchTasks(crew.folder, () => this.emit('engineering:tasks', { crewId })))
-        return readTaskStages(crew.folder)
+        return readTask(crew.folder, Number(this.store.getJson(`engineering.cleared.${crewId}`) ?? 0))
+      },
+      'engineering:clearTask': (crewId) => {
+        this.requireCrew(crewId)
+        this.store.setJson(`engineering.cleared.${crewId}`, this.now())
+        this.emit('engineering:tasks', { crewId })
       },
       'engineering:reset': () => {
         if (this.engineeringDir) resetPack(this.pluginDir, this.engineeringDir, this.now())

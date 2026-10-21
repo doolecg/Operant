@@ -2,7 +2,7 @@ import { mkdirSync, mkdtempSync, rmSync, utimesSync, writeFileSync } from 'node:
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
-import { readTaskStages, watchTasks } from './task-stage'
+import { readTask, readTaskStages, watchTasks } from './task-stage'
 
 let folder = ''
 beforeEach(() => void (folder = mkdtempSync(join(tmpdir(), 'operant-stage-'))))
@@ -42,6 +42,25 @@ describe('readTaskStages', () => {
   it('counts the ticked slices of the newest task', () => {
     task('a', { 'spec.html': 's', 'slices.html': '<input type="checkbox" checked> 1. x <input type="checkbox"> 2. y' })
     expect(readTaskStages(folder)?.find((s) => s.key === 'build')?.detail).toBe('1 of 2')
+  })
+})
+
+describe('readTask', () => {
+  it('titles the task with its spec title without the "Spec: " lead', () => {
+    task('stage-box', { 'spec.html': '<title>Spec: stage box and history lines</title>' })
+    expect(readTask(folder)).toMatchObject({ name: 'stage-box', title: 'stage box and history lines' })
+  })
+
+  it('falls back to the folder name as words', () => {
+    task('stage-box', { 'notes.html': '<p>no title</p>' })
+    expect(readTask(folder)?.title).toBe('Stage box')
+  })
+
+  it('hides a task whose files did not change after it was cleared, and shows it again when they do', () => {
+    task('a', { 'spec.html': 's' }, 1_000)
+    expect(readTask(folder, 2_000_000)).toBeNull()
+    task('a', { 'slices.html': 'x' }, 3_000)
+    expect(readTask(folder, 2_000_000)?.name).toBe('a')
   })
 })
 

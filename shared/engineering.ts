@@ -15,6 +15,13 @@ export interface PackDirs {
   factoryDir: string
 }
 
+// The newest Engineering task of a project: its folder name, a readable title and where it stands.
+export interface TaskInfo {
+  name: string
+  title: string
+  stages: StageLine[]
+}
+
 export type StageKey = 'frame' | 'spec' | 'slices' | 'plan' | 'build' | 'ship'
 
 export interface StageLine {

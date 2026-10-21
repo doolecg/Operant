@@ -58,7 +58,7 @@ import type { GitBranches, GitCommit, GitCommitDetails, GitCommitResult, GitDiff
 import type { Settings, SettingsPatch } from './settings'
 import type { MediaState, MediaTimeline } from './media'
 import type { CapabilityReport, ClaudeTileState } from './mods'
-import type { EngineeringStatus, StageLine } from './engineering'
+import type { EngineeringStatus, TaskInfo } from './engineering'
 import type { RunningCounts } from './notify'
 import type { TilePopoutRequest } from './tile-popout'
 import { CHAT_CHANNELS, type ChatApi, type ChatEvents, type ChatImage } from './claude-chat'
@@ -308,8 +308,10 @@ export interface IpcApi extends ChatApi {
   // Engineering Mode and Subagent Factory skill packs: which files the owner edited, and reset (backs those up first).
   'engineering:status': () => EngineeringStatus
   'engineering:reset': () => EngineeringStatus
-  // The stages of the project's newest Engineering task (null when it has none). Every change pushes engineering:tasks.
-  'engineering:stages': (crewId: number) => StageLine[] | null
+  // The project's newest Engineering task and its stages (null when it has none, or it was cleared). Every change pushes engineering:tasks.
+  'engineering:stages': (crewId: number) => TaskInfo | null
+  // Takes the current task off the panel (its files stay); a task edited after this shows again.
+  'engineering:clearTask': (crewId: number) => void
   // Handled by main: opens <userData>/engineering in the file manager.
   'engineering:openFolder': () => void
   // A Claude Code tile's sub-agents, status line and events state (null when the tile has none yet).
@@ -732,6 +734,7 @@ export const CORE_CHANNELS: CoreChannel[] = [
   'engineering:status',
   'engineering:reset',
   'engineering:stages',
+  'engineering:clearTask',
   'claudeTile:get',
   ...CHAT_CHANNELS,
   'settings:get',
