@@ -21,6 +21,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuTrigger } from '@/compon
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
 import { iconBtn } from '@/components/topbar/pill'
 import { ClockPill } from '@/components/topbar/ClockPill'
+import { OPEN_CHANGES_EVENT } from '@/components/chat/ChangedFilesCard'
 import { GitChip } from '@/components/topbar/GitChip'
 import { MediaBar } from '@/components/topbar/MediaBar'
 import { ProjectBlock } from '@/components/topbar/ProjectBlock'
@@ -102,6 +103,13 @@ export function App() {
     if (!list) return
     if (crewId == null || !list.some((r) => r.id === crewId)) setCrewId((list.find((r) => r.kind !== 'playground') ?? list[0])?.id ?? null)
   }, [crews.data, crewId])
+
+  // "Open diff" on a chat's changed-files card.
+  useEffect(() => {
+    const open = () => setGitOpen(true)
+    window.addEventListener(OPEN_CHANGES_EVENT, open)
+    return () => window.removeEventListener(OPEN_CHANGES_EVENT, open)
+  }, [])
 
   useEffect(() => {
     try {

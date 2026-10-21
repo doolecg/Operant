@@ -1,15 +1,18 @@
-import { useCallback, useLayoutEffect, useMemo, useRef, useState, type KeyboardEvent } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type KeyboardEvent } from 'react'
 import { ArrowDown } from 'lucide-react'
+import type { SubagentItem } from '@shared/claude-chat'
+import { validPath } from '@shared/chat-lineage'
 import { cliBlocked } from '@/lib/capabilities'
 import { useCapabilities } from '@/lib/queries'
 import { cn } from '@/lib/utils'
+import { AgentThread } from './AgentThread'
 import { Composer } from './Composer'
 import { ConversationList } from './ConversationList'
 import { InfoRow } from './InfoRow'
 import { StatusLine } from './StatusLine'
 import { TaskList } from './TaskList'
 import { capItems, mainThread } from './chatHelpers'
-import { selectAgent } from './agentSelection'
+import { openAgentThread, useAgentThread } from './agentSelection'
 import { chatActions, useChatState } from './useChat'
 
 const RENDER_CAP = 300
@@ -23,11 +26,14 @@ interface Props {
   tileModel: string | null
   // Switches the tile to the Terminal view.
   onTerminal: () => void
+  // Names for the breadcrumbs when an agent's conversation is open.
+  projectName?: string | null
+  threadTitle?: string
 }
 
 // The Chat view of a Claude tile: the conversation (Claude's text on the background, owner messages as soft bubbles,
 // tools as quiet rows, one bordered card per prompt), the running status line and the composer.
-export function ChatView({ scratchId, launchEffort, tileModel, onTerminal }: Props) {
+export function ChatView({ scratchId, launchEffort, tileModel, onTerminal, projectName = null, threadTitle = 'Chat' }: Props) {
   const state = useChatState(scratchId)
   const caps = useCapabilities().data
   const scroller = useRef<HTMLDivElement>(null)
@@ -38,6 +44,13 @@ export function ChatView({ scratchId, launchEffort, tileModel, onTerminal }: Pro
   const [loading, setLoading] = useState(false)
 
   const items = state?.items
+  const thread = useAgentThread(scratchId)
+  const agents = useMemo(() => items?.filter((i): i is SubagentItem => i.kind === 'subagent') ?? [], [items])
+  const path = useMemo(() => validPath(agents, thread.path), [agents, thread.path])
+  const current = path.length > 0 ? agents.find((a) => a.id === path[path.length - 1]) : undefined
+  const returning = useRef(false)
+  const lastTop = useRef(0)
+  if (current) returning.current = true
   const main = useMemo(() => (items ? mainThread(items) : []), [items])
   const capped = useMemo(() => capItems(main, limit), [main, limit])
 
@@ -53,15 +66,24 @@ export function ChatView({ scratchId, launchEffort, tileModel, onTerminal }: Pro
     const ro = new ResizeObserver(() => stuck.current && toBottom())
     ro.observe(el)
     return () => ro.disconnect()
-  }, [toBottom, state === null])
+  }, [toBottom, state === null, !current])
   useLayoutEffect(() => {
     if (stuck.current) toBottom()
-  }, [items, toBottom])
+  }, [items, toBottom, !current])
+  // Coming back from an agent: the scroll position it was left at.
+  useLayoutEffect(() => {
+    const el = scroller.current
+    if (el && !stuck.current) el.scrollTop = lastTop.current
+  }, [!current])
+  useEffect(() => {
+    if (!current) returning.current = false
+  })
 
   const onScroll = () => {
     const el = scroller.current
     if (!el) return
     const near = el.scrollHeight - el.scrollTop - el.clientHeight < NEAR_BOTTOM
+    lastTop.current = el.scrollTop
     stuck.current = near
     setAtBottom(near)
   }
@@ -105,10 +127,13 @@ export function ChatView({ scratchId, launchEffort, tileModel, onTerminal }: Pro
       </div>
     )
 
+  if (current)
+    return <AgentThread key={path.join('>')} scratchId={scratchId} state={state} agents={agents} path={path} agent={current} dir={thread.dir} project={projectName} thread={threadTitle} onTerminal={onTerminal} />
+
   const crashNotice = items!.slice(-10).some((i) => i.kind === 'notice' && i.source === 'crash')
 
   return (
-    <div className="relative flex h-full min-h-0 flex-col" onKeyDown={onKeyDown} data-chat="view">
+    <div className={cn('relative flex h-full min-h-0 flex-col', returning.current && 'm-drill-out')} onKeyDown={onKeyDown} data-chat="view">
       <div className="relative min-h-0 flex-1">
         <div ref={scroller} onScroll={onScroll} role="log" aria-live="polite" aria-relevant="additions" aria-label="Conversation" className="h-full overflow-y-auto">
           <div ref={inner} className="mx-auto flex max-w-[720px] flex-col gap-3.5 px-5 pt-7 pb-4">
@@ -122,7 +147,7 @@ export function ChatView({ scratchId, launchEffort, tileModel, onTerminal }: Pro
             <ConversationList
               scratchId={scratchId}
               items={capped.items}
-              onOpenAgent={(id) => selectAgent(scratchId, id)}
+              onOpenAgent={(id) => openAgentThread(scratchId, agents, id)}
               onTerminal={onTerminal}
               live={state.turn.phase === 'working' || state.turn.phase === 'waiting'}
               turnStartedAt={state.turn.startedAt}

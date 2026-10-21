@@ -1,6 +1,8 @@
 import { memo, useMemo } from 'react'
 import { buildRows, type ChatItem, type ChatRow } from '@shared/claude-chat'
 import { planTurns, type TurnEntry } from '@shared/chat-summary'
+import { collectChanges, type FileChange } from '@shared/chat-changes'
+import { ChangedFilesCard } from './ChangedFilesCard'
 import { AgentsSummary, AssistantText, CommandRow, NoticeRow, SubagentRow, ThinkingRow, ToolGroupRow, ToolRow, TurnFold, TurnRow, UserBubble, WorkingHeading } from './ItemViews'
 import { PermissionCard, PlanCard, QuestionCard } from './PromptCards'
 import { cn } from '@/lib/utils'
@@ -59,21 +61,30 @@ type Row =
   | { type: 'fold'; id: string; rows: ChatRow[]; ms: number; stopped: boolean; failed: number }
   | { type: 'working'; id: string; startedAt: number }
   | { type: 'agents'; id: string; text: string }
+  | { type: 'changes'; id: string; files: FileChange[] }
 
 // The turn plan as rows: runs of plain items still fold read-only tools into groups, a turn's fold holds its own groups.
+// A closed turn that edited files gets a changed-files card just before its footer.
 function toRows(entries: TurnEntry[]): Row[] {
   const out: Row[] = []
   let run: ChatItem[] = []
+  let fold: ChatItem[] | null = null
   const flush = () => {
     out.push(...buildRows(run))
     run = []
   }
   for (const e of entries) {
     if (e.type === 'item') {
+      if (e.item.kind === 'turn' && fold) {
+        const files = collectChanges(fold)
+        if (files.length) (flush(), out.push({ type: 'changes', id: `changes:${e.item.id}`, files }))
+        fold = null
+      }
       run.push(e.item)
       continue
     }
     flush()
+    if (e.type === 'fold') fold = e.items
     out.push(e.type === 'fold' ? { type: 'fold', id: e.id, rows: buildRows(e.items), ms: e.ms, stopped: e.stopped, failed: e.failed } : e)
   }
   flush()
@@ -108,6 +119,12 @@ export const ConversationList = memo(function ConversationList({ scratchId, item
           return (
             <div key={row.id} className={cls}>
               <WorkingHeading startedAt={row.startedAt} small={small} />
+            </div>
+          )
+        if (row.type === 'changes')
+          return (
+            <div key={row.id} className={cls}>
+              <ChangedFilesCard files={row.files} small={small} />
             </div>
           )
         if (row.type === 'agents')

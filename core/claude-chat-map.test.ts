@@ -410,6 +410,7 @@ describe('tool results, diffs and rows', () => {
     m.feed({ type: 'user', message: { content: [{ type: 'tool_result', tool_use_id: 'ed', content: 'ok' }] }, tool_use_result: { filePath: 'C:\\a\\b.ts', structuredPatch: [{ oldStart: 3, oldLines: 2, newStart: 3, newLines: 3, lines: [' x', '-a', '+b', '+c'] }] } })
     expect((of(m, 'tool')[0] as ToolItem).diff).toMatchObject({ added: 2, removed: 1, hunks: [{ oldStart: 3 }] })
     expect(diffFromInput('Write', { file_path: 'q.txt', content: 'one\ntwo' })).toMatchObject({ created: true, added: 2 })
+    expect(diffFromInput('Write', { file_path: 'q.txt', content: 'one\ntwo\n' })).toMatchObject({ created: true, added: 2 })
     expect(diffFromInput('MultiEdit', { file_path: 'q', edits: [{ old_string: 'a', new_string: 'b' }, { old_string: 'c', new_string: 'd' }] })).toMatchObject({ added: 2, removed: 2 })
     expect(diffFromInput('Read', { file_path: 'q' })).toBeNull()
   })

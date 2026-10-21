@@ -1,5 +1,5 @@
 import { useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react'
-import { Check, ChevronDown, ChevronLeft, Square, X } from 'lucide-react'
+import { Check, ChevronDown, ChevronLeft, MessageSquareText, Square, X } from 'lucide-react'
 import { decodeIpcError } from '@shared/ipc'
 import { itemsOf, type ChatItem, type SubagentItem } from '@shared/claude-chat'
 import type { ClaudeSubagent } from '@shared/claude-mods'
@@ -9,12 +9,13 @@ import { ConfirmDialog } from '@/components/ui/confirm-dialog'
 import { PixelBar, meterTone } from '@/components/ui/pixel-bar'
 import { ConversationList } from '@/components/chat/ConversationList'
 import { UserBubble } from '@/components/chat/ItemViews'
-import { selectAgent, useAgentSelection } from '@/components/chat/agentSelection'
+import { openAgentThread, selectAgent, useAgentSelection } from '@/components/chat/agentSelection'
 import { ContextBar } from '@/components/chat/ItemViews'
 import { agentElapsed, agentTitle, agentList, agentRowFor, kTokens, type AgentDot, type AgentRowModel } from '@/components/chat/chatHelpers'
-import { chatActions, useAgentHistory, useChatState, useNow } from '@/components/chat/useChat'
+import { chatActions, useChatState, useNow } from '@/components/chat/useChat'
 import { Critter } from './agents/Critter'
 import { RightNowCard } from './agents/RightNowCard'
+import { useAgentItems } from './agents/useAgentItems'
 import { cardTime, critterFor, effortInfo, loadCleared, loadStatusOpen, mcpSummary, mcpTiles, metricsOf, money, progressOf, saveCleared, saveStatusOpen, sessionRows, shortModel, skillSummary, skillTiles, stopPlan, summarize, viewFor, type AgentView, type EffortTone, type McpTile, type McpTone } from './agents/agentView'
 import type { ModProps } from './registry'
 
@@ -235,10 +236,9 @@ function AgentList({ tileId, views, now, onOpen, onStop }: { tileId: number; vie
 }
 
 // One agent's conversation in the panel, in the same calm style at 13 px: its prompt, tools and replies, live.
-function AgentConversation({ scratchId, agent, live, onBack, fromTranscript }: { scratchId: number; agent: AgentRowModel & { prompt: string }; live: ChatItem[]; onBack: () => void; fromTranscript?: boolean }) {
+function AgentConversation({ scratchId, agent, live, onBack, onOpenInChat, fromTranscript }: { scratchId: number; agent: AgentRowModel & { prompt: string }; live: ChatItem[]; onBack: () => void; onOpenInChat?: () => void; fromTranscript?: boolean }) {
   const running = agent.dot === 'running' || agent.dot === 'waiting'
-  const history = useAgentHistory(scratchId, agent.id, live.length === 0 && (!running || !!fromTranscript))
-  const items = live.length > 0 ? live : (history ?? [])
+  const items = useAgentItems(scratchId, agent.id, running, live, fromTranscript)
   const box = useRef<HTMLDivElement>(null)
   const stuck = useRef(true)
   useLayoutEffect(() => {
@@ -248,9 +248,16 @@ function AgentConversation({ scratchId, agent, live, onBack, fromTranscript }: {
   return (
     <div className="flex min-h-0 flex-1 flex-col">
       <div className="shrink-0 px-3 pt-2.5 pb-1.5">
-        <button type="button" onClick={onBack} className="text-muted-foreground hover:text-foreground inline-flex items-center gap-0.5 text-[13px]">
-          <ChevronLeft className="size-3.5" aria-hidden /> Agents
-        </button>
+        <div className="flex items-center justify-between gap-2">
+          <button type="button" onClick={onBack} className="text-muted-foreground hover:text-foreground inline-flex items-center gap-0.5 text-[13px]">
+            <ChevronLeft className="size-3.5" aria-hidden /> Agents
+          </button>
+          {onOpenInChat && (
+            <button type="button" onClick={onOpenInChat} className="text-muted-foreground hover:text-foreground inline-flex items-center gap-1 text-[13px]">
+              <MessageSquareText className="size-3.5" aria-hidden /> Open in chat
+            </button>
+          )}
+        </div>
         <div className="mt-1 truncate text-[13px] font-semibold">{agentTitle(agent)}</div>
         {agent.context && <ContextBar ctx={agent.context} />}
         {agent.description && agent.description !== (agent.agentType || '') && <div className="text-muted-foreground truncate text-xs">{agent.description}</div>}
@@ -277,6 +284,8 @@ function AgentConversation({ scratchId, agent, live, onBack, fromTranscript }: {
   )
 }
 
+const subagentsOf = (items: ChatItem[]): SubagentItem[] => items.filter((i): i is SubagentItem => i.kind === 'subagent')
+
 // Chat tiles: the agents come from the chat stream.
 function ChatAgents({ tileId }: { tileId: number }) {
   const state = useChatState(tileId)
@@ -291,7 +300,7 @@ function ChatAgents({ tileId }: { tileId: number }) {
   }, [state?.items, now])
   const open = sel.agent ? state?.items.find((i): i is SubagentItem => i.kind === 'subagent' && i.id === sel.agent) : undefined
   if (!state) return <p className="text-muted-foreground px-4 py-3 text-[13px]">Loading…</p>
-  if (open) return <AgentConversation scratchId={tileId} agent={{ ...agentRowFor(open), prompt: open.prompt }} live={itemsOf(state, open.id)} onBack={() => selectAgent(tileId, null)} />
+  if (open) return <AgentConversation scratchId={tileId} agent={{ ...agentRowFor(open), prompt: open.prompt }} live={itemsOf(state, open.id)} onBack={() => selectAgent(tileId, null)} onOpenInChat={() => openAgentThread(tileId, subagentsOf(state.items), open.id)} />
   const stop = async (scope: 'one' | 'turn', id: string) => {
     if (scope === 'one') await bridge().invoke('chat:stopAgent', tileId, id)
     else chatActions.interrupt(tileId)

@@ -763,7 +763,8 @@ export function partialTarget(name: string, partial: string): string {
 
 // ---- diffs
 
-const splitLines = (s: string): string[] => (s === '' ? [] : s.replace(/\r\n/g, '\n').split('\n'))
+// A trailing newline ends the last line, it does not start another one.
+const splitLines = (s: string): string[] => (s === '' ? [] : s.replace(/\r\n/g, '\n').replace(/\n$/, '').split('\n'))
 
 function countDiff(hunks: DiffHunk[]): { added: number; removed: number } {
   let added = 0
