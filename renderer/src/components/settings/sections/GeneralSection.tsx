@@ -184,6 +184,31 @@ export function GeneralSection() {
           </Row>
         </CardContent>
       </Card>
+
+      <Card data-testid="settings-license">
+        <CardHeader>
+          <CardTitle className="text-base">License</CardTitle>
+          <CardDescription>Operant is free software under the MIT License. Copyright © 2026 doolecg.</CardDescription>
+        </CardHeader>
+        <CardContent className="text-muted-foreground space-y-2 text-xs">
+          <p>
+            Operant is provided "as is", without warranty of any kind. The authors are not liable for any claim, damages or other liability
+            arising from its use, including anything an AI agent does from a terminal you start in it.
+          </p>
+          <p>
+            Claude Code, OpenCode and the other tools Operant starts or installs are separate software under their own licenses and terms.
+            Operant is not made by or affiliated with Anthropic or the makers of those tools.
+          </p>
+          <div className="flex gap-2 pt-1">
+            <Button variant="outline" size="sm" onClick={() => void bridge().invoke('app:openLicenses')}>
+              Open license files
+            </Button>
+            <Button variant="ghost" size="sm" onClick={() => void bridge().invoke('app:openExternal', 'https://github.com/doolecg/operant2/blob/main/LICENSE')}>
+              License on GitHub
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
     </>
   )
 }

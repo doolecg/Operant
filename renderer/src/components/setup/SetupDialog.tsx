@@ -94,6 +94,10 @@ export function SetupDialog() {
               This applies only to those scripts and does not change your execution policy.
             </p>
           )}
+          <p>
+            These tools have their own licenses and terms. Operant is provided as is under the MIT License, without warranty; see Settings, General,
+            License.
+          </p>
         </div>
         <DialogFooter>
           {finished ? (

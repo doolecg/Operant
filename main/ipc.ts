@@ -1,4 +1,5 @@
 import { app, clipboard, dialog, ipcMain, shell, type BrowserWindow, type IpcMainInvokeEvent } from 'electron'
+import { join } from 'node:path'
 import { consoleLog, isConsoleSource } from '../core/console'
 import { stopOwnProcess } from '../core/proc'
 import { previewOf, readDefaultBrowserCookies } from '../core/browser-cookies'
@@ -87,6 +88,9 @@ export function registerIpc(
     'app:info': () => ({ version: app.getVersion(), platform: process.platform }),
     'app:openExternal': (url) => {
       if (/^(https?:\/\/|mailto:)/i.test(url)) void shell.openExternal(url)
+    },
+    'app:openLicenses': () => {
+      void shell.openPath(app.isPackaged ? join(process.resourcesPath, 'licenses') : join(app.getAppPath(), 'out', 'licenses'))
     },
     'update:status': () => updater.status,
     'update:check': async () => {

@@ -31,6 +31,9 @@ extraResources:
   # The window and taskbar icon, loaded at runtime.
   - from: build/icon.png
     to: icon.png
+  # Operant's LICENSE and the third-party notices, written by scripts/notices.mjs during the build.
+  - from: out/licenses
+    to: licenses
   # The PowerShell helper for the Windows media controls; outside the asar so PowerShell can read it.
   - from: helper
     to: helper

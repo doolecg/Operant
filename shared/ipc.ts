@@ -320,6 +320,8 @@ export interface IpcApi extends ChatApi {
   'clipboard:hasImage': () => boolean
   'app:info': () => AppInfo
   'app:openExternal': (url: string) => void
+  // Opens the folder with Operant's LICENSE and the third-party notices that ship with it.
+  'app:openLicenses': () => void
   'update:status': () => UpdateStatus
   'update:check': () => UpdateStatus
   'update:install': () => boolean
@@ -424,6 +426,7 @@ export type MainChannel =
   | 'clipboard:hasImage'
   | 'app:info'
   | 'app:openExternal'
+  | 'app:openLicenses'
   | 'update:status'
   | 'update:check'
   | 'update:install'
@@ -721,6 +724,7 @@ export const MAIN_CHANNELS: MainChannel[] = [
   'clipboard:hasImage',
   'app:info',
   'app:openExternal',
+  'app:openLicenses',
   'update:status',
   'update:check',
   'update:install',

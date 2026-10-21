@@ -41,6 +41,16 @@ npm run dist       # installers for this system into dist/
 
 Optional settings go in a `.env` (copy `.env.example`).
 
+## License
+
+Operant is released under the [MIT License](LICENSE). Copyright © 2026 doolecg.
+
+Operant is provided "as is", without warranty of any kind. The authors are not liable for any claim, damages or other liability arising from its use. That includes what an AI agent does in a terminal you start in Operant: agents can read, change and delete files and run commands with your permissions, so review what you let them do.
+
+Claude Code, OpenCode, Hindsight, CodeGraph, Playwright and the other tools Operant starts or installs are separate software under their own licenses and terms, which you accept with their makers when you install or use them. Claude Code is a product of Anthropic and is not open source. Operant is not made by, endorsed by or affiliated with Anthropic or the makers of those tools; their names are used only to say what Operant works with.
+
+Each installer ships `LICENSE.txt` and `THIRD_PARTY_NOTICES.txt` (the licenses of every package bundled with the app) in the `licenses` folder of the app's resources, alongside Electron's and Chromium's licenses. Settings, General, License opens that folder.
+
 ## Credits
 
 Inspired by [OpenRig](https://github.com/mvschwarz/openrig) and [Paperclip](https://github.com/paperclipai/paperclip). Built with [CodeGraph](https://github.com/colbymchenry/codegraph) and [shadcn/ui](https://github.com/shadcn-ui/ui).
