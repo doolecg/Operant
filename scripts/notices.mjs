@@ -1,5 +1,6 @@
 // Writes out/licenses: Operant's own LICENSE and THIRD_PARTY_NOTICES.txt with the license text of every package the
-// app ships, bundled or not. The packages are the ones the source imports, plus everything they depend on.
+// app ships, bundled or not. The packages are the runtime dependencies and the ones the source
+// imports, plus everything they depend on.
 // Electron's and Chromium's licenses are added by electron-builder itself.
 import { existsSync, mkdirSync, readdirSync, readFileSync, statSync, writeFileSync, copyFileSync } from 'node:fs'
 import { builtinModules } from 'node:module'
@@ -24,10 +25,12 @@ const packageOf = (spec) => {
   return SKIP.has(name) ? null : name
 }
 
-const roots = new Set()
+// Runtime dependencies ship in node_modules as they are, whether or not the source names them literally.
+const roots = new Set(Object.keys(JSON.parse(readFileSync(join(root, 'package.json'), 'utf8')).dependencies ?? {}))
 for (const dir of SOURCE_DIRS) {
   for (const f of files(join(root, dir))) {
-    const text = readFileSync(f, 'utf8')
+    // Type-only imports ship nothing.
+    const text = readFileSync(f, 'utf8').replace(/^\s*import\s+type\s[\s\S]*?\bfrom\s+['"][^'"]+['"]/gm, '')
     for (const m of text.matchAll(/(?:from\s+|import\s*\(\s*|import\s+|@import\s+)['"]([^'"]+)['"]/g)) {
       const name = packageOf(m[1])
       if (name) roots.add(name)

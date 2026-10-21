@@ -47,7 +47,7 @@ jobs:
           node-version: 24
           cache: npm
 
-      # Native and per-platform packages (node-pty, CodeGraph) install for the runner's own OS and arch,
+      # Native and per-platform packages (node-pty) install for the runner's own OS and arch,
       # so each installer is built on a matching runner.
       - run: npm ci
 

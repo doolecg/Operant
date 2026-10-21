@@ -10,7 +10,7 @@ import { createExtras, type Extras } from '../core/browser/extras'
 import { McpHost } from '../core/browser/mcp-host'
 import { assessCall, confirmSummary } from '../core/browser/risk'
 import { CliServer, type CliTarget } from '../core/cli-server'
-import { CrewIndexes } from '../core/codegraph'
+import { CrewIndexes, globalCodegraph } from '../core/codegraph'
 import { consoleLog } from '../core/console'
 import { FileSecretStore } from '../core/secrets'
 import { Operant } from '../core/operant'
@@ -295,9 +295,7 @@ app.whenReady().then(() => {
   mkdirSync(playground.folder, { recursive: true })
   consoleLog.setScrubber(scrubLogLine)
   sessions = new SessionManager((file, args, opts) => spawnPty(file, args, { name: 'xterm-256color', ...opts }))
-  const indexes = new CrewIndexes(
-    app.isPackaged ? join(process.resourcesPath, 'codegraph', 'lib', 'dist', 'index.js') : undefined,
-  )
+  const indexes = new CrewIndexes(app.isPackaged ? globalCodegraph() : undefined)
   const core = new Operant({
     store,
     sessions,

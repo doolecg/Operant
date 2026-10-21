@@ -12,9 +12,6 @@ files:
   - out/renderer/**
   - package.json
   - "!**/*.map"
-  # CodeGraph's platform bundle is copied by build/after-pack.cjs instead (its own Node runtime is left
-  # out: the embedded library runs on Electron's Node).
-  - "!node_modules/@colbymchenry/codegraph-*/**"
 
 extraResources:
   # The operant skill plugin that operators load with --plugin-dir.
@@ -43,9 +40,6 @@ asarUnpack:
   - node_modules/@lydell/node-pty*/**
 
 npmRebuild: false
-
-# Copies CodeGraph's platform library (with its grammars) into resources/codegraph/lib.
-afterPack: build/after-pack.cjs
 
 win:
   target:
