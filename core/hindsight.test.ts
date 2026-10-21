@@ -25,6 +25,13 @@ describe('hindsight service', () => {
     expect((await s.act('start')).state).toBe('no-uv')
   })
 
+  it('tells the owner after a start attempt, however it ended', async () => {
+    let n = 0
+    const s = svc({ fetch: async () => { throw new Error('refused') }, run: async () => ({ code: null, stdout: '', stderr: 'ENOENT' }) }, { onChange: () => n++ })
+    await s.act('start')
+    expect(n).toBe(1)
+  })
+
   it('reports running, stopped and a remote server', async () => {
     expect((await svc({ fetch: async () => resp(true) }).status()).state).toBe('running')
     const down = svc({ fetch: async () => { throw new Error('x') }, run: async () => ({ code: 0, stdout: '', stderr: '' }) })

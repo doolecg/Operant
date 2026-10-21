@@ -28,6 +28,13 @@ describe('resolveAux', () => {
 })
 
 describe('AuxBudget', () => {
+  it('tells the owner when counts change', async () => {
+    let n = 0
+    const b = new AuxBudget({ now: () => DAY1, sleep: async () => {}, settings: () => DEFAULT_AUX_SETTINGS, onChange: () => n++ })
+    b.record('learn.test', { tokens: 1, usd: 0 })
+    expect(n).toBe(1)
+  })
+
   it('counts calls, tokens and spend per feature', async () => {
     const { b } = budget()
     await b.call('learn.extraction', async () => ({ text: 'ok', tokens: 120, usd: 0.01 }))

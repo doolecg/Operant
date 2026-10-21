@@ -4,6 +4,7 @@ import { dirname, join } from 'node:path'
 import type { HindsightStatus } from '../shared/types'
 import {
   textProblem,
+  needsReview,
   stripLinks,
   LEARN_STORES,
   LESSON_KINDS,
@@ -374,6 +375,8 @@ export class LearnService {
   private readonly lastConsolidated = new Map<number, number>()
   // Groups the model already left as they are (lesson ids and edit times), so a close does not ask about them again.
   private readonly settledGroups = new Set<string>()
+  // Drafts already reported as waiting for approval, so each settle pass does not repeat the note.
+  private readonly held = new Set<number>()
   // The token use of the learn run in progress (its extraction and any consolidation it starts); null between runs.
   private usage: { tokens: number; usd: number; estimated: boolean } | null = null
 
@@ -553,7 +556,9 @@ export class LearnService {
         this.note({ ...run(), validation: unsafe }, { kind: 'lesson', targetId: 0, proposal: raw.text, previous: '', next: '', status: 'failed' })
         continue
       }
-      const e = { ...raw, text: stripLinks(raw.text) }
+      // A command, code block, link or install waits for one-click approval, with its text kept whole so the owner sees it.
+      const review = needsReview(raw.text)
+      const e = { ...raw, text: review ? raw.text : stripLinks(raw.text) }
       if (!e.text) continue
       const existing = db.listLessons({ crewId }).filter((l) => l.status === 'active' || l.status === 'pending')
       const dup = existing.find((l) => l.kind === e.kind && isDuplicate(l, e))
@@ -572,9 +577,10 @@ export class LearnService {
           changes++
         }
       } else {
-        // A new lesson never waits; any number per session reaches the project's bank.
-        lesson = db.addLesson({ crewId, text: e.text, kind: e.kind, scope: e.scope, files: e.files, symbols: e.symbols, sourceJobs: jobs, status: 'active' })
-        this.note(run(), { kind: 'lesson', targetId: lesson.id, proposal: e.text, previous: '', next: e.text, status: 'applied', filesAffected: e.files })
+        // Plain advice never waits; any number per session reaches the project's bank.
+        lesson = db.addLesson({ crewId, text: e.text, kind: e.kind, scope: e.scope, files: e.files, symbols: e.symbols, sourceJobs: jobs, status: review ? 'pending' : 'active' })
+        if (review) this.note({ ...run(), validation: `Waiting for approval: ${review}` }, { kind: 'lesson', targetId: lesson.id, proposal: e.text, previous: '', next: '', status: 'proposed', filesAffected: e.files })
+        else this.note(run(), { kind: 'lesson', targetId: lesson.id, proposal: e.text, previous: '', next: e.text, status: 'applied', filesAffected: e.files })
         changes++
       }
       const fix = e.skill ? installed.find((s) => s.name === e.skill) : undefined
@@ -1002,7 +1008,8 @@ export class LearnService {
   }
 
   // Advanced mode: every pending draft (new skills and fixes to installed ones, from this run or an earlier one) that passes
-  // validation installs itself and is recorded, so rollback can undo it. One that fails validation is rejected, never left waiting.
+  // validation installs itself into the project's own .claude/skills and is recorded, so rollback can undo it. One that fails
+  // validation is rejected. One with a command, code block, link or install stays pending for the owner to approve.
   private applyPendingDrafts(crewId: number, run: () => RunCtx): void {
     for (const d of this.d.db.listDrafts(crewId).filter((x) => x.status === 'pending')) {
       const problem = skillProblem(d)
@@ -1011,8 +1018,16 @@ export class LearnService {
         this.note({ ...run(), validation: problem }, { kind: 'skill', targetId: d.id, proposal: `Skill ${d.name}`, previous: '', next: '', status: 'failed' })
         continue
       }
+      const review = needsReview(d.body)
+      if (review) {
+        if (!this.held.has(d.id)) {
+          this.held.add(d.id)
+          this.note({ ...run(), validation: `Waiting for approval: ${review}` }, { kind: 'skill', targetId: d.id, proposal: d.targetPath ? `Fix ${d.name}` : `Skill ${d.name}`, previous: '', next: '', status: 'proposed' })
+        }
+        continue
+      }
       try {
-        this.approveDraft(d.id)
+        this.approveDraft(d.id, this.d.store.getCrew(crewId)?.folder)
         const done = this.d.db.getDraft(d.id)
         this.note(run(), { kind: 'skill', targetId: d.id, proposal: d.targetPath ? `Fix ${d.name}` : `Skill ${d.name}`, previous: done?.previousBody ?? '', next: d.body, status: 'applied', filesAffected: [done?.installedPath ?? ''] })
       } catch (err) {
@@ -1053,6 +1068,7 @@ export class LearnService {
         this.note({ ...run(), validation: problem }, { kind: 'lesson', targetId: l.id, proposal: l.text, previous: '', next: '', status: 'failed' })
         continue
       }
+      if (needsReview(l.text)) continue
       const next = this.d.db.updateLesson(l.id, { status: 'active' })
       this.note(run(), { kind: 'lesson', targetId: l.id, proposal: l.text, previous: '', next: l.text, status: 'applied', filesAffected: l.files })
       info.written += (await this.writeStores(next, folder, info.skipped)) ? 1 : 0
@@ -1089,8 +1105,9 @@ export class LearnService {
 
   // The only way a skill reaches Claude Code: the user approves a pending draft. A new skill goes to the skills home
   // (every session loads it) and an existing one is never overwritten. A fix rewrites its installed file and keeps the
-  // text it replaced, so rollback can restore it.
-  approveDraft(id: number): SkillDraft {
+  // text it replaced, so rollback can restore it. With a project folder (automatic installs), a new skill goes to that
+  // project's .claude/skills instead.
+  approveDraft(id: number, projectFolder?: string): SkillDraft {
     const d = this.draft(id)
     if (d.status !== 'pending') throw new LearnError('CONFLICT', 'Only a pending draft can be approved')
     if (d.targetPath) {
@@ -1100,7 +1117,7 @@ export class LearnService {
       return this.d.db.updateDraft(id, { status: 'approved', installedPath: d.targetPath, previousBody: previous })
     }
     if (!SKILL_NAME.test(d.name)) throw new LearnError('BAD_ARGS', 'A skill name is lowercase letters, digits and dashes')
-    const path = join(this.skillsHome(), d.name, 'SKILL.md')
+    const path = join(projectFolder ? join(projectFolder, '.claude', 'skills') : this.skillsHome(), d.name, 'SKILL.md')
     if (this.exists(path)) throw new LearnError('CONFLICT', `A skill named ${d.name} is already installed`)
     this.writeSkill(path, scrubLogLine(d.body))
     return this.d.db.updateDraft(id, { status: 'approved', installedPath: path })

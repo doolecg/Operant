@@ -405,6 +405,7 @@ export class Operant extends EventEmitter<PushEvents> {
       },
       key: () => (this.settings.hindsight.mode === 'local' ? null : this.secrets.get(HINDSIGHT_KEY[this.settings.hindsight.mode === 'lan' ? 'shared' : 'remote'])),
       llmEnv: () => ({ HINDSIGHT_API_LLM_PROVIDER: 'claude-code' }),
+      onChange: () => this.emit('hindsight:changed', {}),
     })
     this.aux = new AuxBudget({
       now: this.now,
@@ -417,6 +418,7 @@ export class Operant extends EventEmitter<PushEvents> {
         return { ...a, maxUsdPerDay }
       },
       store: { load: () => store.getJson('aux.usage'), save: (v) => store.setJson('aux.usage', v) },
+      onChange: () => this.emit('aux:changed', {}),
     })
     this.enhanceModel = opts.learnModel ?? claudeLearnModel(opts.launch?.supported, { settings: () => this.auxLearn('promptEnhance'), local: this.localLlm() })
     this.changes = new LearnChangesDb(store.db, this.now)
@@ -1354,6 +1356,10 @@ export class Operant extends EventEmitter<PushEvents> {
   private noteTurn(phases: Map<number, string>, scratchId: number, phase: string): void {
     const prev = phases.get(scratchId)
     phases.set(scratchId, phase)
+    if (prev === 'working' && phase === 'idle' && this.store.isOpen) {
+      const crewId = this.store.getScratch(scratchId)?.crewId
+      if (crewId !== undefined) this.emit('turn:finished', { crewId })
+    }
     const feed = this.scratchFeeds.get(scratchId)
     if (!feed) return
     if (phase === 'working') feed.finished = false
@@ -2041,6 +2047,7 @@ export class Operant extends EventEmitter<PushEvents> {
       })
       n++
     }
+    if (n > 0) this.emit('usage:changed', { crewId: this.store.getScratch(scratchId)!.crewId })
     return n
   }
 

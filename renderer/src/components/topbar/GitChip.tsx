@@ -18,7 +18,7 @@ export function gitSummary(g: GitInfo): string {
 // The open project's git branch with its changed-file count; nothing for a folder that is not a git repository.
 // Clicking it shows the changes. `compact` (the sidebar footer) lets the chip shrink: the branch name truncates, the count stays.
 export function GitChip({ crewId, onOpen, compact = false }: { crewId: number | null; onOpen: () => void; compact?: boolean }) {
-  const git = useGitInfo(crewId, true).data
+  const git = useGitInfo(crewId).data
   if (!git) return null
   const text = gitSummary(git)
   return (

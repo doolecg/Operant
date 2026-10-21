@@ -50,4 +50,5 @@ export const useExportAllData = () => useMutation({ mutationFn: () => call('data
 
 registerLive((b, qc) => [
   b.on('budget', () => void qc.invalidateQueries({ queryKey: ['budgets'] })),
+  b.on('usage:changed', () => void qc.invalidateQueries({ queryKey: ['scratchSpend'] })),
 ])

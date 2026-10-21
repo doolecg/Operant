@@ -44,6 +44,7 @@ export interface AuxBudgetDeps {
   sleep: (ms: number) => Promise<void>
   settings: () => AuxSettings
   store?: AuxStore
+  onChange?: () => void
 }
 
 interface State {
@@ -97,6 +98,7 @@ export class AuxBudget {
     } catch {
       // the counts stay in memory for this run
     }
+    this.d.onChange?.()
   }
 
   private blockReason(): { label: 'local limit' | 'provider limit'; message: string } | null {
@@ -176,6 +178,7 @@ export class AuxBudget {
       } catch (err) {
         const msg = errText(err)
         this.lastError = msg
+        this.d.onChange?.()
         if (QUOTA.test(msg)) {
           this.cur().providerLimit = msg.slice(0, 300)
           this.persist()

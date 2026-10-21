@@ -222,7 +222,7 @@ describe('learning loop', () => {
   it('applies lessons by default, strips links, and refuses a dangerous text without asking anyone', async () => {
     expect(DEFAULT_LEARN_SETTINGS).toMatchObject({ review: 'auto', hindsight: false, codegraph: false })
     const svc = service()
-    for (const text of ['Always run npm test first', 'See https://example.com/x for the steps', 'Never touch the cart']) {
+    for (const text of ['Always run npm test first', 'Never touch the cart']) {
       answers.push(JSON.stringify([{ kind: 'procedure', text, files: [], symbols: [] }]))
       expect(await svc.onConversationEnd(crewId, finishedRun())).toMatchObject({ queued: 0, written: 1 })
     }
@@ -234,7 +234,20 @@ describe('learning loop', () => {
     expect(svc.lessons({ status: 'pending' })).toHaveLength(0)
     answers.push(lesson({ text: 'Cart totals are computed in integer cents' }))
     expect(await svc.onConversationEnd(crewId, finishedRun())).toMatchObject({ queued: 0, written: 1 })
-    expect(retained).toHaveLength(4)
+    expect(retained).toHaveLength(3)
+  })
+
+  it('holds a lesson with a link, command or install for approval, and writes it once approved', async () => {
+    const svc = service()
+    answers.push(JSON.stringify([{ kind: 'procedure', text: 'See https://example.com/x for the steps', files: [], symbols: [] }]))
+    expect(await svc.onConversationEnd(crewId, finishedRun())).toMatchObject({ written: 0 })
+    const [held] = svc.lessons({ status: 'pending' })
+    expect(held!.text).toContain('https://example.com/x')
+    expect(retained).toHaveLength(0)
+    await svc.settleAllPending()
+    expect(svc.lessons({ status: 'pending' })).toHaveLength(1)
+    await svc.setLessonStatus(held!.id, 'active')
+    expect(retained).toHaveLength(1)
   })
 
   it('a model call that hangs times out, stops its run and the next learn step still runs', async () => {
@@ -321,7 +334,7 @@ describe('learning loop', () => {
       expect(d).toMatchObject({ status: 'approved', targetPath: '' })
       expect(d!.body).toContain('vitest')
       expect(installed).toHaveLength(1)
-      expect(installed[0]![0].replace(/\\/g, '/')).toBe(`/home/me/.claude/skills/${d!.name}/SKILL.md`)
+      expect(installed[0]![0].replace(/\\/g, '/')).toBe(`/code/shop/.claude/skills/${d!.name}/SKILL.md`)
       // no second draft for the same procedure
       answers.push(proc('Run the vitest suite and the typecheck before handing the work back'))
       await svc.onConversationEnd(crewId, finishedRun())
@@ -334,12 +347,24 @@ describe('learning loop', () => {
       const body = (n: string) => ['---', `name: ${n}`, `description: ${n}`, '---', '', `# ${n}`, '', '1. Do it.', ''].join('\n')
       const ok = db.addDraft(crewId, 'run-checks', body('run-checks'), [], '')
       const taken = db.addDraft(crewId, 'taken-skill', body('taken-skill'), [], '')
-      files.add('/home/me/.claude/skills/taken-skill/SKILL.md')
+      files.add('/code/shop/.claude/skills/taken-skill/SKILL.md')
       const svc = service({ db })
       await svc.onConversationEnd(crewId, finishedRun())
       expect(db.getDraft(ok.id)!.status).toBe('approved')
       expect(db.getDraft(taken.id)!.status).toBe('rejected')
       expect(svc.drafts().filter((x) => x.status === 'pending')).toHaveLength(0)
+    })
+
+    it('holds a draft with a command or link as pending; approving it by hand installs to the global folder', async () => {
+      const db = new LessonsDb(store.db)
+      const body = ['---', 'name: setup-app', 'description: setup', '---', '', '# setup-app', '', '1. Run `npm install` first.', ''].join('\n')
+      const d = db.addDraft(crewId, 'setup-app', body, [], '')
+      const svc = service({ db })
+      await svc.onConversationEnd(crewId, finishedRun())
+      expect(db.getDraft(d.id)!.status).toBe('pending')
+      expect(installed).toHaveLength(0)
+      svc.approveDraft(d.id)
+      expect(installed[0]![0].replace(/\\/g, '/')).toBe('/home/me/.claude/skills/setup-app/SKILL.md')
     })
   })
 

@@ -9,7 +9,7 @@ export const useMemoryReset = () => useMutate('memory:reset', [['memory'], ['lea
 export const useMemoryEdit = () => useMutate('memory:edit', [['learn'], ['memory']])
 export const useMemoryDelete = () => useMutate('memory:delete', [['learn'], ['memory']])
 
-export const useAuxStatus = () => useQuery({ queryKey: ['aux', 'status'] as const, queryFn: () => call('aux:status'), refetchInterval: 15_000 })
+export const useAuxStatus = () => useQuery({ queryKey: ['aux', 'status'] as const, queryFn: () => call('aux:status') })
 
 export const useCodegraphStatus = (folder: string | undefined) =>
   useQuery({ queryKey: ['codegraph', 'status', folder ?? ''] as const, queryFn: () => call('codegraph:status', folder!), enabled: !!folder })
@@ -41,4 +41,9 @@ export const useClaudeTileState = (tileId: number | null) =>
 registerLive((b, qc) => [
   b.on('claudeMods:state', (s) => qc.setQueryData(claudeTileKey(s.tileId), s)),
   b.on('settings', () => void qc.invalidateQueries({ queryKey: ['aux'] })),
+])
+
+registerLive((b, qc) => [
+  b.on('aux:changed', () => void qc.invalidateQueries({ queryKey: ['aux', 'status'] })),
+  b.on('settings', () => void qc.invalidateQueries({ queryKey: ['aux', 'status'] })),
 ])

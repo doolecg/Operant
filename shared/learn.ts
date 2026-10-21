@@ -194,6 +194,22 @@ const DANGEROUS =
 // Why a lesson or skill text must not be kept ('' when it is fine).
 export const textProblem = (text: string): string => (DANGEROUS.test(text) ? 'it holds a download, a pipe into a shell, an elevated or destructive command, or an order to ignore earlier rules' : '')
 
+const COMMANDS = 'npm|npx|pnpm|yarn|bun|node|pip3?|uv|uvx|python3?|git|cargo|go|dotnet|docker|winget|brew|apt|apt-get|make|bash|sh|pwsh|powershell|cd|rm|ls|cat|ssh|scp|kubectl'
+const FENCE = /```|~~~/
+const INLINE_COMMAND = new RegExp(`\`\\s*(${COMMANDS})\\s[^\`\\n]*\``, 'i')
+const COMMAND_LINE = new RegExp(`^\\s*(\\$|PS>|>)\\s*\\S|^\\s*(${COMMANDS})\\s+-{1,2}\\w`, 'im')
+const LINK = /https?:\/\//i
+const INSTALL = /\b(npm|pnpm|yarn|bun|pip3?|uv|winget|brew|apt|apt-get|cargo|go)\s+(i|add|install)\b|\b(npx|uvx)\s+\S/i
+
+// Why a lesson or skill text must wait for one-click approval ('' when it is plain advice).
+export const needsReview = (text: string): string => {
+  if (FENCE.test(text)) return 'it holds a code block'
+  if (LINK.test(text)) return 'it holds a link'
+  if (INSTALL.test(text)) return 'it installs a package'
+  if (INLINE_COMMAND.test(text) || COMMAND_LINE.test(text)) return 'it holds a command'
+  return ''
+}
+
 // Links are dropped from kept text; the words around them stay.
 export const stripLinks = (text: string): string => text.replace(/\s*(https?:\/\/|www\.)\S+/gi, '').replace(/\s{2,}/g, ' ').trim()
 

@@ -60,7 +60,7 @@ function learnLine(s: LearnStatus): string {
 // the chat stream, so the headline and the file list are left out.
 export function RightNowCard({ tileId, crewId, chat }: { tileId: number; crewId: number | null; chat: boolean }) {
   const state = useChatState(chat ? tileId : null)
-  const git = useGitInfo(crewId, true).data
+  const git = useGitInfo(crewId).data
   const status = useRepoStatus(git ? crewId : null).data
   const gitPaths = useMemo(() => (status?.files ?? []).map((f) => f.path), [status?.files])
   const items: ChatItem[] = state?.items ?? []

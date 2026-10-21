@@ -524,6 +524,14 @@ export interface IpcEvents {
   'notify:open': { scratchId: number; crewId: number }
   // A tile's output looked like a server starting, or a tile ended: the list of servers may have changed.
   'servers:changed': Record<string, never>
+  // A tile's turn ended (working to idle): the project's files may have changed.
+  'turn:finished': { crewId: number }
+  // New usage rows were stored for a tile of the project.
+  'usage:changed': { crewId: number }
+  // The memory server was started, stopped or failed to; the status is read again.
+  'hindsight:changed': Record<string, never>
+  // The auxiliary-call counts, spend or last error changed.
+  'aux:changed': Record<string, never>
   // A project's browser panel changed (tabs, navigation, AI activity or control).
   'browser:state': BrowserState
   // The project's visited pages changed (address bar suggestions).

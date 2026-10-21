@@ -4,7 +4,7 @@ import { call, registerLive } from './core'
 const HS = ['hindsight'] as const
 
 export const useHindsightStatus = () =>
-  useQuery({ queryKey: ['hindsight', 'status'] as const, queryFn: () => call('hindsight:status'), refetchInterval: 20_000, retry: false })
+  useQuery({ queryKey: ['hindsight', 'status'] as const, queryFn: () => call('hindsight:status'), retry: false })
 
 export const useHindsightAdapters = () => useQuery({ queryKey: ['hindsight', 'adapters'] as const, queryFn: () => call('hindsight:adapters'), staleTime: 30_000 })
 
@@ -31,10 +31,17 @@ export function useHindsightAct() {
   })
 }
 
-// The mode, port and keys decide the status, the health badges and the Memory page.
-registerLive((b, qc) => [
-  b.on('settings', () => {
-    void qc.invalidateQueries({ queryKey: HS })
-    void qc.invalidateQueries({ queryKey: ['health'] })
-  }),
-])
+// The mode, port and keys decide the status, the health badges and the Memory page. A server stopped or started outside
+// Operant is not pushed, so the window gaining focus reads the status again.
+registerLive((b, qc) => {
+  const refresh = () => void qc.invalidateQueries({ queryKey: ['hindsight', 'status'] })
+  window.addEventListener('focus', refresh)
+  return [
+    () => window.removeEventListener('focus', refresh),
+    b.on('hindsight:changed', refresh),
+    b.on('settings', () => {
+      void qc.invalidateQueries({ queryKey: HS })
+      void qc.invalidateQueries({ queryKey: ['health'] })
+    }),
+  ]
+})

@@ -82,7 +82,6 @@ export function TileInfoBar({ tile, crew }: { tile: TerminalTab; crew: Crew | un
     queryKey: ['scratchSpend', crew?.id ?? -1],
     queryFn: () => call('scratch:spend', crew!.id),
     enabled: !claude && !!crew,
-    refetchInterval: 30_000,
   }).data
   if (!enabled) return null
 

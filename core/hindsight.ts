@@ -59,6 +59,8 @@ export interface HindsightOptions {
   settingsFile?: string
   // The hindsight-embed profile; coding-agent unless a test uses a throwaway one.
   profile?: string
+  // Called after a start, stop or restart finished, however it ended.
+  onChange?: () => void
 }
 
 // On a shared or remote server the bank also has to be unique across machines. The project's git origin identifies it
@@ -292,6 +294,12 @@ export class HindsightService {
 
   // Start or stop the local daemon. A hosted-elsewhere server is never touched. Returns the status after.
   async act(action: 'start' | 'stop' | 'restart'): Promise<HindsightStatus> {
+    const status = await this.runAct(action)
+    this.opts.onChange?.()
+    return status
+  }
+
+  private async runAct(action: 'start' | 'stop' | 'restart'): Promise<HindsightStatus> {
     if (!this.managed) return { ...(await this.status()), detail: 'Hosted elsewhere: Operant does not start or stop it' }
     const mode = this.mode
     const fail = (state: HindsightStatus['state'], detail: string): HindsightStatus => ({ url: this.url, managed: true, mode, state, detail })

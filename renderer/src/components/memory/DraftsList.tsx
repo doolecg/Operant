@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { Pencil } from 'lucide-react'
-import type { SkillDraft } from '@shared/learn'
+import { needsReview, type SkillDraft } from '@shared/learn'
 import type { Crew } from '@shared/types'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -82,6 +82,7 @@ function DraftRow({ draft, crewName, onEdit, onDelete }: { draft: SkillDraft; cr
   const approve = useApproveDraft()
   const reject = useRejectDraft()
   const pending = draft.status === 'pending'
+  const review = needsReview(draft.body)
   return (
     <li className="space-y-2 rounded-md border p-3" data-draft={draft.id}>
       <div className="flex flex-wrap items-center gap-2">
@@ -98,10 +99,11 @@ function DraftRow({ draft, crewName, onEdit, onDelete }: { draft: SkillDraft; cr
             <span className="text-muted-foreground font-mono text-[11px] break-all">{draft.targetPath}</span>
           </>
         ) : (
-          <Badge variant="outline">New skill, installs to ~/.claude/skills/{draft.name}</Badge>
+          <Badge variant="outline">New skill, installs to ~/.claude/skills/{draft.name} when you approve it, or to the project's .claude/skills when applied automatically</Badge>
         )}
       </div>
       <pre className="bg-muted/40 max-h-40 overflow-auto rounded-md p-2 font-mono text-[11px] whitespace-pre-wrap">{draft.body}</pre>
+      {pending && review && <p className="text-amber-400 text-xs">Waiting for approval: {review}.</p>}
       {draft.installedPath && <p className="text-muted-foreground font-mono text-[11px]">Installed at {draft.installedPath}</p>}
       <div className="flex flex-wrap items-center justify-end gap-1.5">
         {pending && (

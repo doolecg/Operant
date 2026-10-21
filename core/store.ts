@@ -822,7 +822,15 @@ export class Store {
 
   close(): void {
     this.db.close()
+    this.closed = true
   }
+
+  // False once closed: a chat batch still in flight at quit must not read a closed database.
+  get isOpen(): boolean {
+    return !this.closed
+  }
+
+  private closed = false
 
   // Crews
 
