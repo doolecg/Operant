@@ -11,7 +11,7 @@ import { useWaitingTiles } from '@/components/terminal/useWaitingTiles'
 import { Toaster } from '@/components/ui/toaster'
 import { Sidebar } from '@/components/dashboard/Sidebar'
 import { TerminalView } from '@/components/terminal/TerminalView'
-import { OPEN_SETTINGS_EVENT } from '@/components/memory/LearningBadge'
+import { LearningBadge, OPEN_SETTINGS_EVENT } from '@/components/memory/LearningBadge'
 import { ServersPopover } from '@/components/dashboard/ServersPopover'
 import { ProviderLimitBadge } from '@/components/cost/ProviderBadge'
 import { SettingsPage } from '@/components/settings/SettingsPage'
@@ -295,6 +295,7 @@ export function App() {
                   </TooltipTrigger>
                   <TooltipContent>Settings (Ctrl+,)</TooltipContent>
                 </Tooltip>
+                <LearningBadge variant="footer" />
                 <Tooltip>
                   <TooltipTrigger asChild>
                     <Button

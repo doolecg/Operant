@@ -17,6 +17,7 @@ import { applySuggestion, currentModel, filterCommands, highlightParts, modeLabe
 import { EffortPopover } from './EffortPopover'
 import { setActivity } from './activityStore'
 import { CommandMenu } from './CommandMenu'
+import { LearningBadge } from '@/components/memory/LearningBadge'
 import { LearnPill } from './ComposerPills'
 import { InfoRow } from './InfoRow'
 import { QueueStrip } from './QueueStrip'
@@ -446,6 +447,7 @@ export function Composer({ scratchId, state, launchEffort, tileModel, disabled, 
         {!enhancing && lastRun?.note && <span className="text-muted-foreground/70 text-[11px]">{lastRun.note}</span>}
         </div>
         <LearnPill scratchId={scratchId} />
+        <LearningBadge variant="pill" />
         <KeepWarmLine state={state} />
         <InfoRow state={state} />
       </div>
