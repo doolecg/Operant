@@ -14,6 +14,7 @@ import { useBrowserActions, useBrowserState } from '@/components/browser/useBrow
 import { OperatorTerminal } from '@/components/dashboard/OperatorTerminal'
 import { ChatView } from '@/components/chat/ChatView'
 import { ChatHeaderControls, ChatStateBadge, ViewSwitch } from '@/components/chat/ChatHeader'
+import { ContextButton } from '@/components/chat/ContextPopover'
 import { CLI_SHORT, cliBlocked } from '@/lib/capabilities'
 import { call, useCapabilities, useCrews, useSettings } from '@/lib/queries'
 import { toast } from '@/lib/toast'
@@ -216,8 +217,9 @@ export function TerminalView({ crewId, scratch, active, onCloseScratch, onStart,
                   <FactoryChip crewId={crewId} on={crew?.factory ?? false} workers={workers} />
                 </>
               }
-              badge={chrome(openTile).badge}
-              status={chrome(openTile).status}
+              badge={isScratchTile(openTile) && openTile.scratch.kind === 'claude' && viewOf(openTile) === 'chat' ? <ChatStateBadge scratchId={openTile.scratch.scratchId} /> : isScratchTile(openTile) ? <TileStatus tile={openTile.scratch} /> : null}
+              context={isScratchTile(openTile) && openTile.scratch.kind === 'claude' && viewOf(openTile) === 'chat' ? <ContextButton scratchId={openTile.scratch.scratchId} /> : null}
+              claude={isScratchTile(openTile) && openTile.scratch.kind === 'claude' && viewOf(openTile) ? { scratchId: openTile.scratch.scratchId, view: viewOf(openTile)!, onView: (v) => void switchView(openTile, v) } : undefined}
               onPopOut={popOut(openTile)}
               onClose={() => close(openTile)}
             />
