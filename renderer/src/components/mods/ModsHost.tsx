@@ -63,8 +63,12 @@ export function ModsHost({ tileId, crewId, chat, engineering }: { tileId: number
   const panel = useRef<HTMLElement>(null)
   // Opening an agent from the chat opens the Agents panel.
   const opened = useAgentSelection(tileId).nonce
+  const seen = useRef(opened)
   useEffect(() => {
-    if (opened > 0) pick('agents')
+    if (opened <= seen.current) return
+    seen.current = opened
+    setTab('agents')
+    writeStored(TAB_KEY, 'agents')
   }, [opened])
   const mod = settings?.mods.enabled ? MODS.find((m) => m.kind === 'panel' && m.component && settings.mods.mods[m.id as ModId]) : undefined
   const tabs: Tab[] = [...(engineering ? (['plan'] as const) : []), ...(crewId !== null ? (['files'] as const) : []), ...(mod?.component ? (['agents'] as const) : [])]

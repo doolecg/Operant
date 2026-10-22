@@ -405,6 +405,7 @@ export class Operant extends EventEmitter<PushEvents> {
       new ProviderMonitor({
         store,
         now: this.now,
+        planEnabled: () => this.settings.claudePlanUsage,
         onAlert: (a) => this.log('provider', `${a.providerId === 'claude' ? 'Claude plan' : a.providerId}: ${a.windowId} is at ${Math.floor(a.usedPct)}% (alert at ${a.thresholdPct}%)`),
       })
     this.budgets = new BudgetMonitor({
@@ -638,6 +639,10 @@ export class Operant extends EventEmitter<PushEvents> {
           next[key] = on
         }
         const updated = store.updateCrew(crewId, next)
+        if (next.folder !== undefined && next.folder !== crew.folder) {
+          this.taskWatchers.get(crewId)?.()
+          this.taskWatchers.delete(crewId)
+        }
         this.log('crew', `Project ${updated.name} updated`, crewId)
         return updated
       },

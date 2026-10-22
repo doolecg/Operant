@@ -1,3 +1,40 @@
+# Operant 3.5.0
+
+**Install:** download the file for your system from the assets below. Operant keeps itself up to date from these releases.
+
+## New
+- **A new look and layout.** Chats are now threads. The top bar switches between Thread, Board, Plans and Tiles. The sidebar lists each project's threads with a search box, a New thread button and a Settled shelf: a closed chat is kept and can be opened again where it left off. The chat has no frame, with the title and the stage and Factory chips on one line, and a warm Focus theme is the default.
+- **Board and Plans.** The Board shows the threads of all your projects as cards: what each is doing, who needs you, and a box to message the selected one. Plans lists the Engineering tasks of every project with their stage.
+- **A right rail with Plan, Files and Agents.** The Plan panel shows the plan gate, the slices and the spec. Files lists the changed files and opens the diff. Agents is the old panel.
+- **Engineering Mode and Subagent Factory Mode.** Two switches per project in the top bar. Engineering Mode runs a task through frame, spec, slices, plan OK, build and ship, with a stage chip that shows where it is. Factory Mode adds Leader, Builder, Reviewer, Scout and Tester helpers with a Start button for each, and stops a chat from running more than three at once.
+- **Edit from here.** Rewind a chat, and optionally the files, to before a message.
+- **Compact button and image chips.** When the context is nearly full a Compact button shows; the next message compacts first unless you click to keep the full history. Images show as small chips with a name and size.
+- **One Tools and installs page.** Every program, skill and MCP server in one place with where it lives. If Operant cannot find a program it looks in the usual folders, then lets you point at it, also at first start.
+- **New keys.** Ctrl+Shift+N starts a thread and Ctrl+K searches threads. Both can be changed in Settings.
+
+---
+
+## Changed
+- **The Claude and OpenCode switch is gone from the top bar.** Set your main CLI in Settings, Terminals; each project's menu can start either one.
+- **Plan limits are off until you turn them on.** Reading your Claude plan limits sends your Claude Code login token to Anthropic, which its terms may not allow, so it is now a switch in Settings, Tokens and budgets. Until it is on, the plan rings show no figure.
+- **Much smaller install.** CodeGraph and the dictation libraries are no longer packed into the installer (about 600 MB less). Install CodeGraph from Settings, Install.
+- **Mods are just Mods.** The Claude mods got one list page; Dictation moved to General.
+- **Updates check more.** An update needs a checksum from GitHub and a plain version tag, and downloads to your own folder.
+- **The README now says what Operant runs and what leaves your computer.** The licence and disclaimer wording in the app, the first-start window and the README now match.
+
+---
+
+## Fixed
+- **Indexing no longer freezes the window.** CodeGraph runs in its own thread with a 10 minute limit, so a locked index cannot hang Operant. Index buttons now say when indexing starts, ends or fails, and hide when CodeGraph is not installed.
+- **No jump when a chat turn ends.**
+- **No crash message when you quit during a turn.**
+- **Documents from outside a project are served more safely.** Only pictures, styles and fonts load beside them, and the page cannot fetch other files.
+- **More file types are shown in the file manager instead of being run:** `.pyw`, `.rdp`, `.scf`, `.msix`, `.appinstaller` and a few more.
+- **Factory Mode no longer blocks every helper after one crashed.** A helper that started more than 15 minutes ago and never stopped is no longer counted.
+- **The Agents panel no longer closes itself** when you switch threads, and opening a closed chat twice no longer makes two tabs.
+
+---
+
 # Operant 3.4.2
 
 **Install:** download the file for your system from the assets below. Operant keeps itself up to date from these releases.

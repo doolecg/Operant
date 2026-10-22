@@ -258,8 +258,8 @@ export function GeneralSection() {
         </CardHeader>
         <CardContent className="text-muted-foreground space-y-2 text-xs">
           <p>
-            Operant is provided "as is", without warranty of any kind. The authors are not liable for any claim, damages or other liability
-            arising from its use, including anything an AI agent does from a terminal you start in it.
+            Operant is provided "as is", without warranty of any kind. To the extent permitted by law, the authors are not liable for any claim, damages
+            or other liability arising from its use, including anything an AI agent does from a terminal you start in it. Back up your work.
           </p>
           <p>
             Claude Code, OpenCode and the other tools Operant starts or installs are separate software under their own licenses and terms.
@@ -269,7 +269,7 @@ export function GeneralSection() {
             <Button variant="outline" size="sm" onClick={() => void bridge().invoke('app:openLicenses')}>
               Open license files
             </Button>
-            <Button variant="ghost" size="sm" onClick={() => void bridge().invoke('app:openExternal', 'https://github.com/doolecg/operant2/blob/main/LICENSE')}>
+            <Button variant="ghost" size="sm" onClick={() => void bridge().invoke('app:openExternal', 'https://github.com/doolecg/Operant/blob/main/LICENSE')}>
               License on GitHub
             </Button>
           </div>

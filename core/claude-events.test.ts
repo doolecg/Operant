@@ -160,6 +160,13 @@ describe('op-event.mjs Factory cap', () => {
     expect(pre('Bash', started(3)).stdout).toBe('')
   })
 
+  it('does not count helpers that started long ago and never reported a stop', () => {
+    const old = Date.now() - 60 * 60_000
+    const stale = Array.from({ length: 3 }, () => ({ hook_event_name: 'SubagentStart', session_id: SID, ts: old }))
+    expect(pre('Agent', stale).stdout).toBe('')
+    expect(pre('Agent', [...stale, ...started(2)]).stdout).toBe('')
+  })
+
   it('does nothing when Factory Mode is off', () => {
     expect(pre('Agent', started(5), {}).stdout).toBe('')
   })

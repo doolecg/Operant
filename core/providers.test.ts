@@ -42,7 +42,7 @@ afterEach(() => {
   rmSync(dir, { recursive: true, force: true })
 })
 
-const monitor = (o: { fetch?: FetchLike; files?: Record<string, string>; envs?: Array<Record<string, string | undefined>>; db?: string; stats?: () => Promise<unknown>; onAlert?: (a: ProviderAlert) => void }) =>
+const monitor = (o: { fetch?: FetchLike; files?: Record<string, string>; envs?: Array<Record<string, string | undefined>>; db?: string; stats?: () => Promise<unknown>; onAlert?: (a: ProviderAlert) => void; planEnabled?: () => boolean }) =>
   new ProviderMonitor({
     store,
     now: () => now,
@@ -53,6 +53,7 @@ const monitor = (o: { fetch?: FetchLike; files?: Record<string, string>; envs?: 
     openCodeDb: () => o.db ?? join(dir, 'none.db'),
     openCodeStats: o.stats ?? (async () => null),
     onAlert: o.onAlert,
+    planEnabled: o.planEnabled,
   })
 
 describe('Claude plan limits', () => {
@@ -107,6 +108,14 @@ describe('Claude plan limits', () => {
     await m.pollPlan(true)
     expect(n).toBe(4)
     expect(m.status().providers[0]!.state).toBe('ok')
+  })
+
+  it('does not read the login or call Anthropic while plan limits are switched off', async () => {
+    let calls = 0
+    const off = monitor({ fetch: async () => (calls++, reply(200, null)), files: { '/home/.claude/.credentials.json': CREDS }, planEnabled: () => false })
+    await off.pollPlan(true)
+    expect(calls).toBe(0)
+    expect(off.status().providers[0]).toMatchObject({ state: 'off' })
   })
 
   it('degrades quietly: no login, an expired login, an error and a network failure', async () => {

@@ -7,7 +7,7 @@ const RUNNABLE = new Set([
   'msi', 'msp', 'jar', 'scr', 'reg', 'sh', 'bash', 'zsh', 'command', 'app', 'pif', 'cpl', 'hta', 'dll', 'appref-ms',
   'desktop', 'run', 'bin', 'py', 'pl', 'rb', 'apk', 'dmg', 'pkg', 'deb', 'rpm', 'gadget',
   'jnlp', 'chm', 'msc', 'wsc', 'ps1xml', 'psc1', 'settingcontent-ms', 'library-ms', 'search-ms', 'xll', 'docm', 'xlsm',
-  'pptm', 'iso', 'img', 'vhd', 'vhdx', 'application', 'diagcab', 'xbap', 'inf', 'sys', 'ocx', 'theme', 'themepack',
+  'pptm', 'dotm', 'xlam', 'ppam', 'potm', 'sldm', 'pyw', 'pyz', 'rdp', 'scf', 'iqy', 'slk', 'msix', 'msixbundle', 'appx', 'appxbundle', 'appinstaller', 'iso', 'img', 'vhd', 'vhdx', 'application', 'diagcab', 'xbap', 'inf', 'sys', 'ocx', 'theme', 'themepack',
 ])
 
 export function isRunnable(path: string): boolean {

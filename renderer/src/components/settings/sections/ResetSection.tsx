@@ -16,6 +16,7 @@ const LABELS: Record<keyof Settings, string> = {
   dailyBudgetUsd: 'Daily budget',
   fiveHourBudgetUsd: '5-hour budget',
   weeklyBudgetUsd: 'Weekly budget',
+  claudePlanUsage: 'Claude plan limits',
   hindsightUrl: 'Hindsight URL',
   hindsight: 'Hindsight server',
   defaultModels: 'Default models',

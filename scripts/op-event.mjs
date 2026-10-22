@@ -70,14 +70,19 @@ function recall(eventsDir, payload) {
 const FACTORY_CAP = 3
 
 // Subagent Factory Mode: the helpers running in this session, from its events file (SubagentStart minus SubagentStop).
+// A helper that started longer ago than this and never reported a stop (Esc, a crash) no longer counts.
+const HELPER_MAX_AGE_MS = 15 * 60_000
+
 function runningHelpers(file) {
   let n = 0
+  const now = Date.now()
   for (const line of readFileSync(file, 'utf8').split('\n')) {
     if (!line) continue
     try {
-      const name = JSON.parse(line).hook_event_name
-      if (name === 'SubagentStart') n++
-      else if (name === 'SubagentStop') n--
+      const e = JSON.parse(line)
+      if (e.hook_event_name === 'SubagentStart') {
+        if (typeof e.ts !== 'number' || now - e.ts < HELPER_MAX_AGE_MS) n++
+      } else if (e.hook_event_name === 'SubagentStop') n = Math.max(0, n - 1)
     } catch {
       /* a torn line counts for nothing */
     }

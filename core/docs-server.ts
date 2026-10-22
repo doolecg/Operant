@@ -35,6 +35,11 @@ const TYPES: Readonly<Record<string, string>> = {
   '.txt': 'text/plain; charset=utf-8',
 }
 
+// A document outside any project is served with its pictures, styles and fonts only: not the scripts, JSON or text files that sit
+// beside it (a page there could read them), and with a policy that stops its own script from fetching anything.
+const LOOSE_TYPES = new Set(['.html', '.htm', '.md', '.css', '.svg', '.png', '.jpg', '.jpeg', '.gif', '.webp', '.ico', '.woff', '.woff2'])
+const LOOSE_CSP = "default-src 'none'; img-src 'self' data:; style-src 'self' 'unsafe-inline'; font-src 'self'; script-src 'unsafe-inline'"
+
 export const docContentType = (path: string): string | null => TYPES[extname(path).toLowerCase()] ?? null
 
 export type DocRoute = { kind: 'file'; crewId: number; segments: string[] } | { kind: 'memory'; id: string } | { kind: 'loose'; id: string; segments: string[] }
@@ -197,14 +202,15 @@ export class DocsServer {
     }
     const root = route.kind === 'loose' ? (this.loose.get(route.id) ?? null) : this.o.folderOf(route.crewId)
     const found = root ? resolveDocFile(root, route.segments, this.o.maxBytes) : null
-    if (!found) return notFound()
+    if (!found || (route.kind === 'loose' && !LOOSE_TYPES.has(extname(found.file).toLowerCase()))) return notFound()
+    const csp = route.kind === 'loose' ? LOOSE_CSP : undefined
     try {
       const data = readFileSync(found.file)
       if (extname(found.file).toLowerCase() === '.md') {
         const name = route.segments[route.segments.length - 1]!
         this.send(res, 200, 'text/html; charset=utf-8', renderMarkdownPage(name, data.toString('utf8')), head, MARKDOWN_CSP)
       } else {
-        this.send(res, 200, docContentType(found.file)!, data, head)
+        this.send(res, 200, docContentType(found.file)!, data, head, csp)
       }
     } catch {
       notFound()

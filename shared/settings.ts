@@ -69,6 +69,8 @@ export interface Settings {
   aux: AuxSettings
   // The currency money is shown in; amounts are stored in USD and shown as USD x rate (the rate is typed by the user).
   currency: CurrencySetting
+  // Read the 5-hour and weekly Claude plan limits from Anthropic with the login Claude Code keeps. Off until the owner turns it on: it sends that login's token to Anthropic.
+  claudePlanUsage: boolean
   // Daily spend budget in USD across all crews; 0 turns the budget off.
   dailyBudgetUsd: number
   // The same across the last 5 hours and the last 7 days; 0 turns each off.
@@ -175,6 +177,7 @@ export const DEFAULT_SETTINGS: Settings = {
   auxModels: DEFAULT_AUX_MODELS,
   aux: DEFAULT_AUX_SETTINGS,
   currency: DEFAULT_CURRENCY,
+  claudePlanUsage: false,
   dailyBudgetUsd: 0,
   fiveHourBudgetUsd: 0,
   weeklyBudgetUsd: 0,
@@ -351,6 +354,7 @@ export function sanitizeSettings(raw: unknown): Settings {
     auxModels: sanitizeAuxModels(r.auxModels),
     aux: sanitizeAux(r.aux),
     currency: sanitizeCurrency(r.currency),
+    claudePlanUsage: flag(r.claudePlanUsage, d.claudePlanUsage),
     dailyBudgetUsd: num(r.dailyBudgetUsd, d.dailyBudgetUsd, 0, 100_000),
     fiveHourBudgetUsd: num(r.fiveHourBudgetUsd, d.fiveHourBudgetUsd, 0, 100_000),
     weeklyBudgetUsd: num(r.weeklyBudgetUsd, d.weeklyBudgetUsd, 0, 100_000),

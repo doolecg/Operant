@@ -102,6 +102,7 @@ export function watchTasks(folder: string, onChange: () => void): () => void {
       watcher.on('error', () => {})
     } catch {
       watcher = null
+      level = -1
     }
   }
   function fire() {

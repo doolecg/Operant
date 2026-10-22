@@ -1163,9 +1163,10 @@ export class Store {
   // Scratch terminals
 
   createScratch(input: ScratchInput): ScratchTerminal {
+    const now = this.now()
     const row = this.db
       .prepare('INSERT INTO scratch (crew_id, title, agent, model, effort, preset_id, cwd, view, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING *')
-      .get(input.crewId, input.title, input.agent, input.model ?? '', input.effort ?? '', input.presetId ?? null, input.cwd, input.view ?? 'terminal', this.now(), this.now()) as Row
+      .get(input.crewId, input.title, input.agent, input.model ?? '', input.effort ?? '', input.presetId ?? null, input.cwd, input.view ?? 'terminal', now, now) as Row
     return toScratch(row)
   }
 

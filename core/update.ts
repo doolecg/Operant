@@ -4,7 +4,7 @@
 import { createHash } from 'node:crypto'
 import { createReadStream, lstatSync } from 'node:fs'
 
-export const UPDATE_REPO = 'doolecg/operant2'
+export const UPDATE_REPO = 'doolecg/Operant'
 export const APP_BUNDLE = 'Operant 3.app'
 // Copies installed before the rename keep the old bundle and folder names until an update replaces them.
 export const APP_BUNDLES = [APP_BUNDLE, 'Operant 2.app']

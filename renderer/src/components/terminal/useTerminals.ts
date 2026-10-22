@@ -81,8 +81,9 @@ export function useTerminals(crews: Crew[] | undefined, defaultModel: string, ma
   const closeTab = useCallback((scratchId: number) => {
     const b = bridge()
     const tab = tabs.find((x) => x.scratchId === scratchId)
+    if (!tab) return
     void (async () => {
-      const row = tab?.kind === 'claude' ? (await b.invoke('scratch:list', tab.crewId)).find((r) => r.id === scratchId) : undefined
+      const row = tab.kind === 'claude' ? (await b.invoke('scratch:list', tab.crewId)).find((r) => r.id === scratchId) : undefined
       if (row && row.updatedAt > row.createdAt) await b.invoke('scratch:stop', scratchId)
       else await b.invoke('scratch:delete', scratchId)
     })().catch(() => {})
@@ -101,7 +102,7 @@ export function useTerminals(crews: Crew[] | undefined, defaultModel: string, ma
       if (row.agent !== 'claude' && row.agent !== 'opencode') return
       try {
         await bridge().invoke('scratch:start', row.id, true)
-        setTabs((t) => [...t, { scratchId: row.id, crewId: row.crewId, title: row.title, kind: row.agent as MainCli, exited: false }])
+        setTabs((t) => (t.some((x) => x.scratchId === row.id) ? t : [...t, { scratchId: row.id, crewId: row.crewId, title: row.title, kind: row.agent as MainCli, exited: false }]))
         setActive(row.id)
         setOpen(true)
       } catch (e) {

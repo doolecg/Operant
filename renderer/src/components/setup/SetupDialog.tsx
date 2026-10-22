@@ -109,8 +109,8 @@ export function SetupDialog() {
             </p>
           )}
           <p>
-            These tools have their own licenses and terms. Operant is provided as is under the MIT License, without warranty; see Settings, General,
-            License.
+            These tools have their own licenses and terms. Operant is provided as is under the MIT License, without warranty and, to the extent permitted by law, without liability for loss
+            or damage. Back up your work. See Settings, General, License.
           </p>
         </div>
         <DialogFooter>

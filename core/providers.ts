@@ -244,6 +244,8 @@ export interface ProviderMonitorDeps {
   // The text of a file, or null when it cannot be read.
   readFile?: (path: string) => string | null
   claudeDir?: () => string
+  // Whether the Claude plan limits may be read at all (they send the Claude Code login token to Anthropic). Absent: yes.
+  planEnabled?: () => boolean
   // Environments a seat runs with: where a z.ai base URL and key would be.
   seatEnvs?: () => Array<Record<string, string | undefined>>
   openCodeDb?: () => string
@@ -338,6 +340,10 @@ export class ProviderMonitor {
     const now = this.now()
     const cur = this.claude
     if (cur.fetchedAt != null && !force && now - cur.fetchedAt < PLAN_POLL_MS - 5000) return
+    if (this.d.planEnabled && !this.d.planEnabled()) {
+      this.claude = { ...this.claude, state: 'off', windows: [], note: 'Plan limits are off. Turn them on in Settings, Tokens and budgets.', fetchedAt: null }
+      return
+    }
     if (now < this.planBackoffUntil) return
     const set = (p: Partial<ProviderStatus>) => {
       this.claude = { ...this.claude, ...p, fetchedAt: this.now(), nextPollAt: Math.max(this.now() + PLAN_POLL_MS, this.planBackoffUntil) }

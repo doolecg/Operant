@@ -1,7 +1,7 @@
 {
   "name": "operant2",
   "productName": "Operant 3",
-  "version": "3.4.2",
+  "version": "3.5.0",
   "description": "Run coding agents across your projects from one dashboard.",
   "license": "MIT",
   "private": true,
@@ -11,9 +11,9 @@
   },
   "repository": {
     "type": "git",
-    "url": "https://github.com/doolecg/operant2.git"
+    "url": "https://github.com/doolecg/Operant.git"
   },
-  "homepage": "https://github.com/doolecg/operant2",
+  "homepage": "https://github.com/doolecg/Operant",
   "type": "module",
   "main": "out/main/index.cjs",
   "scripts": {
