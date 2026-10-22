@@ -165,14 +165,9 @@ try {
   await page.keyboard.press('Escape')
   await page.screenshot({ path: join(outDir, 'sidebar-footer.png'), clip: { x: 0, y: 600, width: 260, height: 100 } })
 
-  // At the narrowest tier the terminal CLI pick is a menu in the top bar; the usage and branch chips stay in the sidebar footer.
+  // At the narrowest tier the usage and branch chips stay in the sidebar footer.
   await page.evaluate(() => window.operant.invoke('settings:set', { uiScale: 2 }))
   await page.waitForTimeout(800)
-  await page.getByRole('button', { name: 'Terminal CLI' }).click({ timeout: 10_000 }).catch(async (e) => {
-    const probe = await page.evaluate(() => ({ inner: window.innerWidth, bar: document.querySelector('header')?.getBoundingClientRect().width }))
-    throw new Error(`${e.message.split('\n')[0]} at ${JSON.stringify(probe)}; window ${JSON.stringify(await win((w) => w.getContentSize()))}`)
-  })
-  await page.keyboard.press('Escape')
   await foot.getByRole('button', { name: /^Git: / }).waitFor()
   await foot.getByRole('button', { name: /^Provider limits: / }).click()
   await page.getByRole('dialog', { name: 'Usage' }).waitFor()

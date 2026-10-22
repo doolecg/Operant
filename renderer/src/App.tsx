@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { Bot, PanelLeft, Plus, Settings, Terminal } from 'lucide-react'
+import { PanelLeft, Plus, Settings, Terminal } from 'lucide-react'
 import { ConsoleDrawer } from '@/components/console/ConsoleDrawer'
 import { useConsole } from '@/components/console/useConsole'
 import { DeleteCrewDialog, EditCrewDialog, NewCrewDialog } from '@/components/dashboard/Dialogs'
@@ -19,7 +19,6 @@ import { ServersPopover } from '@/components/dashboard/ServersPopover'
 import { ProviderLimitBadge } from '@/components/cost/ProviderBadge'
 import { SettingsPage } from '@/components/settings/SettingsPage'
 import { Button } from '@/components/ui/button'
-import { DropdownMenu, DropdownMenuContent, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
 import { iconBtn } from '@/components/topbar/pill'
 import { ClockPill } from '@/components/topbar/ClockPill'
@@ -27,7 +26,6 @@ import { OPEN_CHANGES_EVENT } from '@/components/chat/ChangedFilesCard'
 import { GitChip } from '@/components/topbar/GitChip'
 import { MediaBar } from '@/components/topbar/MediaBar'
 import { ModeToggles } from '@/components/topbar/ModeToggles'
-import { CliSelect } from '@/components/topbar/CliSelect'
 import { TopNav, type View } from '@/components/topbar/TopNav'
 import { ActivityMenu } from '@/components/topbar/ActivityMenu'
 import { UsageDialog } from '@/components/cost/UsageDialog'
@@ -74,7 +72,6 @@ export function App() {
   const [changesTarget, setChangesTarget] = useState<Crew | null>(null)
   const moveToGroup = useMoveToGroup()
   const [barRef, tier] = useBarTier()
-  const [cliOpen, setCliOpen] = useState(false)
   const searchRef = useRef<HTMLInputElement>(null)
   const [usageOpen, setUsageOpen] = useState(false)
   const [gitOpen, setGitOpen] = useState(false)
@@ -147,27 +144,6 @@ export function App() {
     [],
   )
   const tb = settings.data?.topBar
-
-  // Once the bar is narrow, the terminal CLI pick moves into a menu next to the view switcher.
-  const cliMenu = (
-    <DropdownMenu open={cliOpen} onOpenChange={setCliOpen}>
-      <Tooltip>
-        <TooltipTrigger asChild>
-          <DropdownMenuTrigger asChild>
-            <button type="button" className={iconBtn} aria-label="Terminal CLI">
-              <Bot />
-            </button>
-          </DropdownMenuTrigger>
-        </TooltipTrigger>
-        <TooltipContent>Terminal CLI</TooltipContent>
-      </Tooltip>
-      <DropdownMenuContent align="start" aria-label="Terminal CLI" className="w-auto p-2">
-        <div className="flex flex-col items-start gap-1.5" onClick={() => setCliOpen(false)}>
-          <CliSelect />
-        </div>
-      </DropdownMenuContent>
-    </DropdownMenu>
-  )
 
   const openSettingsAt = (section?: string) => (setSettingsSection(section), setPage('settings'))
   const projectMenu = {
@@ -260,8 +236,6 @@ export function App() {
             </span>
             {tier < 3 && <span className="text-[14px] font-semibold whitespace-nowrap">Operant 3</span>}
           </div>
-          {tier < 7 && <CliSelect />}
-          {tier >= 7 && cliMenu}
         </div>
         <TopNav views={['thread', 'board', 'plans', 'tiles']} view={page === 'dashboard' ? view : null} onChange={(v) => (setView(v), setPage('dashboard'))} />
         <div className="flex items-center justify-end gap-2">

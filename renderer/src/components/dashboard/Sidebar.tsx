@@ -628,7 +628,7 @@ export function Sidebar({ crews: allCrews, selected, onSelect, onNewCrew, action
             className="text-foreground placeholder:text-muted-foreground min-w-0 flex-1 bg-transparent outline-none"
           />
         </label>
-        <button type="button" onClick={onNewThread} className="text-foreground hover:bg-foreground/5 flex h-9 w-full items-center gap-2 rounded-xl px-3 text-[13.5px] font-medium">
+        <button type="button" onClick={onNewThread} disabled={!!agentBlocked} title={agentBlocked ?? `New ${CLI_SHORT[mainCli]} thread`} className="text-foreground hover:bg-foreground/5 flex h-9 w-full items-center gap-2 rounded-xl px-3 text-[13.5px] font-medium disabled:opacity-50">
           <Plus className="text-primary size-4" aria-hidden /> New thread
         </button>
       </div>
