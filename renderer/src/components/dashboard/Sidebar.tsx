@@ -388,9 +388,8 @@ export function Sidebar({ crews: allCrews, selected, onSelect, onNewCrew, action
               className="flex h-full min-w-0 flex-1 items-center gap-[5px] text-left outline-none"
             >
               <span className={cn('max-w-[60%] shrink-0 truncate font-semibold', isSelected && 'text-primary')}>{crew.name}</span>
-              <RowGit crewId={crew.id} />
+              {isSelected && <RowGit crewId={crew.id} />}
               <span className="flex-1" />
-              <span className="text-muted-foreground/70 shrink-0 font-mono text-[9px] group-hover:hidden group-focus-within:hidden">PRJ#{crew.prjNumber}</span>
             </button>
             <div data-no-nav className={cn('shrink-0 items-center', hoverOnly)}>
               {codegraph && (

@@ -91,7 +91,7 @@ describe('themes: catalogue', () => {
   it('has Dark, Light and all twelve 2.8.2 themes with unique ids', () => {
     const ids = BUILTIN_THEMES.map((t) => t.id)
     expect(new Set(ids).size).toBe(ids.length)
-    expect(ids).toEqual(['dark', 'light', 'obsidian', 'void', 'graphite', 'midnight', 'nord', 'dracula', 'tokyonight', 'catppuccin', 'gruvbox', 'rosepine', 'paper', 'daylight'])
+    expect(ids).toEqual(['dark', 'focus', 'light', 'obsidian', 'void', 'graphite', 'midnight', 'nord', 'dracula', 'tokyonight', 'catppuccin', 'gruvbox', 'rosepine', 'paper', 'daylight'])
     expect(BUILTIN_THEMES.find((t) => t.id === 'nord')).toMatchObject({ name: 'Nord', bg: '#2e3440', accent: '#88c0d0', card: '#383e4d' })
     expect(BUILTIN_THEMES.filter((t) => t.scheme === 'light').map((t) => t.id)).toEqual(['light', 'paper', 'daylight'])
   })
@@ -149,9 +149,9 @@ describe('themes: Claude neutrals', () => {
 
 describe('themes: sanitising', () => {
   it('fills defaults and drops anything malformed', () => {
-    expect(sanitizeAppearance(undefined)).toEqual({ theme: 'dark', accent: '', terminalFollowsTheme: true, noise: 25, customThemes: [] })
+    expect(sanitizeAppearance(undefined)).toEqual({ theme: 'focus', accent: '', terminalFollowsTheme: true, noise: 25, customThemes: [] })
     const a = sanitizeAppearance({ theme: 'nope', accent: 'red', terminalFollowsTheme: 'x', customThemes: 'x' })
-    expect(a).toEqual({ theme: 'dark', accent: '', terminalFollowsTheme: true, noise: 25, customThemes: [] })
+    expect(a).toEqual({ theme: 'focus', accent: '', terminalFollowsTheme: true, noise: 25, customThemes: [] })
     expect(sanitizeAppearance({ theme: 'system', accent: '#ABC' })).toMatchObject({ theme: 'system', accent: '#aabbcc' })
     expect(sanitizeAppearance({ theme: 'nord', accent: 'D97757' }).accent).toBe('#d97757')
     expect(sanitizeAppearance({ noise: 400 }).noise).toBe(100)
@@ -165,9 +165,9 @@ describe('themes: sanitising', () => {
     expect(a.theme).toBe('custom-a')
     expect(a.customThemes).toEqual([
       { id: 'custom-a', name: 'Mine', base: 'nord', colors: { bg: '#101010', accent: '#ffffff' } },
-      { id: 'custom-b', name: 'Custom theme', base: 'dark', colors: {} },
+      { id: 'custom-b', name: 'Custom theme', base: 'focus', colors: {} },
     ])
-    expect(sanitizeAppearance({ theme: 'custom-a', customThemes: [] }).theme).toBe('dark')
+    expect(sanitizeAppearance({ theme: 'custom-a', customThemes: [] }).theme).toBe('focus')
   })
 
   it('is part of the settings and merges live', () => {
@@ -208,7 +208,7 @@ describe('themes: custom theme CRUD', () => {
 
     list = deleteCustomTheme(list, 'custom-1')
     expect(list.map((t) => t.id)).toEqual(['custom-2'])
-    expect(sanitizeAppearance({ theme: 'custom-1', customThemes: list }).theme).toBe('dark')
+    expect(sanitizeAppearance({ theme: 'custom-1', customThemes: list }).theme).toBe('focus')
   })
 
   it('does not reuse an id after a delete and caps the list', () => {

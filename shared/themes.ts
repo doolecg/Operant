@@ -75,6 +75,17 @@ export const BUILTIN_THEMES: ThemeDef[] = [
       ...ANSI, blue: '#7aa6e3', cyan: '#5fb3a8', magenta: '#a98bd6', green: '#8fbf7f', yellow: '#e6c15a', red: '#e0704f', brightMagenta: '#d987b0',
     },
   },
+  // The Focus Quiet look: a warm brown ground, one tone step for cards and popovers, coral only for work and the main action.
+  {
+    id: 'focus', name: 'Focus', note: 'Warm and quiet', scheme: 'dark',
+    bg: '#251b17', glow: '#2c1f19', card: '#2c221e', surface: '#3b302b', text: '#f2ede9', dim: '#a79e99',
+    accent: '#d97757', onAccent: '#2a1610', agent: '#f0c27a', done: '#4ade80', danger: '#f87171', warn: '#f0a24a',
+    info: '#7aa6e3', working: '#d97757', termBlack: '#1c1410',
+    border: '#342a25', muted: '#2c221e', input: '#43362f', sidebar: '#211814', hover: '#3a2f2b',
+    ansi: {
+      ...ANSI, blue: '#7aa6e3', cyan: '#5fb3a8', magenta: '#a98bd6', green: '#8fbf7f', yellow: '#e6c15a', red: '#e0704f', brightMagenta: '#d987b0',
+    },
+  },
   {
     id: 'light', name: 'Light', note: 'Clean white', scheme: 'light',
     bg: '#faf9f7', glow: '#f0ede7', card: '#ffffff', surface: '#ffffff', text: '#1a1a1a', dim: '#6b6862',
@@ -215,7 +226,7 @@ export const ACCENT_PRESETS: Array<[string, string]> = [
 ]
 
 export const SYSTEM_THEME = 'system'
-export const DEFAULT_THEME = 'dark'
+export const DEFAULT_THEME = 'focus'
 
 // ---------------------------------------------------------------- colour maths
 
