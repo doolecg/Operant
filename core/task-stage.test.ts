@@ -121,6 +121,8 @@ describe('watchTasks', () => {
     const calls = { n: 0 }
     const stop = watchTasks(folder, () => calls.n++)
     try {
+      // macOS starts its file-event stream a moment after watch() returns and misses a change made before then.
+      await new Promise((r) => setTimeout(r, 500))
       task('a', { 'spec.html': 's' })
       await nextCall(calls, 0)
     } finally {
