@@ -519,6 +519,8 @@ export interface IpcEvents {
   'chat:ops': ChatEvents['chat:ops']
   // switching: the process ended for a Chat/Terminal view switch; the tile starts again at once.
   'scratch:exit': { scratchId: number; exitCode: number; switching?: boolean }
+  // A tile's title or last-active time changed.
+  'scratch:changed': { crewId: number; scratchId: number }
   'index:status': { crewId: number; status: IndexStatus }
   // A project's notes changed.
   'notes:changed': { crewId: number }

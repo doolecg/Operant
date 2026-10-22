@@ -72,6 +72,8 @@ export interface ScratchTerminal {
   sessionId: string | null
   view: ScratchView
   createdAt: number
+  // Epoch ms of the last activity: a message sent or a turn ended (createdAt until then).
+  updatedAt: number
 }
 
 export interface Usage {

@@ -283,6 +283,15 @@ function cleanName(v: unknown, what: string): string {
   return t
 }
 
+const THREAD_TITLE_MAX = 60
+
+// The first non-empty line of a message, cut to THREAD_TITLE_MAX; null when there is no text.
+function threadTitle(text: string): string | null {
+  const line = text.split(/\r?\n/).map((l) => l.trim()).find((l) => l) ?? ''
+  if (!line) return null
+  return line.length > THREAD_TITLE_MAX ? `${line.slice(0, THREAD_TITLE_MAX - 1).trimEnd()}…` : line
+}
+
 // Everything the dashboard can ask for or be told about, independent of Electron.
 export class Operant extends EventEmitter<PushEvents> {
   readonly handlers: Handlers
@@ -909,6 +918,7 @@ export class Operant extends EventEmitter<PushEvents> {
           cwd: input.cwd === undefined ? crew.folder : cwd(input.cwd),
         })
         this.log('scratch', `Tile ${scratch.title} created`, crew.id)
+        this.emit('scratch:changed', { crewId: crew.id, scratchId: scratch.id })
         return scratch
       },
       'scratch:update': (scratchId, patch: ScratchPatch) => {
@@ -923,6 +933,7 @@ export class Operant extends EventEmitter<PushEvents> {
           ...(patch.cwd !== undefined ? { cwd: cwd(patch.cwd) } : {}),
         })
         this.log('scratch', `Tile ${scratch.title} updated`, scratch.crewId)
+        if (patch.title !== undefined) this.emit('scratch:changed', { crewId: scratch.crewId, scratchId })
         return scratch
       },
       'scratch:delete': (scratchId) => {
@@ -932,6 +943,7 @@ export class Operant extends EventEmitter<PushEvents> {
         this.detachScratch(scratchId)
         store.deleteScratch(scratchId)
         this.log('scratch', `Tile ${scratch.title} deleted`, scratch.crewId)
+        this.emit('scratch:changed', { crewId: scratch.crewId, scratchId })
       },
       'scratch:start': (scratchId, resume) => {
         this.requireScratch(scratchId)
@@ -1473,6 +1485,18 @@ export class Operant extends EventEmitter<PushEvents> {
     this.learnIdle()
   }
 
+  // Activity on a tile moves its updatedAt. A message also names a tile that still has its default title ("Claude: <project>",
+  // "<Role>: <project>"); a title the owner set stays.
+  private touchScratch(scratchId: number, message?: string): void {
+    const cur = this.store.getScratch(scratchId)
+    if (!cur) return
+    const crewName = this.store.getCrew(cur.crewId)?.name
+    const isDefault = /^(Claude|OpenCode):/.test(cur.title) || (crewName !== undefined && cur.title.endsWith(`: ${crewName}`))
+    const title = message !== undefined && isDefault ? threadTitle(message) : null
+    this.store.updateScratch(scratchId, { updatedAt: this.now(), ...(title ? { title } : {}) })
+    this.emit('scratch:changed', { crewId: cur.crewId, scratchId })
+  }
+
   // The finished flag: a turn going from working to idle sets it, the next turn starting clears it.
   private noteTurn(phases: Map<number, string>, scratchId: number, phase: string): void {
     const prev = phases.get(scratchId)
@@ -1480,6 +1504,7 @@ export class Operant extends EventEmitter<PushEvents> {
     if (prev === 'working' && phase === 'idle' && this.store.isOpen) {
       const crewId = this.store.getScratch(scratchId)?.crewId
       if (crewId !== undefined) this.emit('turn:finished', { crewId })
+      this.touchScratch(scratchId)
     }
     const feed = this.scratchFeeds.get(scratchId)
     if (!feed) return
@@ -2083,6 +2108,7 @@ export class Operant extends EventEmitter<PushEvents> {
       'chat:send': (scratchId, input) => {
         if (!input || typeof input.text !== 'string') throw bad('A message needs text')
         live(scratchId).send(input)
+        this.touchScratch(scratchId, input.text)
       },
       'chat:interrupt': (scratchId) => live(scratchId).interrupt(),
       'chat:stopAgent': (scratchId, toolUseId) => {

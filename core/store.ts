@@ -486,6 +486,9 @@ export const MIGRATIONS: string[] = [
   // Engineering Mode and Subagent Factory Mode, per project, off for existing projects.
   `ALTER TABLE crews ADD COLUMN engineering INTEGER NOT NULL DEFAULT 0;
    ALTER TABLE crews ADD COLUMN factory INTEGER NOT NULL DEFAULT 0;`,
+  // Tiles keep when they were last active (a message sent, a turn ended), so closed chats can be listed as history.
+  `ALTER TABLE scratch ADD COLUMN updated_at INTEGER NOT NULL DEFAULT 0;
+   UPDATE scratch SET updated_at = created_at;`,
 ]
 
 export const PLAYGROUND_KEPT = 'The Playground cannot be deleted; you can rename it or change its folder'
@@ -549,6 +552,7 @@ const toScratch = (r: Row): ScratchTerminal => ({
   sessionId: r.session_id == null ? null : String(r.session_id),
   view: r.view === 'chat' ? 'chat' : 'terminal',
   createdAt: Number(r.created_at),
+  updatedAt: Number(r.updated_at),
 })
 
 
@@ -708,6 +712,7 @@ const SCRATCH_COLUMNS: Record<string, string> = {
   cwd: 'cwd',
   sessionId: 'session_id',
   view: 'view',
+  updatedAt: 'updated_at',
 }
 
 
@@ -722,7 +727,7 @@ export interface ScratchInput {
   cwd: string
 }
 
-export type ScratchPatch = Partial<Omit<ScratchInput, 'crewId'>> & { sessionId?: string | null }
+export type ScratchPatch = Partial<Omit<ScratchInput, 'crewId'>> & { sessionId?: string | null; updatedAt?: number }
 
 // One assistant message's usage. `cacheTokens` is the pre-split total, kept for callers that
 // cannot tell the kinds apart: it is recorded as cache reads when no kind is given.
@@ -1159,8 +1164,8 @@ export class Store {
 
   createScratch(input: ScratchInput): ScratchTerminal {
     const row = this.db
-      .prepare('INSERT INTO scratch (crew_id, title, agent, model, effort, preset_id, cwd, view, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING *')
-      .get(input.crewId, input.title, input.agent, input.model ?? '', input.effort ?? '', input.presetId ?? null, input.cwd, input.view ?? 'terminal', this.now()) as Row
+      .prepare('INSERT INTO scratch (crew_id, title, agent, model, effort, preset_id, cwd, view, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING *')
+      .get(input.crewId, input.title, input.agent, input.model ?? '', input.effort ?? '', input.presetId ?? null, input.cwd, input.view ?? 'terminal', this.now(), this.now()) as Row
     return toScratch(row)
   }
 

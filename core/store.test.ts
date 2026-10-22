@@ -21,6 +21,7 @@ describe('store', () => {
       old.db.exec('ALTER TABLE lessons DROP COLUMN related; ALTER TABLE lessons DROP COLUMN consolidated_into')
       for (const c of ['session_id', 'turns', 'tokens', 'usd', 'tokens_estimated']) old.db.exec(`ALTER TABLE learn_runs DROP COLUMN ${c}`)
       for (const c of ['engineering', 'factory']) old.db.exec(`ALTER TABLE crews DROP COLUMN ${c}`)
+      old.db.exec('ALTER TABLE scratch DROP COLUMN updated_at')
       old.db.exec(`PRAGMA user_version = ${MIGRATIONS.indexOf(LESSON_LINKS_MIGRATION)}`)
       old.db
         .prepare("INSERT INTO lessons (crew_id, text, kind, scope, created_at, updated_at) VALUES (?, 'keep it small', 'convention', 'project', 1, 1)")
@@ -38,6 +39,29 @@ describe('store', () => {
         expect(db.lastLearnRun(crew.id)).toMatchObject({ id: run.id, tokens: 1200, usd: 0.002, tokensEstimated: false })
         expect(db.learnedTurns('s1')).toBe(12)
         expect(db.learnedTurns('other')).toBe(0)
+      } finally {
+        s.close()
+      }
+    } finally {
+      rmSync(dir, { recursive: true, force: true })
+    }
+  })
+
+  it('gives tiles from before updated_at their creation time as the last activity, and lets updateScratch move it', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'operant-scratch-'))
+    const file = join(dir, 'a.db')
+    try {
+      const old = new Store(file, () => 1234)
+      const crew = old.createCrew('alpha', '/code/alpha')
+      const tile = old.createScratch({ crewId: crew.id, title: 'Claude: alpha', agent: 'claude', cwd: '/code/alpha' })
+      expect(tile).toMatchObject({ createdAt: 1234, updatedAt: 1234 })
+      old.db.exec('ALTER TABLE scratch DROP COLUMN updated_at')
+      old.db.exec(`PRAGMA user_version = ${MIGRATIONS.length - 1}`)
+      old.close()
+      const s = new Store(file, () => 9999)
+      try {
+        expect(s.getScratch(tile.id)).toMatchObject({ createdAt: 1234, updatedAt: 1234 })
+        expect(s.updateScratch(tile.id, { updatedAt: 5000 })).toMatchObject({ createdAt: 1234, updatedAt: 5000 })
       } finally {
         s.close()
       }

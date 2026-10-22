@@ -26,6 +26,7 @@ const tile = (over: Partial<ScratchTerminal> = {}): ScratchTerminal => ({
   sessionId: null,
   view: 'chat',
   createdAt: 0,
+  updatedAt: 0,
   ...over,
 })
 

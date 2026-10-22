@@ -357,6 +357,87 @@ describe('Operant: Chat view tiles', () => {
     expect(children[1]!.spawn.args).toContain('--session-id')
   })
 
+  describe('thread history', () => {
+    const MIN = 60_000
+    let changed: Array<{ crewId: number; scratchId: number }>
+    const titled = (title: string) => {
+      const crew = store.listCrews().find((c) => c.name === 'shop') ?? store.createCrew('shop', '/code/shop')
+      const t = op.handlers['scratch:create']({ crewId: crew.id, title, agent: 'claude', model: 'claude-sonnet-5-5' }) as { id: number; crewId: number }
+      op.startScratch(t.id)
+      changed.length = 0
+      return t
+    }
+    beforeEach(() => {
+      vi.useFakeTimers({ toFake: ['Date'] })
+      changed = []
+      op.on('scratch:changed', (e) => void changed.push(e))
+    })
+    afterEach(() => vi.useRealTimers())
+
+    it('names a tile with its default title from the first line of the first message, cut to 60 characters, and announces it', () => {
+      const t = titled('Claude: shop')
+      op.handlers['chat:send'](t.id, { text: `\n  Fix the login bug  \nand then the logout one` })
+      expect(store.getScratch(t.id)!.title).toBe('Fix the login bug')
+      expect(changed).toEqual([{ crewId: t.crewId, scratchId: t.id }])
+      op.handlers['chat:send'](t.id, { text: 'second message' })
+      expect(store.getScratch(t.id)!.title).toBe('Fix the login bug')
+
+      const long = titled('Reviewer: shop')
+      op.handlers['chat:send'](long.id, { text: 'x'.repeat(100) })
+      const title = store.getScratch(long.id)!.title
+      expect(title).toBe(`${'x'.repeat(59)}…`)
+      expect(title).toHaveLength(60)
+    })
+
+    it('announces a tile that is created and one that is deleted', () => {
+      const crew = store.listCrews().find((c) => c.name === 'shop') ?? store.createCrew('shop', '/code/shop')
+      const t = op.handlers['scratch:create']({ crewId: crew.id, title: 'Claude: shop', agent: 'claude', model: 'claude-sonnet-5-5' }) as { id: number; crewId: number }
+      op.handlers['scratch:delete'](t.id)
+      expect(changed).toEqual([
+        { crewId: t.crewId, scratchId: t.id },
+        { crewId: t.crewId, scratchId: t.id },
+      ])
+    })
+
+    it('never overwrites a title the owner set', () => {
+      const t = titled('Claude: shop')
+      op.handlers['scratch:update'](t.id, { title: 'Payments rewrite' })
+      op.handlers['chat:send'](t.id, { text: 'hello there' })
+      expect(store.getScratch(t.id)!.title).toBe('Payments rewrite')
+    })
+
+    it('moves updatedAt when a message is sent and when a turn ends', () => {
+      const t = titled('Payments rewrite')
+      const born = store.getScratch(t.id)!.updatedAt
+      const sessionId = store.getScratch(t.id)!.sessionId
+      lastChild().child.out({ type: 'system', subtype: 'init', session_id: sessionId, model: 'claude-opus-5-5', permissionMode: 'default' })
+      vi.advanceTimersByTime(MIN)
+      op.handlers['chat:send'](t.id, { text: 'go' })
+      op.chat.flush()
+      const sent = store.getScratch(t.id)!.updatedAt
+      // The store's clock is not the faked one, so compare with a margin instead of to the millisecond.
+      expect(sent - born).toBeGreaterThan(MIN - 1000)
+      vi.advanceTimersByTime(MIN)
+      lastChild().child.out({ type: 'result', subtype: 'success', is_error: false, num_turns: 1, duration_ms: 5, total_cost_usd: 0.01 })
+      op.chat.flush()
+      expect(store.getScratch(t.id)!.updatedAt - sent).toBe(MIN)
+      expect(changed).toHaveLength(2)
+    })
+
+    it('keeps the row and its session when the owner stops the chat, and resumes it', async () => {
+      const t = titled('Claude: shop')
+      const sessionId = store.getScratch(t.id)!.sessionId
+      op.handlers['chat:send'](t.id, { text: 'remember me' })
+      op.handlers['scratch:stop'](t.id)
+      await op.chat.stop(t.id)
+      expect(op.scratchStatus(t.id).running).toBe(false)
+      expect(store.getScratch(t.id)).toMatchObject({ title: 'remember me', sessionId })
+      expect(op.handlers['scratch:start'](t.id, true)).toMatchObject({ running: true, sessionId })
+      expect(children[1]!.spawn.args).toContain(sessionId)
+      expect(store.listScratch(t.crewId).map((s) => s.id)).toContain(t.id)
+    })
+  })
+
   describe('idle learn', () => {
     const MIN = 60_000
     const say = (t: { id: number }, line: unknown) => appendFileSync(join(bin, `${store.getScratch(t.id)!.sessionId}.jsonl`), `${JSON.stringify(line)}\n`)

@@ -201,6 +201,7 @@ export function registerIpc(
   forward('event')
   forward('scratch:data')
   forward('scratch:exit')
+  forward('scratch:changed')
   forward('servers:changed')
   forward('turn:finished')
   forward('usage:changed')
