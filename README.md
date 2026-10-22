@@ -34,9 +34,11 @@ Coding agents are strong, but they live in a terminal window with no memory of l
 
 ## Quick start
 
-1. **Download the installer** for your system from [Releases](https://github.com/doolecg/Operant/releases): `.msi` for Windows, `.dmg` for macOS (Apple silicon or Intel), `.AppImage` or `.deb` for Linux. Operant then updates itself.
-2. **Have an agent CLI** on your `PATH`: [Claude Code](https://code.claude.com) (`claude`) or OpenCode (`opencode`).
-3. **Add a project folder, press New thread.** That is it.
+Download the installer for your system from [Releases](https://github.com/doolecg/Operant/releases): `.msi` for Windows, `.dmg` for macOS (Apple silicon or Intel), `.AppImage` or `.deb` for Linux. Operant then updates itself.
+
+You need [Claude Code](https://code.claude.com) (`claude`) or OpenCode (`opencode`) on your `PATH`.
+
+Read [What Operant runs on your machine](#what-operant-runs-on-your-machine) before the first start, then add a project folder and press New thread.
 
 ## Why Operant
 
