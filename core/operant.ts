@@ -28,6 +28,7 @@ import type {
 } from '../shared/types'
 import type { IndexStatus, CrewIndexes } from './codegraph'
 import { ProjectGroups } from './groups'
+import { ProjectActions } from './actions'
 import { BUDGETS_KEY, BudgetMonitor, mergeBudgets, sanitizeBudgets, WINDOW_LABEL, type BudgetDecision } from './usage-budgets'
 import { HindsightService, bankFor, setSharedBanks } from './hindsight'
 import { generateApiKey, listAdapters } from './hindsight-net'
@@ -309,6 +310,7 @@ export class Operant extends EventEmitter<PushEvents> {
   private readonly sessions: SessionManager
   private readonly indexes: CrewIndexes
   private readonly groups: ProjectGroups
+  private readonly actions: ProjectActions
   private readonly pluginDir: string
   private readonly now: () => number
   private readonly transcriptFile: (cwd: string, sessionId: string) => string
@@ -363,6 +365,7 @@ export class Operant extends EventEmitter<PushEvents> {
     this.sessions = sessions
     this.indexes = indexes
     this.groups = new ProjectGroups(store.db)
+    this.actions = new ProjectActions(store.db)
     this.pluginDir = opts.pluginDir
     this.now = opts.now ?? Date.now
     this.transcriptFile = opts.transcriptFile ?? ((cwd, id) => transcriptPath(cwd, id))
@@ -515,6 +518,7 @@ export class Operant extends EventEmitter<PushEvents> {
     const all: Handlers = {
       ...this.crewHandlers(),
       ...this.groupHandlers(),
+      ...this.actionHandlers(),
       ...this.presetHandlers(),
       ...this.teamHandlers(),
       ...this.modelHandlers(),
@@ -668,6 +672,23 @@ export class Operant extends EventEmitter<PushEvents> {
           this.log('crew', `Browser data cleanup failed: ${e instanceof Error ? e.message : String(e)}`)
         }
       },
+    }
+  }
+
+  private actionHandlers(): Group<'actions'> {
+    const actions = this.actions
+    // The action's own errors are plain messages; they reach the dialog as BAD_ARGS.
+    const guard = <T,>(fn: () => T): T => {
+      try {
+        return fn()
+      } catch (e) {
+        throw bad(e instanceof Error ? e.message : String(e))
+      }
+    }
+    return {
+      'actions:list': (crewId) => (this.requireCrew(crewId), actions.list(crewId)),
+      'actions:save': (input) => (this.requireCrew(input.crewId), guard(() => actions.save(input))),
+      'actions:delete': (actionId) => guard(() => actions.delete(actionId)),
     }
   }
 

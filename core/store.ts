@@ -489,6 +489,14 @@ export const MIGRATIONS: string[] = [
   // Tiles keep when they were last active (a message sent, a turn ended), so closed chats can be listed as history.
   `ALTER TABLE scratch ADD COLUMN updated_at INTEGER NOT NULL DEFAULT 0;
    UPDATE scratch SET updated_at = created_at;`,
+  // Project actions: a named command with an optional shortcut, run in a shell tile of the project.
+  `CREATE TABLE project_actions (
+     id INTEGER PRIMARY KEY,
+     crew_id INTEGER NOT NULL REFERENCES crews(id) ON DELETE CASCADE,
+     name TEXT NOT NULL,
+     command TEXT NOT NULL,
+     keybinding TEXT NOT NULL DEFAULT ''
+   );`,
 ]
 
 export const PLAYGROUND_KEPT = 'The Playground cannot be deleted; you can rename it or change its folder'

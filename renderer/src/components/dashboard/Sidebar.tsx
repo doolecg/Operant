@@ -72,6 +72,7 @@ interface Props {
   active: number | null
   onOpenThread: (row: ScratchTerminal) => void
   onDeleteThread: (row: ScratchTerminal) => void
+  onArchiveThread: (row: ScratchTerminal) => void
   onNewThread: () => void
   searchRef: RefObject<HTMLInputElement | null>
 }
@@ -152,7 +153,7 @@ const tiny = 'text-muted-foreground hover:text-foreground size-5 shrink-0'
 const headerBtn = 'text-muted-foreground hover:text-foreground hover:bg-foreground/[.08] size-[22px] rounded-md [&_svg]:size-3'
 const ring = 'shadow-[inset_0_0_0_1.5px_var(--primary)]'
 
-export function Sidebar({ crews: allCrews, selected, onSelect, onNewCrew, actions, footer, waiting, onShowTerminal, tabs, active, onOpenThread, onDeleteThread, onNewThread, searchRef }: Props) {
+export function Sidebar({ crews: allCrews, selected, onSelect, onNewCrew, actions, footer, waiting, onShowTerminal, tabs, active, onOpenThread, onDeleteThread, onArchiveThread, onNewThread, searchRef }: Props) {
   const [query, setQuery] = useState('')
   // The Playground is pinned above the list; every list below works on the real projects only.
   const playground = allCrews.find((c) => c.kind === 'playground')
@@ -435,7 +436,7 @@ export function Sidebar({ crews: allCrews, selected, onSelect, onNewCrew, action
         </ContextMenuTrigger>
         {menu('context')}
       </ContextMenu>
-      {isSelected && <ThreadRows crew={crew} tabs={tabs} active={active} query={query} onOpen={onOpenThread} onDelete={onDeleteThread} />}
+      {isSelected && <ThreadRows crew={crew} tabs={tabs} active={active} query={query} onOpen={onOpenThread} onDelete={onDeleteThread} onArchive={onArchiveThread} />}
       </div>
     )
   }

@@ -46,6 +46,7 @@ import type {
   ScratchPatch,
   ScratchSpend,
   ScratchStatus,
+  ProjectAction,
   ScratchTerminal,
   Team,
   TeamImportPreview,
@@ -80,6 +81,11 @@ export interface IpcApi extends ChatApi {
   'groups:create': (name?: string) => ProjectGroup
   'groups:rename': (groupId: number, name: string) => ProjectGroup
   'groups:delete': (groupId: number) => void
+
+  // Project actions. Save creates when no id is given.
+  'actions:list': (crewId: number) => ProjectAction[]
+  'actions:save': (input: Omit<ProjectAction, 'id'> & { id?: number }) => ProjectAction
+  'actions:delete': (actionId: number) => void
   'groups:collapse': (groupId: number, collapsed: boolean) => ProjectGroup
   // Saved order of the groups.
   'groups:reorder': (groupIds: number[]) => ProjectGroup[]
@@ -601,6 +607,9 @@ export const CORE_CHANNELS: CoreChannel[] = [
   'groups:create',
   'groups:rename',
   'groups:delete',
+  'actions:list',
+  'actions:save',
+  'actions:delete',
   'groups:collapse',
   'groups:reorder',
   'groups:move',

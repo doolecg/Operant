@@ -80,6 +80,14 @@ describe('buildChatLaunch', () => {
     expect(buildChatLaunch(tile(), ctx, { preset: { ...preset, permissionMode: 'plan' } }).args).not.toContain('--allow-dangerously-skip-permissions')
   })
 
+  it('loads only the own MCP servers and project settings of the tile when the preset limits the tools (a user MCP config would load in full without ToolSearch)', () => {
+    const preset = { id: 4, permissionMode: 'dontAsk', tools: 'Read,Grep,Glob,Bash', allow: [], deny: [], cacheTtl: 'auto', contextCap: 0, roleText: null } as unknown as Preset
+    expect(buildChatLaunch(tile(), ctx, { preset }).args).toContain('--strict-mcp-config')
+    expect(buildChatLaunch(tile(), ctx, { preset }).args).toEqual(expect.arrayContaining(['--setting-sources', 'project,local']))
+    expect(buildChatLaunch(tile(), ctx, { preset: { ...preset, tools: '' } }).args).not.toContain('--strict-mcp-config')
+    expect(buildChatLaunch(tile(), ctx, { preset: { ...preset, tools: '' } }).args).not.toContain('--setting-sources')
+  })
+
   it('drops flags this install does not list, keeps the hidden prompt tool when --permission-prompts is listed, and refuses old installs', () => {
     const old = new Set(['--model', '--input-format', '--output-format', '--session-id', '--permission-prompts'])
     const l = buildChatLaunch(tile(), { ...ctx, supported: old })

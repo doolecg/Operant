@@ -246,6 +246,16 @@
   .chat-ai-border::before { animation: none; }
 }
 
+/* The Stop button: an outer glow that pulses outward while Claude works. */
+@keyframes stop-glow {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(255, 106, 26, .55), 0 0 8px 1px rgba(255, 106, 26, .35); }
+  50% { box-shadow: 0 0 0 5px rgba(255, 106, 26, 0), 0 0 18px 4px rgba(236, 72, 153, .5); }
+}
+.stop-glow { animation: stop-glow 1.8s ease-in-out infinite; }
+@media (prefers-reduced-motion: reduce) {
+  .stop-glow { animation: none; box-shadow: 0 0 10px 2px rgba(255, 106, 26, .45); }
+}
+
 /* Motion tokens shared by the Chat view's rows: press, focus, enter, the running-tool breathe and the agent dot pulse. */
 :root {
   --m-ease: cubic-bezier(.32, .72, 0, 1);

@@ -1,29 +1,23 @@
 import { useMemo } from 'react'
-import { useBrowserState } from '@/components/browser/useBrowser'
 import type { TerminalTab } from './useTerminals'
 
-// A terminal tile has its scratch terminal; the browser tile has none.
+// A tile is an agent terminal (Claude Code or OpenCode). Shells live in the bottom drawer and the browser in its side panel.
 export interface TileInfo {
   id: string
   title: string
-  scratch: TerminalTab | null
+  scratch: TerminalTab
 }
 
-export type ScratchTileInfo = TileInfo & { scratch: TerminalTab }
+export type ScratchTileInfo = TileInfo
 
 export const scratchTileId = (id: number) => `scratch:${id}`
-export const BROWSER_TILE_ID = 'browser'
 
-export const isScratchTile = (t: TileInfo): t is ScratchTileInfo => t.scratch != null
+export const isScratchTile = (_t: TileInfo): _t is ScratchTileInfo => true
 
-// The tiles this project wants open: its scratch terminals, and the browser while it is open.
+// The tiles this project wants open: its agent terminals.
 export function useProjectTiles(crewId: number, scratch: TerminalTab[]): TileInfo[] {
-  const browserOpen = useBrowserState(crewId).data?.open ?? false
-  return useMemo(() => {
-    const tiles: TileInfo[] = scratch
-      .filter((t) => t.crewId === crewId)
-      .map((t) => ({ id: scratchTileId(t.scratchId), title: t.title + (t.exited ? ' (exited)' : ''), scratch: t }))
-    if (browserOpen) tiles.push({ id: BROWSER_TILE_ID, title: 'Browser', scratch: null })
-    return tiles
-  }, [scratch, crewId, browserOpen])
+  return useMemo(
+    () => scratch.filter((t) => t.crewId === crewId && t.kind !== 'shell').map((t) => ({ id: scratchTileId(t.scratchId), title: t.title + (t.exited ? ' (exited)' : ''), scratch: t })),
+    [scratch, crewId],
+  )
 }

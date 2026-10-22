@@ -64,8 +64,8 @@ try {
   // Terminal view: the tiles fill the width; there is no side panel and no Terminal side panel button.
   await tilesRegion().waitFor()
   await page.keyboard.press('Alt+Shift+T')
-  await poll('shell tile', async () => (await page.locator('[data-tile]').count()) >= 1)
-  assert.equal(await page.getByTestId('terminal-drawer').count(), 0, 'a new shell is a tile, not a drawer tab')
+  await page.getByTestId('terminal-drawer').waitFor()
+  assert.equal(await page.locator('[data-tile]').count(), 0, 'a new shell is a drawer tab, not a tile')
   assert.equal(await page.getByRole('region', { name: 'Workspace panels' }).count(), 0, 'the side panel is gone')
   assert.equal(await page.getByRole('button', { name: /side panel/i }).count(), 0, 'no side panel button')
   await shot(page, 'terminal-tiles')

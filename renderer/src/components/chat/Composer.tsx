@@ -512,8 +512,14 @@ export function Composer({ scratchId, state, launchEffort, tileModel, disabled, 
 
             <EffortPopover model={model} modelName={modelName} effort={state.effort} defaultLevel={launchEffort} onChange={(l) => chatActions.setEffort(scratchId, l)} triggerClass={toolbarBtn} />
             {compactTokens !== null && <CompactPill tokens={compactTokens} keepFull={keepFullNow} onToggle={toggleKeepFull} />}
+            {dictation.state !== 'idle' && (
+              <span role="status" className="text-muted-foreground shrink-0">
+                <Loader2 className="size-4 animate-spin" aria-hidden />
+                <span className="sr-only">{dictation.state === 'recording' ? 'Listening' : dictation.state === 'loading' ? 'Loading speech model' : 'Transcribing'}</span>
+              </span>
+            )}
             {running ? (
-              <button type="button" aria-label="Stop" title="Stop (Esc)" onClick={() => chatActions.interrupt(scratchId)} className="bg-foreground text-background grid size-[30px] shrink-0 place-items-center rounded-full hover:opacity-90">
+              <button type="button" aria-label="Stop" title="Stop (Esc)" onClick={() => chatActions.interrupt(scratchId)} className="stop-glow bg-foreground text-background grid size-[30px] shrink-0 place-items-center rounded-full hover:opacity-90">
                 <Square className="size-[9px] fill-current" aria-hidden />
               </button>
             ) : (
@@ -529,12 +535,6 @@ export function Composer({ scratchId, state, launchEffort, tileModel, disabled, 
               </button>
             )}
           </div>
-          {(running || dictation.state !== 'idle') && (
-            <span role="status" className="text-muted-foreground pointer-events-none absolute top-1/2 right-[46px] -translate-y-1/2">
-              <Loader2 className="size-4 animate-spin" aria-hidden />
-              <span className="sr-only">{running ? 'Claude is working' : dictation.state === 'recording' ? 'Listening' : dictation.state === 'loading' ? 'Loading speech model' : 'Transcribing'}</span>
-            </span>
-          )}
         </div>
         <div className="mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-1 px-1">
           <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">

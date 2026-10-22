@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { ChevronRight, Trash2 } from 'lucide-react'
+import { Archive, ChevronRight, Trash2 } from 'lucide-react'
 import { tileState } from '@shared/claude-chat'
 import type { Crew, ScratchTerminal } from '@shared/types'
 import { ConfirmDialog } from '@/components/ui/confirm-dialog'
@@ -19,7 +19,7 @@ function Dot({ id, open }: { id: number; open: boolean }) {
 }
 
 // The threads of the open project under its row: the ones open as tiles, newest first, then a "Settled" shelf of closed chats that can be opened again.
-export function ThreadRows({ crew, tabs, active, query, onOpen, onDelete }: { crew: Crew; tabs: TerminalTab[]; active: number | null; query: string; onOpen: (row: ScratchTerminal) => void; onDelete: (row: ScratchTerminal) => void }) {
+export function ThreadRows({ crew, tabs, active, query, onOpen, onDelete, onArchive }: { crew: Crew; tabs: TerminalTab[]; active: number | null; query: string; onOpen: (row: ScratchTerminal) => void; onDelete: (row: ScratchTerminal) => void; onArchive: (row: ScratchTerminal) => void }) {
   const rows = (useThreads(crew.id).data ?? []).filter((r) => OPENABLE.has(r.agent) || tabs.some((t) => t.scratchId === r.id))
   const [settledOpen, setSettledOpen] = useState(false)
   const [doomed, setDoomed] = useState<ScratchTerminal | null>(null)
@@ -40,11 +40,14 @@ export function ThreadRows({ crew, tabs, active, query, onOpen, onDelete }: { cr
           <span className="min-w-0 flex-1 truncate">{r.title}</span>
           <span className="text-muted-foreground/70 shrink-0 text-[11.5px] group-hover/th:hidden">{shortAge(r.updatedAt)}</span>
         </button>
-        {!open && (
-          <button type="button" aria-label={`Delete ${r.title}`} title="Delete this thread" onClick={() => setDoomed(r)} className="text-muted-foreground hover:text-destructive mr-1 hidden size-5 shrink-0 place-items-center rounded group-hover/th:grid">
-            <Trash2 className="size-3" />
+        {open && (
+          <button type="button" aria-label={`Archive ${r.title}`} title="Archive: close it and keep it under Settled" onClick={() => onArchive(r)} className="text-muted-foreground hover:text-foreground mr-0.5 hidden size-5 shrink-0 place-items-center rounded group-hover/th:grid">
+            <Archive className="size-3" />
           </button>
         )}
+        <button type="button" aria-label={`Delete ${r.title}`} title="Delete this thread" onClick={() => setDoomed(r)} className="text-muted-foreground hover:text-destructive mr-1 hidden size-5 shrink-0 place-items-center rounded group-hover/th:grid">
+          <Trash2 className="size-3" />
+        </button>
       </div>
     )
   }

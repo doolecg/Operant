@@ -128,6 +128,15 @@ export interface HindsightStatus {
   pendingRestart?: boolean
 }
 
+// A saved command of a project, run in a shell tile; keybinding is an accelerator or empty.
+export interface ProjectAction {
+  id: number
+  crewId: number
+  name: string
+  command: string
+  keybinding: string
+}
+
 export interface HindsightAdapter {
   // The address to bind: an adapter's IPv4, 127.0.0.1 or 0.0.0.0.
   address: string

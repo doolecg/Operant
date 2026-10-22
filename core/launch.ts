@@ -43,6 +43,7 @@ export const CLAUDE_FLAGS = [
   '--settings',
   '--append-system-prompt-file',
   '--strict-mcp-config',
+  '--setting-sources',
   '--mcp-config',
   '--autocompact',
   '--plugin-dir',
@@ -319,6 +320,11 @@ function claudeCore(parts: ClaudeParts, ctx: LaunchContext): LaunchResult {
     files.push(f)
     add('--mcp-config', f.path)
   }
+  // A restricted --tools list drops ToolSearch, so every MCP tool of the user's own config would load in full (about 60k tokens
+  // before the first message). The seat only gets the servers added above.
+  if (tools.length) add('--strict-mcp-config')
+  // Helpers are briefed by their lead, so they skip the user's own hooks, plugins, CLAUDE.md and settings (about 9k tokens).
+  if (tools.length) add('--setting-sources', 'project,local')
   add('--plugin-dir', ctx.pluginDir)
   for (const dir of ctx.modPlugins ?? []) add('--plugin-dir', checkPath('modPlugin', dir))
   for (const dir of ctx.packPlugins ?? []) add('--plugin-dir', checkPath('packPlugin', dir))

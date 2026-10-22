@@ -77,6 +77,16 @@ export function useTerminals(crews: Crew[] | undefined, defaultModel: string, ma
     [defaultModel, defaultEffort, mainCli],
   )
 
+  // Takes a tile off the screen without touching its saved row.
+  const dropTab = useCallback((scratchId: number) => {
+    setTabs((t) => {
+      const next = t.filter((x) => x.scratchId !== scratchId)
+      setActive((a) => (a === scratchId ? (next.at(-1)?.scratchId ?? null) : a))
+      if (next.length === 0) setOpen(false)
+      return next
+    })
+  }, [])
+
   // A Claude chat that has history is stopped and kept as a settled thread; an empty one, a shell and OpenCode are deleted.
   const closeTab = useCallback((scratchId: number) => {
     const b = bridge()
@@ -87,13 +97,8 @@ export function useTerminals(crews: Crew[] | undefined, defaultModel: string, ma
       if (row && row.updatedAt > row.createdAt) await b.invoke('scratch:stop', scratchId)
       else await b.invoke('scratch:delete', scratchId)
     })().catch(() => {})
-    setTabs((t) => {
-      const next = t.filter((x) => x.scratchId !== scratchId)
-      setActive((a) => (a === scratchId ? (next.at(-1)?.scratchId ?? null) : a))
-      if (next.length === 0) setOpen(false)
-      return next
-    })
-  }, [tabs])
+    dropTab(scratchId)
+  }, [tabs, dropTab])
 
   // Opens a thread that is already saved: a closed chat resumes its session, an open one just comes to the front.
   const reopenTab = useCallback(
@@ -122,5 +127,5 @@ export function useTerminals(crews: Crew[] | undefined, defaultModel: string, ma
     })
   }, [])
 
-  return { tabs, active, setActive, open, setOpen, openTab, reopenTab, closeTab, dropCrew }
+  return { tabs, active, setActive, open, setOpen, openTab, reopenTab, closeTab, dropTab, dropCrew }
 }

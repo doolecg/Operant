@@ -8,9 +8,8 @@ import { decodeIpcError } from '@shared/ipc'
 import type { ScratchView } from '@shared/types'
 import { isTileOut } from '@shared/tile-popout'
 import { Button } from '@/components/ui/button'
-import { BrowserTile } from '@/components/browser/BrowserTile'
+import { BrowserSide } from '@/components/browser/BrowserSide'
 import { PoppedOutNotice } from '@/components/browser/BrowserPopout'
-import { useBrowserActions, useBrowserState } from '@/components/browser/useBrowser'
 import { OperatorTerminal } from '@/components/dashboard/OperatorTerminal'
 import { ChatView } from '@/components/chat/ChatView'
 import { ChatHeaderControls, ChatStateBadge, ViewSwitch } from '@/components/chat/ChatHeader'
@@ -36,7 +35,7 @@ const HEADING:Record<string, string> = { claude: 'Claude Code', opencode: 'OpenC
 
 interface Props {
   crewId: number
-  // The project's shell and agent terminals (from the drawer's list); they open as tiles here.
+  // The project's terminals; the agent ones open as tiles here (shells show in the bottom drawer).
   scratch: TerminalTab[]
   // The scratch terminal opened last (the drawer's active one); its tile takes the focus when it is in this project.
   active: number | null
@@ -54,9 +53,7 @@ export function TerminalView({ crewId, scratch, active, onCloseScratch, onStart,
   const blocked = cliBlocked(useCapabilities().data, cli)
   const tiles = useProjectTiles(crewId, scratch)
   const scratchTiles = tiles.filter(isScratchTile)
-  const browser = useBrowserActions(crewId)
   const out = useTilePopouts()
-  const browserOut = useBrowserState(crewId).data?.poppedOut === true
   const activeTile = scratchTiles.find((t) => t.scratch.scratchId === active)?.id ?? null
   const crew = useCrews().data?.find((c) => c.id === crewId)
   const [focusedId, setFocusedId] = useState<string | null>(null)
@@ -80,7 +77,7 @@ export function TerminalView({ crewId, scratch, active, onCloseScratch, onStart,
   // The thread on screen: the tile opened last, else the first one.
   const openTile = tiles.find((t) => t.id === activeTile) ?? tiles[0]
 
-  const close = (t: TileInfo) => (t.scratch ? onCloseScratch(t.scratch.scratchId) : void browser.close.mutate())
+  const close = (t: TileInfo) => onCloseScratch(t.scratch.scratchId)
 
   // Each Claude tile is in the Chat or the Terminal view (a property of the scratch terminal).
   const qc = useQueryClient()
@@ -106,7 +103,6 @@ export function TerminalView({ crewId, scratch, active, onCloseScratch, onStart,
   const workers = Object.entries(views ?? {}).map(([id, v]) => ({ id: Number(id), presetId: v.presetId }))
 
   const body = (tile: TileInfo) => {
-    if (!isScratchTile(tile)) return <BrowserTile crewId={crewId} />
     const t = tile
     // The session lives in its own window: no terminal here, so two of them do not fight over the PTY size.
     if (isTileOut(out, t.scratch.scratchId)) return <PoppedOutNotice title={t.title} onPopIn={() => void call('tile:popIn', t.scratch.scratchId).catch(() => undefined)} />
@@ -126,7 +122,6 @@ export function TerminalView({ crewId, scratch, active, onCloseScratch, onStart,
   }
 
   const chrome = (tile: TileInfo) => {
-    if (!isScratchTile(tile)) return { icon: <TileIcon kind="browser" compact={strip === 'compact'} />, heading: 'Browser', subtitle: crew?.name }
     const t = tile
     if (t.scratch.kind === 'claude' && viewOf(t) === 'chat')
       return {
@@ -156,7 +151,6 @@ export function TerminalView({ crewId, scratch, active, onCloseScratch, onStart,
   }
 
   const popOut = (tile: TileInfo) => {
-    if (!isScratchTile(tile)) return browserOut ? null : () => void browser.popOut.mutate()
     const t = tile
     if (isTileOut(out, t.scratch.scratchId)) return null
     return () =>
@@ -197,7 +191,7 @@ export function TerminalView({ crewId, scratch, active, onCloseScratch, onStart,
       <section aria-label="Terminal tiles" className={cn('flex min-w-0 flex-1 flex-col', mode === 'tiles' && 'p-1.5')}>
         {tiles.length === 0 ? (
           <div className="grid flex-1 place-content-center gap-3 p-4 text-center">
-            <p className="text-muted-foreground text-sm">No terminals open. Start one here, or add one from the terminal drawer.</p>
+            <p className="text-muted-foreground text-sm">No threads open. Start one here.</p>
             <div className="flex flex-wrap justify-center gap-2">
               <Button size="sm" onClick={() => onStart(cli)} disabled={!!blocked} title={blocked}>
                 <Sparkles /> Start {CLI_SHORT[cli]}
@@ -239,6 +233,8 @@ export function TerminalView({ crewId, scratch, active, onCloseScratch, onStart,
           />
         )}
       </section>
+
+      <BrowserSide crewId={crewId} />
 
       {claudeTile && (
         <ModsHost key={claudeTile.scratch.scratchId} tileId={claudeTile.scratch.scratchId} crewId={crew?.id ?? null} engineering={crew?.engineering ?? false} chat={views?.[claudeTile.scratch.scratchId]?.view === 'chat'} />

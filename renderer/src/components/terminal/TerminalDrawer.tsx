@@ -1,9 +1,7 @@
 import { useRef, useState } from 'react'
-import { Plus, Sparkles, X } from 'lucide-react'
+import { Plus, X } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { DrawerResizeHandle } from '@/components/ui/resize-handle'
-import { CLI_SHORT } from '@/lib/capabilities'
-import { useSettings } from '@/lib/queries'
 import { cn } from '@/lib/utils'
 import { OperatorTerminal } from '@/components/dashboard/OperatorTerminal'
 import type { TerminalTab } from './useTerminals'
@@ -27,28 +25,26 @@ interface Props {
   onSelect: (scratchId: number) => void
   onClose: (scratchId: number) => void
   onNewShell: () => void
-  onNewAgent: () => void
   onHide: () => void
 }
 
-// Bottom drawer with the terminals opened from the project menu. Its height is a percentage of the window and
+// Bottom drawer with the current project's shells. Its height is a percentage of the window and
 // every tab keeps running while another is shown or the drawer is hidden.
-export function TerminalDrawer({ tabs, active, onSelect, onClose, onNewShell, onNewAgent, onHide }: Props) {
+export function TerminalDrawer({ tabs, active, onSelect, onClose, onNewShell, onHide }: Props) {
   const [height, setHeight] = useState(readHeight)
   const root = useRef<HTMLElement>(null)
-  const cli = CLI_SHORT[useSettings().data?.mainCli ?? 'claude']
 
   return (
     <section
       ref={root}
-      aria-label="Terminals"
+      aria-label="Shells"
       data-testid="terminal-drawer"
       style={{ flexBasis: `${height}%` }}
       className="m-panel surface relative mx-1.5 mb-1.5 flex min-h-0 shrink-0 flex-col"
     >
-      <DrawerResizeHandle root={root} label="Resize terminals" storageKey={HEIGHT} onHeight={setHeight} />
+      <DrawerResizeHandle root={root} label="Resize shells" storageKey={HEIGHT} onHeight={setHeight} />
       <div className="surface-line flex shrink-0 items-center gap-1 border-b px-2 py-1">
-        <div role="tablist" aria-label="Open terminals" className="flex min-w-0 flex-1 gap-1 overflow-x-auto">
+        <div role="tablist" aria-label="Open shells" className="flex min-w-0 flex-1 gap-1 overflow-x-auto">
           {tabs.map((t) => (
             <div
               key={t.scratchId}
@@ -70,7 +66,7 @@ export function TerminalDrawer({ tabs, active, onSelect, onClose, onNewShell, on
               <button
                 type="button"
                 aria-label={`Close ${t.title}`}
-                title="Close this terminal"
+                title="Close this shell"
                 onClick={() => onClose(t.scratchId)}
                 className="hover:bg-accent rounded-md p-1"
               >
@@ -79,13 +75,10 @@ export function TerminalDrawer({ tabs, active, onSelect, onClose, onNewShell, on
             </div>
           ))}
         </div>
-        <Button variant="ghost" size="icon-sm" aria-label={`New ${cli} terminal in this project`} title={`New ${cli} terminal in this project`} onClick={onNewAgent}>
-          <Sparkles />
-        </Button>
         <Button variant="ghost" size="icon-sm" aria-label="New shell in this project" title="New shell in this project" onClick={onNewShell}>
           <Plus />
         </Button>
-        <Button variant="ghost" size="icon-sm" aria-label="Hide terminals" title="Hide (sessions keep running)" onClick={onHide}>
+        <Button variant="ghost" size="icon-sm" aria-label="Hide shells" title="Hide (shells keep running)" onClick={onHide}>
           <X />
         </Button>
       </div>

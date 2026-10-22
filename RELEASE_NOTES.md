@@ -1,3 +1,17 @@
+# Operant 3.6.0
+
+**Install:** download the file for your system from the assets below. Operant keeps itself up to date from these releases.
+
+## New
+- **Shells open in a drawer at the bottom,** like the Console, and show only the shells of the current project. A Shells button in the sidebar footer shows or hides it. Shells no longer take up a tile.
+- **The browser opens at the side** of the thread, as a panel you can drag to any width, with Pop out and Close buttons.
+- **The Stop button glows** while Claude is working, in place of the spinning wheel.
+
+## Fixed
+- **Helpers start with far less context.** A Leader used to begin at about 115k tokens (77% of its limit) before it did anything, because every tool from your own MCP servers was loaded in full. Helpers (Leader, Builder, Reviewer, Scout, Tester, Design, Release, Learn) now load only Operant's own MCP servers and skip your user-level hooks, plugins and settings. They start at about 13k.
+
+---
+
 # Operant 3.5.0
 
 **Install:** download the file for your system from the assets below. Operant keeps itself up to date from these releases.

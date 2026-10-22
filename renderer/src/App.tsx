@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { PanelLeft, Plus, Settings, Terminal } from 'lucide-react'
+import { PanelLeft, Plus, Settings, SquareTerminal, Terminal } from 'lucide-react'
 import { ConsoleDrawer } from '@/components/console/ConsoleDrawer'
 import { useConsole } from '@/components/console/useConsole'
 import { DeleteCrewDialog, EditCrewDialog, NewCrewDialog } from '@/components/dashboard/Dialogs'
@@ -11,6 +11,7 @@ import { useWaitingTiles } from '@/components/terminal/useWaitingTiles'
 import { Toaster } from '@/components/ui/toaster'
 import { Sidebar } from '@/components/dashboard/Sidebar'
 import { TerminalView } from '@/components/terminal/TerminalView'
+import { TerminalDrawer } from '@/components/terminal/TerminalDrawer'
 import { BoardView } from '@/components/board/BoardView'
 import { PlansView } from '@/components/plans/PlansView'
 import { LearningBadge, OPEN_SETTINGS_EVENT } from '@/components/memory/LearningBadge'
@@ -130,6 +131,16 @@ export function App() {
   const notesOpen = layout?.notesOpen ?? false
   const setLayout = (patch: Partial<NonNullable<typeof layout>>) => saveSettings.mutate({ layout: patch })
   const projectScratch = terminals.tabs.filter((t) => t.crewId === crewId)
+  // The bottom drawer holds this project's shells; a new shell opens it, and it closes when the last one goes.
+  const [shellsOpen, setShellsOpen] = useState(true)
+  const shellTabs = projectScratch.filter((t) => t.kind === 'shell')
+  const shellActive = shellTabs.some((t) => t.scratchId === terminals.active) ? terminals.active : (shellTabs.at(-1)?.scratchId ?? null)
+  const shellCount = terminals.tabs.filter((t) => t.kind === 'shell').length
+  const lastShellCount = useRef(0)
+  useEffect(() => {
+    if (shellCount > lastShellCount.current) setShellsOpen(true)
+    lastShellCount.current = shellCount
+  }, [shellCount])
   const waitingTiles = useWaitingTiles()
   const waitingCrews = new Set(terminals.tabs.filter((t) => waitingTiles.has(t.scratchId)).map((t) => t.crewId))
   const closeTile = useCloseTile(terminals.tabs, settings.data?.confirm.closeTile ?? true, terminals.closeTab)
@@ -266,7 +277,8 @@ export function App() {
             active={terminals.active}
             searchRef={searchRef}
             onOpenThread={(row) => (setView('thread'), setPage('dashboard'), void terminals.reopenTab(row))}
-            onDeleteThread={(row) => void bridge().invoke('scratch:delete', row.id).catch((e) => toast(decodeIpcError(e).message, true))}
+            onDeleteThread={(row) => void bridge().invoke('scratch:delete', row.id).then(() => terminals.dropTab(row.id)).catch((e) => toast(decodeIpcError(e).message, true))}
+            onArchiveThread={(row) => terminals.closeTab(row.id)}
             onNewThread={() => crew && (setView('thread'), setPage('dashboard'), void terminals.openTab(crew, 'agent'))}
             footer={
               <>
@@ -298,6 +310,20 @@ export function App() {
                     </Button>
                   </TooltipTrigger>
                   <TooltipContent>Console (Ctrl+J)</TooltipContent>
+                </Tooltip>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      variant="ghost"
+                      size="icon-sm"
+                      aria-label="Shells"
+                      aria-pressed={shellsOpen && shellTabs.length > 0}
+                      onClick={() => (shellTabs.length === 0 ? crew && void terminals.openTab(crew, 'shell') : setShellsOpen((v) => !v))}
+                    >
+                      <SquareTerminal />
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>Shells for this project</TooltipContent>
                 </Tooltip>
                 <ServersPopover onOpened={(id) => (setCrewId(id), setPage('dashboard'))} />
                 <ProviderLimitBadge onOpen={() => (setPage('dashboard'), setUsageOpen(true))} />
@@ -331,6 +357,16 @@ export function App() {
                 )
               )}
             </div>
+          )}
+          {page === 'dashboard' && shellsOpen && shellTabs.length > 0 && (
+            <TerminalDrawer
+              tabs={shellTabs}
+              active={shellActive}
+              onSelect={terminals.setActive}
+              onClose={closeTile.request}
+              onNewShell={() => crew && void terminals.openTab(crew, 'shell')}
+              onHide={() => setShellsOpen(false)}
+            />
           )}
           {consoleOpen && (
             <ConsoleDrawer
