@@ -106,12 +106,15 @@ describe('readTaskPlan', () => {
   })
 })
 
-const nextCall =(calls: { n: number }, from: number) =>
+// `poke` changes the folder again every half second while waiting: macOS reports a change made just after a watch starts only sometimes.
+const nextCall = (calls: { n: number }, from: number, poke?: () => void) =>
   new Promise<void>((resolve, reject) => {
     const t0 = Date.now()
+    let last = t0
     const id = setInterval(() => {
       if (calls.n > from) (clearInterval(id), resolve())
-      else if (Date.now() - t0 > 4000) (clearInterval(id), reject(new Error('no change was reported')))
+      else if (Date.now() - t0 > 8000) (clearInterval(id), reject(new Error('no change was reported')))
+      else if (poke && Date.now() - last > 500) (last = Date.now(), poke())
     }, 20)
   })
 
@@ -124,7 +127,7 @@ describe('watchTasks', () => {
       // macOS starts its file-event stream a moment after watch() returns and misses a change made before then.
       await new Promise((r) => setTimeout(r, 500))
       task('a', { 'spec.html': 's' })
-      await nextCall(calls, 0)
+      await nextCall(calls, 0, () => task('a', { 'spec.html': String(Math.random()) }))
     } finally {
       stop()
     }
@@ -139,7 +142,7 @@ describe('watchTasks', () => {
       await new Promise((r) => setTimeout(r, 400))
       const before = calls.n
       task('a', { 'spec.html': 's' })
-      await nextCall(calls, before)
+      await nextCall(calls, before, () => task('a', { 'spec.html': String(Math.random()) }))
     } finally {
       stop()
     }
