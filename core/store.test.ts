@@ -21,7 +21,7 @@ describe('store', () => {
       old.db.exec('ALTER TABLE lessons DROP COLUMN related; ALTER TABLE lessons DROP COLUMN consolidated_into')
       for (const c of ['session_id', 'turns', 'tokens', 'usd', 'tokens_estimated']) old.db.exec(`ALTER TABLE learn_runs DROP COLUMN ${c}`)
       for (const c of ['engineering', 'factory']) old.db.exec(`ALTER TABLE crews DROP COLUMN ${c}`)
-      old.db.exec('ALTER TABLE scratch DROP COLUMN updated_at')
+      old.db.exec('ALTER TABLE scratch DROP COLUMN updated_at; DROP TABLE project_actions')
       old.db.exec(`PRAGMA user_version = ${MIGRATIONS.indexOf(LESSON_LINKS_MIGRATION)}`)
       old.db
         .prepare("INSERT INTO lessons (crew_id, text, kind, scope, created_at, updated_at) VALUES (?, 'keep it small', 'convention', 'project', 1, 1)")
@@ -55,8 +55,8 @@ describe('store', () => {
       const crew = old.createCrew('alpha', '/code/alpha')
       const tile = old.createScratch({ crewId: crew.id, title: 'Claude: alpha', agent: 'claude', cwd: '/code/alpha' })
       expect(tile).toMatchObject({ createdAt: 1234, updatedAt: 1234 })
-      old.db.exec('ALTER TABLE scratch DROP COLUMN updated_at')
-      old.db.exec(`PRAGMA user_version = ${MIGRATIONS.length - 1}`)
+      old.db.exec('ALTER TABLE scratch DROP COLUMN updated_at; DROP TABLE project_actions')
+      old.db.exec(`PRAGMA user_version = ${MIGRATIONS.findIndex((m) => m.includes('ALTER TABLE scratch ADD COLUMN updated_at'))}`)
       old.close()
       const s = new Store(file, () => 9999)
       try {
