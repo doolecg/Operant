@@ -1,4 +1,5 @@
-import type { ChatState } from '@shared/claude-chat'
+import type { ChatState, SubagentItem } from '@shared/claude-chat'
+import { runningSubagents } from '@shared/chat-queue'
 import { PixelBar } from '@/components/ui/pixel-bar'
 import { formatDuration, kTokens } from './chatHelpers'
 import { useNow } from './useChat'
@@ -8,9 +9,26 @@ import { useNow } from './useChat'
 export function StatusLine({ state }: { state: ChatState }) {
   const { turn } = state
   const active = turn.phase === 'working' || turn.phase === 'waiting'
-  const now = useNow(active && turn.startedAt !== null)
+  // Helpers (sub-agents) can keep working after the turn ended: say so, or they run unseen.
+  const helpers = state.items.filter((i): i is SubagentItem => i.kind === 'subagent' && (i.status === 'running' || i.status === 'waiting'))
+  const helperCount = runningSubagents(helpers)
+  const now = useNow((active && turn.startedAt !== null) || helperCount > 0)
   // The row keeps its height when nothing runs, so the conversation above does not jump 28px at the start and end of a turn.
-  if (!active) return <div aria-hidden className="h-7 shrink-0" />
+  if (!active && helperCount === 0) return <div aria-hidden className="h-7 shrink-0" />
+  if (!active) {
+    const since = Math.min(...helpers.map((h) => h.startedAt))
+    return (
+      <div role="status" aria-label="Helpers status" data-chat="helpers-line" className="mx-auto flex w-full max-w-[720px] items-center gap-2 px-5 pb-2 text-[13px]">
+        <PixelBar sweep tone="primary" width={96} label="Helpers are working" className="shrink-0" />
+        <span className="text-muted-foreground min-w-0 truncate">
+          <span className="text-foreground">
+            {helperCount} helper{helperCount === 1 ? '' : 's'} working in the background
+          </span>
+          <span> {formatDuration(Math.max(0, now - since))}</span>
+        </span>
+      </div>
+    )
+  }
   const waiting = turn.pendingCount > 0
   const elapsed = turn.startedAt !== null ? Math.max(0, now - turn.startedAt) : turn.elapsedMs
   return (

@@ -725,11 +725,13 @@ export function statusWord(a: Activity): string {
 }
 
 // The tile header state: dot + word.
-export function tileState(s: Pick<ChatState, 'process' | 'turn'>): 'Working' | 'Waiting for you' | 'Idle' | 'Stopped' | 'Crashed' {
+export function tileState(s: Pick<ChatState, 'process' | 'turn'> & { items?: readonly ChatItem[] }): 'Working' | 'Waiting for you' | 'Idle' | 'Stopped' | 'Crashed' {
   if (s.process === 'crashed') return 'Crashed'
   if (s.process === 'stopped' || s.process === 'blocked') return 'Stopped'
   if (s.turn.phase === 'waiting') return 'Waiting for you'
   if (s.turn.phase === 'working') return 'Working'
+  // Helpers can keep working after the main turn ended.
+  if (s.items?.some((i) => i.kind === 'subagent' && i.status === 'running')) return 'Working'
   return 'Idle'
 }
 

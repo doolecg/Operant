@@ -1,3 +1,22 @@
+# Operant 3.6.1
+
+**Install:** download the file for your system from the assets below. Operant keeps itself up to date from these releases.
+
+## New
+- **Orchestrator Mode replaces the fixed Factory levels.** The thread you talk to does the work itself and hands a part to a helper agent only when that saves context or time. No roles to start, no Task Cards. Helpers use the same model, and a chip shows how many are running.
+- **`/clear` starts a fresh conversation** in the same thread.
+- **The Commands menu runs commands.** A command without arguments has a Run button. Commands that only exist on Claude Code's own screen open the matching Settings page where there is one (`/config`, `/theme`, `/memory`, `/usage`, `/hooks`, `/plugin`).
+- **Helpers working in the background are shown.** After the main turn ends, the status line says how many helpers are still working, and the thread, sidebar and Board read Working instead of Idle.
+
+## Changed
+- **The usage badge says plan limits are off** (with where to turn them on) instead of "no usage data".
+- **The Research preset uses Sonnet** instead of Haiku. A cheaper model that gets it wrong costs more in fixes than it saves.
+- **The learning prompts are stricter.** One fact or rule per lesson, user corrections kept first, stale or contradicted lessons replaced, and no secrets, temporary status or raw output.
+- **The name is Operant** in the window, the welcome screen, messages and the README. The installer file names are unchanged so updates keep working.
+- **The README has a new look and screenshots.**
+
+---
+
 # Operant 3.6.0
 
 **Install:** download the file for your system from the assets below. Operant keeps itself up to date from these releases.
