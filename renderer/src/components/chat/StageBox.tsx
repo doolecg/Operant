@@ -1,5 +1,6 @@
 import { Check, ChevronDown, GitBranch, X } from 'lucide-react'
 import type { StageLine, TaskInfo } from '@shared/engineering'
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
 import { call, refreshGit, useGitInfo, useRepoBranches } from '@/lib/queries'
 import { useTaskStages } from '@/lib/queries/engineering'
@@ -86,52 +87,45 @@ function TaskHeader({ crewId, task, stacked }: { crewId: number; task: TaskInfo;
   )
 }
 
-// The Engineering task's steps in one row at the top of a narrow chat, the current one marked.
-export function StageBar({ crewId, on }: { crewId: number | null; on: boolean }) {
-  const task = useTask(crewId, on)
-  if (!task || crewId === null) return null
-  return (
-    <div data-chat="stage-box" className="surface mx-auto mt-2 flex w-[calc(100%-2.5rem)] max-w-[680px] shrink-0 flex-col gap-1 rounded-xl px-3 py-1.5 text-xs @[900px]:hidden">
-      <TaskHeader crewId={crewId} task={task} />
-      <ol aria-label="Engineering stages" className="flex flex-wrap items-center gap-x-4 gap-y-1">
-        {task.stages.map((s) => (
-          <li key={s.key} aria-current={s.state === 'current' ? 'step' : undefined} className={cn('flex items-center gap-1.5', tone(s))}>
-            {s.state === 'done' ? <Check className="text-success size-3.5" aria-hidden /> : <span aria-hidden className={cn('size-1.5 rounded-full', s.state === 'current' ? 'bg-primary' : 'bg-muted-foreground/40')} />}
-            <span className={cn(s.state === 'current' && 'font-medium')}>{s.label}</span>
-            {s.detail && <span className="text-muted-foreground">{s.detail}</span>}
-          </li>
-        ))}
-      </ol>
-    </div>
-  )
-}
+export const chipClass = 'm-press bg-accent/60 text-muted-foreground hover:bg-accent hover:text-foreground data-[state=open]:bg-accent data-[state=open]:text-foreground inline-flex h-[26px] shrink-0 items-center gap-2 rounded-full px-3 text-[13px] outline-none'
 
-// The same steps as a column on the left of a wide chat: the name, and on the right a tick when done or a ring on the current one.
-export function StageRail({ crewId, on }: { crewId: number | null; on: boolean }) {
+// The Engineering task as a chip at the top of the chat ("Build 4 of 6", a dot per step); it opens the task's title, branch, clear button and the steps.
+export function StageChip({ crewId, on }: { crewId: number | null; on: boolean }) {
   const task = useTask(crewId, on)
   if (!task || crewId === null) return null
+  const at = Math.max(0, task.stages.findIndex((s) => s.state === 'current'))
+  const current = task.stages[at]
   return (
-    <div data-chat="stage-rail" className="surface hidden w-[200px] shrink-0 flex-col gap-1 rounded-xl p-2 text-[13px] @[900px]:flex">
-      <div className="px-2 pt-1 pb-1.5">
+    <Popover>
+      <PopoverTrigger data-chat="stage-chip" aria-label={`Engineering task: ${current?.label ?? 'steps'}, step ${at + 1} of ${task.stages.length}`} className={chipClass}>
+        <span aria-hidden className="flex gap-[3px]">
+          {task.stages.map((s) => (
+            <i key={s.key} className={cn('size-[5px] rounded-full', s.state === 'current' ? 'bg-primary' : s.state === 'done' ? 'bg-muted-foreground' : 'bg-muted-foreground/30')} />
+          ))}
+        </span>
+        {current?.label} {at + 1} of {task.stages.length}
+        <ChevronDown className="size-3.5" aria-hidden />
+      </PopoverTrigger>
+      <PopoverContent align="end" className="w-[300px] p-4 text-[13px]" data-chat="stage-popover">
         <TaskHeader crewId={crewId} task={task} stacked />
-      </div>
-      <ol aria-label="Engineering stages" className="flex flex-col gap-0.5">
-        {task.stages.map((s) => (
-          <li key={s.key} aria-current={s.state === 'current' ? 'step' : undefined} className={cn('flex min-h-7 items-center gap-2 rounded-lg px-2', s.state === 'current' && 'bg-accent', tone(s))}>
-            <span className={cn('min-w-0 flex-1', s.state === 'current' && 'font-medium')}>
-              {s.label}
-              {s.detail && <span className="text-muted-foreground ml-1.5 text-xs font-normal">{s.detail}</span>}
-            </span>
-            {s.state === 'done' ? (
-              <Check className="text-success size-4 shrink-0" aria-hidden />
-            ) : s.state === 'current' ? (
-              <span aria-hidden className="border-primary size-3 shrink-0 rounded-full border-2" />
-            ) : (
-              <span aria-hidden className="bg-muted-foreground/40 h-0.5 w-2.5 shrink-0 rounded-full" />
-            )}
-          </li>
-        ))}
-      </ol>
-    </div>
+        <ol aria-label="Engineering stages" className="mt-3 flex flex-col gap-0.5">
+          {task.stages.map((s) => (
+            <li key={s.key} aria-current={s.state === 'current' ? 'step' : undefined} className={cn('flex min-h-7 items-center gap-2 rounded-lg px-2', s.state === 'current' && 'bg-accent', tone(s))}>
+              <span className={cn('min-w-0 flex-1', s.state === 'current' && 'font-medium')}>
+                {s.label}
+                {s.detail && <span className="text-muted-foreground ml-1.5 text-xs font-normal">{s.detail}</span>}
+              </span>
+              {s.state === 'done' ? (
+                <Check className="text-success size-4 shrink-0" aria-hidden />
+              ) : s.state === 'current' ? (
+                <span aria-hidden className="border-primary size-3 shrink-0 rounded-full border-2" />
+              ) : (
+                <span aria-hidden className="bg-muted-foreground/40 h-0.5 w-2.5 shrink-0 rounded-full" />
+              )}
+            </li>
+          ))}
+        </ol>
+      </PopoverContent>
+    </Popover>
   )
 }

@@ -52,12 +52,12 @@ export function HistoryStrip({ scroller, lines }: { scroller: RefObject<HTMLDivE
       <ol className="flex max-h-full min-h-0 flex-col" onMouseLeave={() => setHover(null)}>
         {lines.map((l, i) => (
           <li key={l.id} className="group relative flex min-h-[3px] flex-[0_1_10px] basis-[10px]" onMouseEnter={() => setHover(i)}>
-            <button type="button" onClick={() => go(l.id)} aria-label={`Go to message: ${l.title}`} aria-current={i === at ? 'true' : undefined} className="flex w-9 flex-1 items-center justify-end outline-none @[900px]:justify-start" onFocus={() => setHover(i)} onBlur={() => setHover(null)}>
+            <button type="button" onClick={() => go(l.id)} aria-label={`Go to message: ${l.title}`} aria-current={i === at ? 'true' : undefined} className="flex w-9 flex-1 items-center justify-end outline-none" onFocus={() => setHover(i)} onBlur={() => setHover(null)}>
               <span style={{ width: width(i) }} className={cn('block h-[2px] rounded-full transition-[width,background-color] duration-200', i === at ? 'bg-foreground' : 'bg-muted-foreground/50 group-hover:bg-foreground/80')} />
             </button>
             <div
               role="tooltip"
-              className="surface-edge bg-popover pointer-events-none absolute top-1/2 right-full mr-2 w-64 -translate-y-1/2 translate-x-1 rounded-xl p-3 opacity-0 transition-[opacity,transform] duration-150 group-hover:translate-x-0 group-hover:opacity-100 group-focus-within:translate-x-0 group-focus-within:opacity-100 @[900px]:right-auto @[900px]:left-full @[900px]:mr-0 @[900px]:ml-2 @[900px]:-translate-x-1 @[900px]:group-hover:translate-x-0 @[900px]:group-focus-within:translate-x-0"
+              className="surface-edge bg-popover pointer-events-none absolute top-1/2 right-full mr-2 w-64 -translate-y-1/2 translate-x-1 rounded-xl p-3 opacity-0 transition-[opacity,transform] duration-150 group-hover:translate-x-0 group-hover:opacity-100 group-focus-within:translate-x-0 group-focus-within:opacity-100"
             >
               <p className="text-foreground line-clamp-2 text-[13px] font-medium">{l.title}</p>
               {l.reply && <p className="text-muted-foreground mt-1 line-clamp-3 text-xs">{l.reply}</p>}

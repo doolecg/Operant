@@ -100,6 +100,16 @@ export function useAnyChatWorking(ids: number[]): boolean {
   return useSyncExternalStore(subscribe, () => ids.some((id) => entries.get(id)?.state?.turn.phase === 'working'))
 }
 
+// How many of these Claude tiles are in the middle of a turn.
+export function useWorkingCount(ids: number[]): number {
+  const key = ids.join(',')
+  const subscribe = useCallback((l: () => void) => {
+    const offs = ids.map((id) => subscribeTo(id, l))
+    return () => offs.forEach((off) => off())
+  }, [key])
+  return useSyncExternalStore(subscribe, () => ids.filter((id) => entries.get(id)?.state?.turn.phase === 'working').length)
+}
+
 // "Edit from here" puts the rewound message back into the tile's chat box: the Composer registers here.
 const composers = new Map<number, (m: ChatSendInput) => void>()
 

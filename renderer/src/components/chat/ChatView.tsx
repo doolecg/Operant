@@ -9,8 +9,8 @@ import { cn } from '@/lib/utils'
 import { AgentThread } from './AgentThread'
 import { Composer } from './Composer'
 import { HistoryStrip } from './HistoryStrip'
-import { FactoryBar, FactoryRail, type FactoryWorker } from './FactoryBox'
-import { StageBar, StageRail } from './StageBox'
+import { FactoryChip, type FactoryWorker } from './FactoryBox'
+import { StageChip } from './StageBox'
 import { ConversationList } from './ConversationList'
 import { StatusLine } from './StatusLine'
 import { TaskList } from './TaskList'
@@ -171,8 +171,12 @@ export function ChatView({ scratchId, launchEffort, tileModel, onTerminal, proje
 
   return (
     <div className={cn('@container relative flex h-full min-h-0 flex-col', returning.current && 'm-drill-out')} onKeyDown={onKeyDown} data-chat="view">
-      <StageBar crewId={crewId ?? null} on={engineering} />
-      <FactoryBar crewId={crewId ?? null} on={factory} workers={workers} />
+      {(engineering || factory) && (
+        <div data-chat="mode-chips" className="mx-auto flex w-full max-w-[720px] shrink-0 justify-end gap-2 px-5 pt-2">
+          <StageChip crewId={crewId ?? null} on={engineering} />
+          <FactoryChip crewId={crewId ?? null} on={factory} workers={workers} />
+        </div>
+      )}
       <div className="relative min-h-0 flex-1">
         <div ref={scroller} onScroll={onScroll} onWheel={leaveGlide} onTouchStart={leaveGlide} onPointerDown={leaveGlide} role="log" aria-live="polite" aria-relevant="additions" aria-label="Conversation" className={cn('h-full overflow-y-auto', strip && '[scrollbar-width:none] [&::-webkit-scrollbar]:hidden')}>
           <div ref={inner} className="mx-auto flex max-w-[720px] flex-col gap-3.5 px-5 pt-7 pb-4">
@@ -203,9 +207,7 @@ export function ChatView({ scratchId, launchEffort, tileModel, onTerminal, proje
             {state.process === 'stopped' && items!.length > 0 && <div className="text-muted-foreground text-xs">Claude Code is stopped. Sending a message starts it again.</div>}
           </div>
         </div>
-        <aside aria-label="Chat navigation" className="pointer-events-none absolute top-3 right-1 bottom-3 z-10 flex flex-col gap-4 @[900px]:right-auto @[900px]:left-4 @[900px]:w-[200px] [&>*]:pointer-events-auto">
-          <StageRail crewId={crewId ?? null} on={engineering} />
-          <FactoryRail crewId={crewId ?? null} on={factory} workers={workers} />
+        <aside aria-label="Chat navigation" className="pointer-events-none absolute top-3 right-1 bottom-3 z-10 flex flex-col gap-4 [&>*]:pointer-events-auto">
           {strip && <HistoryStrip scroller={scroller} lines={lines} />}
         </aside>
         {!atBottom && (
