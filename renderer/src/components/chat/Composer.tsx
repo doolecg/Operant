@@ -19,6 +19,7 @@ import { setActivity } from './activityStore'
 import { CommandMenu } from './CommandMenu'
 import { LearningBadge } from '@/components/memory/LearningBadge'
 import { LearnPill } from './ComposerPills'
+import { CompactPill } from './CompactPill'
 import { ImageChip } from './ImageChip'
 import { InfoRow } from './InfoRow'
 import { QueueStrip } from './QueueStrip'
@@ -38,6 +39,8 @@ const MAX_SHARE = 0.4
 // Kept while the app runs so a chat bar keeps its text (and the last enhanced prompt) across project, Settings and Memory switches.
 const drafts = new Map<number, string>()
 const lastEnhanced = new Map<number, string>()
+// The chats whose owner chose to keep the full history instead of compacting before the next message.
+const keepFull = new Set<number>()
 const toolbarBtn ='text-muted-foreground hover:bg-accent hover:text-foreground inline-flex h-[26px] items-center gap-1 rounded-[7px] px-2 text-[13px] disabled:opacity-50'
 
 const readImage = (file: File): Promise<Attachment | null> =>
@@ -246,6 +249,16 @@ export function Composer({ scratchId, state, launchEffort, tileModel, disabled, 
     area.current?.focus()
   }
 
+  const ctxPct = state.contextUsage?.percentage ?? state.context?.percentage ?? null
+  const ctxUsed = state.contextUsage?.totalTokens ?? state.context?.usedTokens ?? null
+  const compactTokens = ctxPct !== null && ctxUsed !== null && ctxPct >= (appSettings?.contextWarnPct ?? 60) && !running ? ctxUsed : null
+  const [keepFullNow, setKeepFullNow] = useState(() => keepFull.has(scratchId))
+  const toggleKeepFull = () => {
+    if (keepFull.has(scratchId)) keepFull.delete(scratchId)
+    else keepFull.add(scratchId)
+    setKeepFullNow(keepFull.has(scratchId))
+  }
+
   const submit = async () => {
     const body = text.trim()
     if ((!body && images.length === 0) || disabled) return
@@ -258,6 +271,8 @@ export function Composer({ scratchId, state, launchEffort, tileModel, disabled, 
       setMenuOpen(true)
       return
     }
+    // A full context compacts first (Claude Code runs the next message after it) unless the owner chose to keep the history.
+    if (compactTokens !== null && !keepFullNow && !body.startsWith('/') && !(await chatActions.send(scratchId, '/compact'))) return
     const ok = await chatActions.send(scratchId, body, images.map(({ mediaType, base64 }) => ({ mediaType, base64 })))
     if (!ok) return
     setText('')
@@ -496,6 +511,7 @@ export function Composer({ scratchId, state, launchEffort, tileModel, disabled, 
             </DropdownMenu>
 
             <EffortPopover model={model} modelName={modelName} effort={state.effort} defaultLevel={launchEffort} onChange={(l) => chatActions.setEffort(scratchId, l)} triggerClass={toolbarBtn} />
+            {compactTokens !== null && <CompactPill tokens={compactTokens} keepFull={keepFullNow} onToggle={toggleKeepFull} />}
             {running ? (
               <button type="button" aria-label="Stop" title="Stop (Esc)" onClick={() => chatActions.interrupt(scratchId)} className="bg-foreground text-background grid size-[30px] shrink-0 place-items-center rounded-full hover:opacity-90">
                 <Square className="size-[9px] fill-current" aria-hidden />

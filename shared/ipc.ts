@@ -58,7 +58,7 @@ import type { GitBranches, GitCommit, GitCommitDetails, GitCommitResult, GitDiff
 import type { Settings, SettingsPatch } from './settings'
 import type { MediaState, MediaTimeline } from './media'
 import type { CapabilityReport, ClaudeTileState } from './mods'
-import type { EngineeringStatus, TaskInfo } from './engineering'
+import type { EngineeringStatus, TaskInfo, TaskListItem, TaskPlan } from './engineering'
 import type { RunningCounts } from './notify'
 import type { TilePopoutRequest } from './tile-popout'
 import { CHAT_CHANNELS, type ChatApi, type ChatEvents, type ChatImage } from './claude-chat'
@@ -316,6 +316,10 @@ export interface IpcApi extends ChatApi {
   'engineering:reset': () => EngineeringStatus
   // The project's newest Engineering task and its stages (null when it has none, or it was cleared). Every change pushes engineering:tasks.
   'engineering:stages': (crewId: number) => TaskInfo | null
+  // The newest task with its plan gate, slices and spec page (what the Plan panel shows); null when it has none or it was cleared.
+  'engineering:plan': (crewId: number) => TaskPlan | null
+  // Every task of the project, newest first, with when its newest file changed (the Plans view).
+  'engineering:tasks:list': (crewId: number) => TaskListItem[]
   // Takes the current task off the panel (its files stay); a task edited after this shows again.
   'engineering:clearTask': (crewId: number) => void
   // Handled by main: opens <userData>/engineering in the file manager.
@@ -745,6 +749,8 @@ export const CORE_CHANNELS: CoreChannel[] = [
   'engineering:status',
   'engineering:reset',
   'engineering:stages',
+  'engineering:plan',
+  'engineering:tasks:list',
   'engineering:clearTask',
   'claudeTile:get',
   ...CHAT_CHANNELS,

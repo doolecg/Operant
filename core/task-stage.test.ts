@@ -2,7 +2,7 @@ import { mkdirSync, mkdtempSync, rmSync, utimesSync, writeFileSync } from 'node:
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
-import { readTask, readTaskStages, watchTasks } from './task-stage'
+import { listTasks, readTask, readTaskPlan, readTaskStages, watchTasks } from './task-stage'
 
 let folder = ''
 beforeEach(() => void (folder = mkdtempSync(join(tmpdir(), 'operant-stage-'))))
@@ -64,7 +64,49 @@ describe('readTask', () => {
   })
 })
 
-const nextCall = (calls: { n: number }, from: number) =>
+describe('listTasks', () => {
+  it('is empty without an Engineering folder', () => {
+    expect(listTasks(folder)).toEqual([])
+  })
+
+  it('lists every task newest first with the time its newest file changed', () => {
+    task('old', { 'spec.html': 's' }, 1_000_000)
+    task('new', { 'notes.html': 'n', 'spec.html': '<title>Spec: Newer</title>' }, 2_000_000)
+    const list = listTasks(folder)
+    expect(list.map((t) => t.name)).toEqual(['new', 'old'])
+    expect(list[0]).toMatchObject({ title: 'Newer', updatedAt: 2_000_000_000 })
+    expect(list[1]?.stages.find((s) => s.state === 'current')?.key).toBe('spec')
+  })
+})
+
+describe('readTaskPlan', () => {
+  it('is null without a task, and when the task was cleared', () => {
+    expect(readTaskPlan(folder)).toBeNull()
+    task('a', { 'spec.html': 's' }, 1_000)
+    expect(readTaskPlan(folder, 2_000_000)).toBeNull()
+  })
+
+  it('gives the gate, slices, spec title and spec path of the newest task', () => {
+    task('a', { 'spec.html': '<title>Spec: Toggles</title>', 'slices.html': '<input type="checkbox" checked> 1. One <input type="checkbox"> 2. Two' })
+    expect(readTaskPlan(folder)).toMatchObject({
+      name: 'a',
+      gate: 'approved',
+      specTitle: 'Toggles',
+      specPath: '.operant/engineering/a/spec.html',
+      slices: [
+        { label: '1. One', done: true, current: false },
+        { label: '2. Two', done: false, current: true },
+      ],
+    })
+  })
+
+  it('has no spec title or path without a spec page', () => {
+    task('a', { 'notes.html': 'n' })
+    expect(readTaskPlan(folder)).toMatchObject({ gate: 'none', slices: [], specTitle: null, specPath: null })
+  })
+})
+
+const nextCall =(calls: { n: number }, from: number) =>
   new Promise<void>((resolve, reject) => {
     const t0 = Date.now()
     const id = setInterval(() => {

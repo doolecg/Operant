@@ -1,6 +1,6 @@
 import { existsSync, readdirSync, readFileSync, realpathSync, statSync, watch, type FSWatcher } from 'node:fs'
 import { join } from 'node:path'
-import { taskStages, type StageLine, type TaskInfo } from '../shared/engineering'
+import { taskPlan, taskStages, type StageLine, type TaskInfo, type TaskListItem, type TaskPlan } from '../shared/engineering'
 
 const tasksDir = (folder: string) => join(folder, '.operant', 'engineering')
 
@@ -22,20 +22,55 @@ function taskTitle(dir: string, files: string[], name: string): string {
   return words.charAt(0).toUpperCase() + words.slice(1)
 }
 
+interface TaskFolder {
+  name: string
+  dir: string
+  files: string[]
+  at: number
+}
+
+// Every task folder of the project, the one whose files changed last first.
+function taskFolders(folder: string): TaskFolder[] {
+  const root = tasksDir(folder)
+  if (!existsSync(root)) return []
+  return readdirSync(root, { withFileTypes: true })
+    .filter((e) => e.isDirectory())
+    .map((e) => ({ name: e.name, dir: join(root, e.name), ...readTask1(join(root, e.name)) }))
+    .sort((a, b) => b.at - a.at)
+}
+
+const slicesOf = (t: TaskFolder) => (t.files.includes('slices.html') ? readFileSync(join(t.dir, 'slices.html'), 'utf8') : null)
+const infoOf = (t: TaskFolder, slices: string | null): TaskInfo => ({ name: t.name, title: taskTitle(t.dir, t.files, t.name), stages: taskStages(t.files, slices) })
+
+// The newest task whose files changed after `clearedAt`; null when there is none.
+function newestTask(folder: string, clearedAt: number): TaskFolder | null {
+  const best = taskFolders(folder)[0]
+  return best && best.at > clearedAt ? best : null
+}
+
 // The project's newest Engineering task (the one whose files changed last, and after `clearedAt`); null when there is none.
 export function readTask(folder: string, clearedAt = 0): TaskInfo | null {
-  const root = tasksDir(folder)
-  if (!existsSync(root)) return null
-  let best: { name: string; dir: string; files: string[]; at: number } | null = null
-  for (const e of readdirSync(root, { withFileTypes: true })) {
-    if (!e.isDirectory()) continue
-    const dir = join(root, e.name)
-    const task = readTask1(dir)
-    if (!best || task.at > best.at) best = { name: e.name, dir, ...task }
+  const best = newestTask(folder, clearedAt)
+  return best ? infoOf(best, slicesOf(best)) : null
+}
+
+// Every Engineering task of the project, newest first, each with when its newest file changed.
+export function listTasks(folder: string): TaskListItem[] {
+  return taskFolders(folder).map((t) => ({ ...infoOf(t, slicesOf(t)), updatedAt: t.at }))
+}
+
+// The newest task with its plan gate, slices and spec (what the Plan panel shows); null when there is none.
+export function readTaskPlan(folder: string, clearedAt = 0): TaskPlan | null {
+  const best = newestTask(folder, clearedAt)
+  if (!best) return null
+  const slices = slicesOf(best)
+  const hasSpec = best.files.includes('spec.html')
+  const specTitle = hasSpec ? (/<title[^>]*>([^<]*)<\/title>/i.exec(readFileSync(join(best.dir, 'spec.html'), 'utf8'))?.[1]?.replace(/^\s*spec\s*:\s*/i, '').trim() || null) : null
+  return {
+    ...infoOf(best, slices),
+    ...taskPlan(best.files, slices, specTitle),
+    specPath: hasSpec ? `.operant/engineering/${best.name}/spec.html` : null,
   }
-  if (!best || best.at <= clearedAt) return null
-  const slices = best.files.includes('slices.html') ? readFileSync(join(best.dir, 'slices.html'), 'utf8') : null
-  return { name: best.name, title: taskTitle(best.dir, best.files, best.name), stages: taskStages(best.files, slices) }
 }
 
 export const readTaskStages = (folder: string): StageLine[] | null => readTask(folder)?.stages ?? null

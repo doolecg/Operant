@@ -11,6 +11,8 @@ import { useWaitingTiles } from '@/components/terminal/useWaitingTiles'
 import { Toaster } from '@/components/ui/toaster'
 import { Sidebar } from '@/components/dashboard/Sidebar'
 import { TerminalView } from '@/components/terminal/TerminalView'
+import { BoardView } from '@/components/board/BoardView'
+import { PlansView } from '@/components/plans/PlansView'
 import { LearningBadge, OPEN_SETTINGS_EVENT } from '@/components/memory/LearningBadge'
 import { START_ROLE_EVENT, type StartRoleDetail } from '@/components/chat/FactoryBox'
 import { ServersPopover } from '@/components/dashboard/ServersPopover'
@@ -261,7 +263,7 @@ export function App() {
           {tier < 7 && <CliSelect />}
           {tier >= 7 && cliMenu}
         </div>
-        <TopNav views={['thread', 'tiles']} view={page === 'dashboard' ? view : null} onChange={(v) => (setView(v), setPage('dashboard'))} />
+        <TopNav views={['thread', 'board', 'plans', 'tiles']} view={page === 'dashboard' ? view : null} onChange={(v) => (setView(v), setPage('dashboard'))} />
         <div className="flex items-center justify-end gap-2">
           {crew && <ModeToggles crew={crew} tier={tier} />}
           {tb && tier < 6 && <ClockPill format={tb.clockFormat} seconds={tb.clockSeconds} date={tb.clockDate && tier < 2} />}
@@ -338,7 +340,12 @@ export function App() {
             <div className="surface min-h-0 flex-1 m-1.5 overflow-hidden"><Welcome onNewCrew={() => setNewCrew(true)} /></div>
           ) : (
             <div className="min-h-0 flex-1">
-              {crewId != null && (
+              {view === 'board' ? (
+                <BoardView crews={crews.data ?? []} tabs={terminals.tabs} onOpenThread={(row) => (setCrewId(row.crewId), setView('thread'), void terminals.reopenTab(row))} />
+              ) : view === 'plans' ? (
+                <PlansView crews={crews.data ?? []} onOpenProject={(id) => (setCrewId(id), setView('thread'))} />
+              ) : (
+                crewId != null && (
                 <TerminalView
                   crewId={crewId}
                   scratch={projectScratch}
@@ -347,6 +354,7 @@ export function App() {
                   onStart={(kind) => crew && void terminals.openTab(crew, kind)}
                   mode={view === 'tiles' ? 'tiles' : 'thread'}
                 />
+                )
               )}
             </div>
           )}

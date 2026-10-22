@@ -1,15 +1,21 @@
 import { useEffect, useRef, useState } from 'react'
-import { ChevronRight } from 'lucide-react'
+import { Bot, Files, ListChecks, type LucideIcon } from 'lucide-react'
 import { useCapabilities, useClaudeTileState, useSettings } from '@/lib/queries'
+import { useTaskPlan } from '@/lib/queries/engineering'
 import { ResizeHandle } from '@/components/ui/resize-handle'
 import { useAgentSelection } from '@/components/chat/agentSelection'
+import { FilesPanel } from '@/components/plans/FilesPanel'
+import { PlanPanel } from '@/components/plans/PlanPanel'
+import { cn } from '@/lib/utils'
 import { ModBoundary } from './ModBoundary'
 import type { ModId } from '@shared/mods'
 import { MODS } from './registry'
 
 const WIDTH_KEY = 'operant.subagentPanelWidth'
-const COLLAPSED_KEY = 'operant.subagentPanelCollapsed'
-const DEFAULT_WIDTH = 300
+const TAB_KEY = 'operant.railTab'
+const DEFAULT_WIDTH = 400
+
+type Tab = 'plan' | 'files' | 'agents'
 
 // localStorage can be missing or full; the panel then keeps its defaults.
 function readStored(key: string): string | null {
@@ -28,69 +34,94 @@ function writeStored(key: string, value: string) {
   }
 }
 
-// The Mods panel beside a Claude tile. Only Operant's own panels live here: native mods draw inside Claude Code.
-// Hidden when mods are off or no panel is enabled; a notice says why the panel cannot run. The frame (width and
-// collapse, kept in localStorage) is the host's; a crash in the panel stays inside its ModBoundary.
-export function ModsHost({ tileId, crewId, chat }: { tileId: number; crewId: number | null; chat?: boolean }) {
+function RailButton({ label, icon: Icon, on, dot, onClick }: { label: string; icon: LucideIcon; on: boolean; dot?: boolean; onClick: () => void }) {
+  return (
+    <button
+      type="button"
+      aria-label={label}
+      title={label}
+      aria-pressed={on}
+      onClick={onClick}
+      className={cn('m-press relative grid size-9 place-items-center rounded-[10px] outline-none focus-visible:ring-2', on ? 'bg-accent text-foreground' : 'text-muted-foreground hover:bg-accent/60 hover:text-foreground')}
+    >
+      <Icon className="size-[18px]" aria-hidden />
+      {dot && <i aria-hidden className={cn('bg-warning absolute top-1 right-1 size-2.5 rounded-full border-2', on ? 'border-accent' : 'border-sidebar')} />}
+    </button>
+  )
+}
+
+// The right rail of a thread: Plan (while Engineering Mode is on), Files and Agents as icons; a click opens that panel beside the rail, another closes it.
+// Only Operant's own panels live here: native mods draw inside Claude Code. The frame (width and the open tab, kept in localStorage) is the host's;
+// a crash in the Agents panel stays inside its ModBoundary.
+export function ModsHost({ tileId, crewId, chat, engineering }: { tileId: number; crewId: number | null; chat?: boolean; engineering?: boolean }) {
   const settings = useSettings().data
   const caps = useCapabilities().data
   const state = useClaudeTileState(tileId).data ?? null
+  const plan = useTaskPlan(engineering ? crewId : null).data
   const [width, setWidth] = useState(() => Number(readStored(WIDTH_KEY)) || DEFAULT_WIDTH)
-  const [collapsed, setCollapsed] = useState(() => readStored(COLLAPSED_KEY) !== '0')
+  const [tab, setTab] = useState<Tab | null>(() => (readStored(TAB_KEY) as Tab | null) || null)
   const panel = useRef<HTMLElement>(null)
-  // Opening an agent from the chat expands a collapsed panel.
+  // Opening an agent from the chat opens the Agents panel.
   const opened = useAgentSelection(tileId).nonce
   useEffect(() => {
-    if (opened > 0) setCollapsed(false)
+    if (opened > 0) pick('agents')
   }, [opened])
-  if (!settings || !settings.mods.enabled) return null
-  const mod = MODS.find((m) => m.kind === 'panel' && m.component && settings.mods.mods[m.id as ModId])
-  if (!mod?.component) return null
-  const Panel = mod.component
-  const a = chat ? { available: true } : (mod.isAvailable?.(caps) ?? { available: true })
-  const toggle = () => {
-    setCollapsed((c) => !c)
-    writeStored(COLLAPSED_KEY, collapsed ? '0' : '1')
+  const mod = settings?.mods.enabled ? MODS.find((m) => m.kind === 'panel' && m.component && settings.mods.mods[m.id as ModId]) : undefined
+  const tabs: Tab[] = [...(engineering ? (['plan'] as const) : []), ...(crewId !== null ? (['files'] as const) : []), ...(mod?.component ? (['agents'] as const) : [])]
+  if (!settings || tabs.length === 0) return null
+  const shown = tab !== null && tabs.includes(tab) ? tab : null
+  function pick(next: Tab) {
+    setTab((cur) => {
+      const to = cur === next ? null : next
+      writeStored(TAB_KEY, to ?? '')
+      return to
+    })
   }
+  const Panel = mod?.component
+  const a = chat || !mod ? { available: true } : (mod.isAvailable?.(caps) ?? { available: true })
 
   return (
-    <aside
-      ref={panel}
-      aria-label={`Mods: ${mod.title} panel`}
-      data-testid="subagent-panel"
-      className="m-panel surface relative my-1.5 mr-1.5 flex min-h-0 shrink-0 flex-col overflow-hidden text-xs"
-      style={{ width: collapsed ? 44 : width }}
-    >
-      {!collapsed && (
-        <ResizeHandle
-          target={panel}
-          axis="x"
-          grow={-1}
-          min={240}
-          max={520}
-          label="Resize Subagent Panel"
-          className="left-0"
-          onResize={setWidth}
-          onCommit={(px) => (setWidth(px), writeStored(WIDTH_KEY, String(px)))}
-          onReset={() => (setWidth(DEFAULT_WIDTH), writeStored(WIDTH_KEY, String(DEFAULT_WIDTH)))}
-        />
-      )}
-      {collapsed ? (
-        <button type="button" aria-expanded={false} aria-label="Expand Subagent Panel" title={mod.title} onClick={toggle} className="hover:bg-accent flex flex-1 flex-col rounded-2xl items-center gap-2 p-2">
-          <mod.icon className="text-muted-foreground size-4" aria-hidden />
-          <ChevronRight className="text-muted-foreground size-3" aria-hidden />
-        </button>
-      ) : (
-        <ModBoundary title={mod.title}>
-          {a.available ? (
-            <Panel tileId={tileId} crewId={crewId} state={state} settings={settings} chat={chat} onCollapse={toggle} />
-          ) : (
-            <p className="text-muted-foreground p-3 text-xs">
-              <span className="font-medium">{mod.title}</span> is unavailable: {a.reason}.
-            </p>
+    <>
+      {shown && (
+        <aside
+          ref={panel}
+          aria-label={shown === 'agents' ? `Mods: ${mod?.title} panel` : shown === 'plan' ? 'Plan panel' : 'Files panel'}
+          data-testid="subagent-panel"
+          className="m-panel surface relative my-1.5 flex min-h-0 shrink-0 flex-col overflow-hidden text-xs"
+          style={{ width }}
+        >
+          <ResizeHandle
+            target={panel}
+            axis="x"
+            grow={-1}
+            min={280}
+            max={560}
+            label="Resize side panel"
+            className="left-0"
+            onResize={setWidth}
+            onCommit={(px) => (setWidth(px), writeStored(WIDTH_KEY, String(px)))}
+            onReset={() => (setWidth(DEFAULT_WIDTH), writeStored(WIDTH_KEY, String(DEFAULT_WIDTH)))}
+          />
+          {shown === 'plan' && <PlanPanel crewId={crewId} />}
+          {shown === 'files' && <FilesPanel crewId={crewId} />}
+          {shown === 'agents' && Panel && (
+            <ModBoundary title={mod!.title}>
+              {a.available ? (
+                <Panel tileId={tileId} crewId={crewId} state={state} settings={settings} chat={chat} onCollapse={() => pick('agents')} />
+              ) : (
+                <p className="text-muted-foreground p-3 text-xs">
+                  <span className="font-medium">{mod!.title}</span> is unavailable: {a.reason}.
+                </p>
+              )}
+            </ModBoundary>
           )}
-        </ModBoundary>
+        </aside>
       )}
-    </aside>
+      <nav aria-label="Side panels" className="flex w-11 shrink-0 flex-col items-center gap-1 pt-3">
+        {tabs.includes('plan') && <RailButton label="Plan" icon={ListChecks} on={shown === 'plan'} dot={plan?.gate === 'waiting'} onClick={() => pick('plan')} />}
+        {tabs.includes('files') && <RailButton label="Files" icon={Files} on={shown === 'files'} onClick={() => pick('files')} />}
+        {tabs.includes('agents') && <RailButton label="Agents" icon={Bot} on={shown === 'agents'} onClick={() => pick('agents')} />}
+      </nav>
+    </>
   )
 }

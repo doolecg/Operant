@@ -239,7 +239,7 @@ export function TerminalView({ crewId, scratch, active, onCloseScratch, onStart,
       </section>
 
       {claudeTile && (
-        <ModsHost key={claudeTile.scratch.scratchId} tileId={claudeTile.scratch.scratchId} crewId={crew?.id ?? null} chat={views?.[claudeTile.scratch.scratchId]?.view === 'chat'} />
+        <ModsHost key={claudeTile.scratch.scratchId} tileId={claudeTile.scratch.scratchId} crewId={crew?.id ?? null} engineering={crew?.engineering ?? false} chat={views?.[claudeTile.scratch.scratchId]?.view === 'chat'} />
       )}
     </div>
   )

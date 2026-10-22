@@ -71,7 +71,7 @@ import { CapabilityProber, systemProbeDeps, type ProbeDeps } from './capabilitie
 import { ClaudeAgents } from './claude-agents'
 import { hooksConfig, type ModsPaths } from './claude-events'
 import { packStatus, resetPack } from './engineering'
-import { readTask, watchTasks } from './task-stage'
+import { listTasks, readTask, readTaskPlan, watchTasks } from './task-stage'
 import { applyToolPaths, findInDefaults, PROGRAM_BINARY } from './tool-locations'
 import type { InstallId, InstallStatusItem } from '../shared/install'
 import { buildPreamble } from '../shared/engineering'
@@ -1036,13 +1036,17 @@ export class Operant extends EventEmitter<PushEvents> {
 
   private engineeringHandlers(): Group<'engineering'> {
     const status = () => ({ edited: this.engineeringDir ? packStatus(this.engineeringDir).edited : [], folder: this.engineeringDir ?? '' })
+    const watched = (crewId: number) => {
+      const crew = this.requireCrew(crewId)
+      if (!this.taskWatchers.has(crewId)) this.taskWatchers.set(crewId, watchTasks(crew.folder, () => this.emit('engineering:tasks', { crewId })))
+      return crew
+    }
+    const clearedAt = (crewId: number) => Number(this.store.getJson(`engineering.cleared.${crewId}`) ?? 0)
     return {
       'engineering:status': status,
-      'engineering:stages': (crewId) => {
-        const crew = this.requireCrew(crewId)
-        if (!this.taskWatchers.has(crewId)) this.taskWatchers.set(crewId, watchTasks(crew.folder, () => this.emit('engineering:tasks', { crewId })))
-        return readTask(crew.folder, Number(this.store.getJson(`engineering.cleared.${crewId}`) ?? 0))
-      },
+      'engineering:stages': (crewId) => readTask(watched(crewId).folder, clearedAt(crewId)),
+      'engineering:plan': (crewId) => readTaskPlan(watched(crewId).folder, clearedAt(crewId)),
+      'engineering:tasks:list': (crewId) => listTasks(watched(crewId).folder),
       'engineering:clearTask': (crewId) => {
         this.requireCrew(crewId)
         this.store.setJson(`engineering.cleared.${crewId}`, this.now())

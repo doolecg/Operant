@@ -1,11 +1,48 @@
 import { describe, expect, it } from 'vitest'
-import { buildPreamble, taskStages } from './engineering'
+import { buildPreamble, taskPlan, taskStages } from './engineering'
 
 const row = (box: string, n: number) => `<li>${box} <b>${n}. Title</b></li>`
 const slices = (ticked: number, total: number) => Array.from({ length: total }, (_, i) => row(i < ticked ? '<input type="checkbox" checked>' : '<input type="checkbox">', i + 1)).join('\n')
 const at = (files: string[], html: string | null = null) => taskStages(files, html).map((s) => `${s.key}:${s.state}`).join(' ')
 
 const dirs = { engineeringDir: 'C:\\Data\\engineering\\engineering', factoryDir: 'C:\\Data\\engineering\\factory\\' }
+
+describe('taskPlan', () => {
+  const files = ['spec.html', 'slices.html']
+
+  it('has no gate before there is a numbered slice', () => {
+    expect(taskPlan(['spec.html'], null, 'x')).toMatchObject({ gate: 'none', slices: [] })
+    expect(taskPlan(files, '<h1>Slices</h1>', null).gate).toBe('none')
+  })
+
+  it('waits for the OK while no slice is ticked and marks the first slice current', () => {
+    const p = taskPlan(files, slices(0, 2), 'x')
+    expect(p.gate).toBe('waiting')
+    expect(p.slices).toEqual([
+      { label: '1. Title', done: false, current: true },
+      { label: '2. Title', done: false, current: false },
+    ])
+  })
+
+  it('is approved once a slice is ticked; the first unticked one is current', () => {
+    const p = taskPlan(files, slices(1, 3), 'x')
+    expect(p.gate).toBe('approved')
+    expect(p.slices.map((s) => `${s.done}:${s.current}`)).toEqual(['true:false', 'false:true', 'false:false'])
+  })
+
+  it('has no current slice when all are ticked, and keeps the spec title', () => {
+    const p = taskPlan(files, slices(2, 2), 'Stage box')
+    expect(p.gate).toBe('approved')
+    expect(p.slices.some((s) => s.current)).toBe(false)
+    expect(p.specTitle).toBe('Stage box')
+  })
+
+  it('reads labels from the [x] text style and from several boxes on one line, without tags or entities', () => {
+    const p = taskPlan(files, '[x] 1. Mods &amp; hooks\n  <input type="checkbox"> criterion\n<input type="checkbox" checked> 2. <code>ModeToggles</code> <input type="checkbox"> 3. Last', null)
+    expect(p.slices.map((s) => s.label)).toEqual(['1. Mods & hooks', '2. ModeToggles', '3. Last'])
+    expect(p.slices.map((s) => s.done)).toEqual([true, true, false])
+  })
+})
 
 describe('taskStages', () => {
   it('lists the six stages in order with their labels', () => {
