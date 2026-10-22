@@ -119,7 +119,7 @@ export function createUpdater({
     }
     if (!Number.isFinite(free) || free >= size * 2) return
     const mb = (n: number) => Math.ceil(n / 1_048_576)
-    throw new Error(`Not enough disk space to download Operant 3 ${version} (needs ${mb(size * 2)} MB, ${mb(free)} MB free)`)
+    throw new Error(`Not enough disk space to download Operant ${version} (needs ${mb(size * 2)} MB, ${mb(free)} MB free)`)
   }
 
   async function fetchAsset(asset: ReleaseAsset, version: string, kind: InstallKind, onDownload: () => void): Promise<string> {
@@ -262,8 +262,8 @@ export function createUpdater({
     if (r.kind === 'dmg') {
       const bundle = resolve(process.execPath, '../../..')
       if (!APP_BUNDLES.includes(basename(bundle)) || bundle.startsWith('/Volumes/') || bundle.includes('/AppTranslocation/'))
-        return fail('Move Operant 3 to Applications, then update')
-      if (!writable(dirname(bundle))) return fail(`Can't write to ${dirname(bundle)}; move Operant 3 somewhere you can write to`)
+        return fail('Move Operant to Applications, then update')
+      if (!writable(dirname(bundle))) return fail(`Can't write to ${dirname(bundle)}; move Operant somewhere you can write to`)
       script = macInstallScript({ pid: process.pid, dmg: r.file, bundle, log, relaunch })
     } else if (r.kind === 'appimage') {
       const target = resolve(process.env.APPIMAGE ?? '')
@@ -285,7 +285,7 @@ export function createUpdater({
   function install(relaunch: boolean): boolean {
     if (!ready || installing) return false
     if (updateInstalling()) {
-      report({ state: 'error', version: ready.version, message: 'An update is already installing; Operant 3 reopens when it is done' })
+      report({ state: 'error', version: ready.version, message: 'An update is already installing; Operant reopens when it is done' })
       return false
     }
     failure = undefined

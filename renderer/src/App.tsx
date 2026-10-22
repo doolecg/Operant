@@ -15,7 +15,6 @@ import { TerminalDrawer } from '@/components/terminal/TerminalDrawer'
 import { BoardView } from '@/components/board/BoardView'
 import { PlansView } from '@/components/plans/PlansView'
 import { LearningBadge, OPEN_SETTINGS_EVENT } from '@/components/memory/LearningBadge'
-import { START_ROLE_EVENT, type StartRoleDetail } from '@/components/chat/FactoryBox'
 import { ServersPopover } from '@/components/dashboard/ServersPopover'
 import { ProviderLimitBadge } from '@/components/cost/ProviderBadge'
 import { SettingsPage } from '@/components/settings/SettingsPage'
@@ -113,17 +112,6 @@ export function App() {
   const saveSettings = useSaveSettings()
   useUiScale(settings.data?.uiScale)
   const terminals = useTerminals(crews.data, settings.data?.defaultModels.claude ?? 'sonnet', settings.data?.mainCli ?? 'claude', settings.data?.defaultEfforts.claude ?? '')
-
-  // "Start" on a Factory level: a new Claude tile with just that preset.
-  useEffect(() => {
-    const start = (e: Event) => {
-      const { crewId: id, ...role } = (e as CustomEvent<StartRoleDetail>).detail
-      const target = crews.data?.find((c) => c.id === id)
-      if (target) void terminals.openTab(target, 'claude', role)
-    }
-    window.addEventListener(START_ROLE_EVENT, start)
-    return () => window.removeEventListener(START_ROLE_EVENT, start)
-  }, [crews.data, terminals.openTab])
 
   const crew = crews.data?.find((c) => c.id === crewId)
   const layout = settings.data?.layout
@@ -245,7 +233,7 @@ export function App() {
             <span aria-hidden className="text-[20px] leading-none text-[#d97757]">
               ◈
             </span>
-            {tier < 3 && <span className="text-[14px] font-semibold whitespace-nowrap">Operant 3</span>}
+            {tier < 3 && <span className="text-[14px] font-semibold whitespace-nowrap">Operant</span>}
           </div>
         </div>
         <TopNav views={['thread', 'board', 'plans', 'tiles']} view={page === 'dashboard' ? view : null} onChange={(v) => (setView(v), setPage('dashboard'))} />
@@ -434,7 +422,7 @@ function Welcome({ onNewCrew }: { onNewCrew: () => void }) {
         <div aria-hidden className="text-[#d97757] text-5xl leading-none">
           ◈
         </div>
-        <h1 className="text-2xl font-semibold">Welcome to Operant 3</h1>
+        <h1 className="text-2xl font-semibold">Welcome to Operant</h1>
         <p className="text-muted-foreground text-sm">
           Add a project folder, open shells and coding agents in it, and keep its lessons, usage and git changes in one place.
         </p>

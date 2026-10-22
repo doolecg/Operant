@@ -117,19 +117,8 @@ export function buildPreamble(modes: ProjectModes, dirs: PackDirs): string {
   }
   if (modes.factory) {
     blocks.push(
-      `Subagent Factory Mode is on. Read ${at(dirs.factoryDir, 'skills/factory/SKILL.md')}. The lead plans and reviews and does bulk work through helper agents using Task Cards (${at(dirs.factoryDir, 'skills/factory/task-card.md')}); paste ${at(dirs.factoryDir, 'skills/factory/worker-brief.md')} into every helper brief; max 3 helpers at once, max 3 per job, one build at a time.`,
+      `Orchestrator Mode is on. Read ${at(dirs.factoryDir, 'skills/factory/SKILL.md')}. You are the one agent the user talks to: do the work yourself, and hand a part to a helper agent only when it saves context or time; max 3 helpers at once, one build at a time.`,
     )
   }
   return blocks.join('\n\n')
 }
-
-// The helper levels of Subagent Factory Mode, each started from the built-in preset of that name (its model, instructions and skills).
-export const FACTORY_ROLES = [
-  { key: 'leader', label: 'Leader', preset: 'plan', job: 'Plans, splits, reviews' },
-  { key: 'builder', label: 'Builder', preset: 'implement', job: 'Writes the code' },
-  { key: 'reviewer', label: 'Reviewer', preset: 'review', job: 'Checks the work' },
-  { key: 'scout', label: 'Scout', preset: 'research', job: 'Reads and reports' },
-  { key: 'tester', label: 'Tester', preset: 'test', job: 'Writes and runs tests' },
-] as const
-
-export type FactoryRole = (typeof FACTORY_ROLES)[number]

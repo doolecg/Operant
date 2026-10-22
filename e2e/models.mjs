@@ -31,7 +31,7 @@ try {
   await page.evaluate(() => window.operant.invoke('settings:set', { setupDone: true }))
   const inv = (c, ...a) => page.evaluate(([c, a]) => window.operant.invoke(c, ...a), [c, a])
   const win = (fn) => app.evaluate(({ BrowserWindow }, f) => new Function('w', `return (${f})(w)`)(BrowserWindow.getAllWindows()[0]), fn.toString())
-  await page.getByText('Welcome to Operant 3').waitFor()
+  await page.getByText('Welcome to Operant').waitFor()
   await inv('crews:create', { name: 'alpha', folder: project })
   await win((w) => w.isMaximized() && w.unmaximize())
   await win((w) => w.setContentSize(1400, 900))

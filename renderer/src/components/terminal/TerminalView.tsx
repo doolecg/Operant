@@ -100,8 +100,6 @@ export function TerminalView({ crewId, scratch, active, onCloseScratch, onStart,
     return e && e !== 'default' ? e : null
   }
 
-  const workers = Object.entries(views ?? {}).map(([id, v]) => ({ id: Number(id), presetId: v.presetId }))
-
   const body = (tile: TileInfo) => {
     const t = tile
     // The session lives in its own window: no terminal here, so two of them do not fight over the PTY size.
@@ -111,7 +109,7 @@ export function TerminalView({ crewId, scratch, active, onCloseScratch, onStart,
     if (t.scratch.kind === 'claude' && view === 'chat')
       return (
         <div className="relative h-full min-h-0">
-          <ChatView scratchId={t.scratch.scratchId} launchEffort={effortOf(t)} tileModel={views?.[t.scratch.scratchId]?.model ?? ''} onTerminal={() => void switchView(t, 'terminal')} projectName={crew?.name} threadTitle={t.title} crewId={crewId} engineering={crew?.engineering ?? false} factory={crew?.factory ?? false} workers={workers} chips={mode === 'tiles'} />
+          <ChatView scratchId={t.scratch.scratchId} launchEffort={effortOf(t)} tileModel={views?.[t.scratch.scratchId]?.model ?? ''} onTerminal={() => void switchView(t, 'terminal')} projectName={crew?.name} threadTitle={t.title} crewId={crewId} engineering={crew?.engineering ?? false} factory={crew?.factory ?? false} chips={mode === 'tiles'} />
         </div>
       )
     return (
@@ -208,7 +206,7 @@ export function TerminalView({ crewId, scratch, active, onCloseScratch, onStart,
               chips={
                 <>
                   <StageChip crewId={crewId} on={crew?.engineering ?? false} />
-                  <FactoryChip crewId={crewId} on={crew?.factory ?? false} workers={workers} />
+                  <FactoryChip scratchId={isScratchTile(openTile) && openTile.scratch.kind === 'claude' ? openTile.scratch.scratchId : null} on={crew?.factory ?? false} />
                 </>
               }
               badge={isScratchTile(openTile) && openTile.scratch.kind === 'claude' && viewOf(openTile) === 'chat' ? <ChatStateBadge scratchId={openTile.scratch.scratchId} /> : isScratchTile(openTile) ? <TileStatus tile={openTile.scratch} /> : null}

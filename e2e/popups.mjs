@@ -72,7 +72,7 @@ const dialogOk = async (label, { footer, scrolls = true }) => {
 
 try {
   await launch()
-  await page.getByText('Welcome to Operant 3').waitFor()
+  await page.getByText('Welcome to Operant').waitFor()
   await inv('crews:create', { name: 'alpha', folder: project })
   await inv('crews:create', { name: 'beta', folder: project })
   for (let i = 0; i < 25; i++) await inv('groups:create', `Group number ${i + 1}`)

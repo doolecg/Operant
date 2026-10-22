@@ -35,7 +35,7 @@ try {
   const tiles = () => page.locator('[data-tile]')
   const rectOf = (loc) => loc.evaluate((e) => ({ x: e.offsetLeft, y: e.offsetTop, w: e.offsetWidth, h: e.offsetHeight }))
 
-  await page.getByText('Welcome to Operant 3').waitFor()
+  await page.getByText('Welcome to Operant').waitFor()
   await inv('crews:create', { name: 'tiles', folder: project })
   await inv('settings:set', { tiles: { layout: 'dwindle', gaps: 6 } })
   await page.locator('[data-crew-row]').getByText('tiles', { exact: true }).click({ position: { x: 4, y: 4 } })

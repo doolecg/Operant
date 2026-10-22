@@ -130,11 +130,11 @@ export const shQuote = (s: string) => `'${String(s).replace(/'/g, `'\\''`)}'`
 const workerHead = (pid: number, log: string) => [
   `exec >>${shQuote(log)} 2>&1`,
   `say() { echo "$(date '+%Y-%m-%d %H:%M:%S') $*"; }`,
-  `say "waiting for Operant 3 (pid ${Number(pid)}) to exit"`,
+  `say "waiting for Operant (pid ${Number(pid)}) to exit"`,
   `n=0`,
   `while kill -0 ${Number(pid)} 2>/dev/null; do`,
   `  n=$((n+1))`,
-  `  if [ "$n" -gt 60 ]; then say "Operant 3 is still running, leaving the update for the next quit"; exit 1; fi`,
+  `  if [ "$n" -gt 60 ]; then say "Operant is still running, leaving the update for the next quit"; exit 1; fi`,
   `  sleep 1`,
   `done`,
 ]
@@ -220,7 +220,7 @@ export function updateFailureMessage(text: string, currentVersion: string, log: 
   const code = Number(raw)
   if (MSI_OK.has(code) || !newer(version, currentVersion)) return null
   if (code === 1223) return `The update to ${version} was cancelled at the Windows admin prompt`
-  if (code === -2) return `The update to ${version} did not install because Operant 3 was still running`
+  if (code === -2) return `The update to ${version} did not install because Operant was still running`
   if (code === 1618) return `The update to ${version} did not install because another install was running`
   return `The update to ${version} did not install (Windows Installer code ${String(code)}). Details: ${log}`
 }

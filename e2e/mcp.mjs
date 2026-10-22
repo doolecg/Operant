@@ -51,7 +51,7 @@ try {
   await page.setViewportSize({ width: 1440, height: 900 })
   await page.waitForFunction(() => !!window.operant)
   await page.evaluate(() => window.operant.invoke('settings:set', { setupDone: true }))
-  await page.getByText('Welcome to Operant 3').waitFor()
+  await page.getByText('Welcome to Operant').waitFor()
 
   const ids = await page.evaluate(async (folder) => {
     const o = window.operant

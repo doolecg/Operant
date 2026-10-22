@@ -110,7 +110,7 @@ const entries = [...seen.entries()]
   .sort((a, b) => a.title.localeCompare(b.title))
 const rule = '\n\n' + '-'.repeat(78) + '\n\n'
 const body = [
-  'Operant 3 includes the third-party software listed below. Each part is under its own license, given in full.',
+  'Operant includes the third-party software listed below. Each part is under its own license, given in full.',
   'Electron and Chromium licenses are in LICENSE.electron.txt and LICENSES.chromium.html next to the app.',
   SHADCN,
   ...ENGINEERING_CREDITS,

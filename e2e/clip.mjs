@@ -85,7 +85,7 @@ try {
 
   const setScale = (s) => inv('settings:set', { uiScale: s })
 
-  await page.getByText('Welcome to Operant 3').waitFor()
+  await page.getByText('Welcome to Operant').waitFor()
   await inv('crews:create', { name: 'clip', folder: project })
   await inv('settings:set', { mainCli: 'claude' })
   await page.locator('[data-crew-row]').getByText('clip', { exact: true }).click({ position: { x: 4, y: 4 } })

@@ -42,7 +42,7 @@ try {
   const winBg = () => app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0].getBackgroundColor())
 
   await page.setViewportSize({ width: 1440, height: 900 })
-  await page.getByText('Welcome to Operant 3').waitFor()
+  await page.getByText('Welcome to Operant').waitFor()
   await page.evaluate(async (folder) => {
     const o = window.operant
     await o.invoke('settings:set', { setupDone: true, uiScale: 1 })

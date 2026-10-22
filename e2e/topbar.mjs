@@ -42,7 +42,7 @@ try {
     await page.waitForTimeout(400)
   }
   await resize(1920)
-  await page.getByText('Welcome to Operant 3').waitFor()
+  await page.getByText('Welcome to Operant').waitFor()
   await page.evaluate(async (folder) => {
     const o = window.operant
     await o.invoke('crews:create', { name: 'shop', folder })

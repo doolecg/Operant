@@ -31,7 +31,7 @@ try {
   await page.setViewportSize({ width: 1440, height: 900 })
   await page.waitForFunction(() => !!window.operant)
   await page.evaluate(() => window.operant.invoke('settings:set', { setupDone: true }))
-  await page.getByText('Welcome to Operant 3').waitFor()
+  await page.getByText('Welcome to Operant').waitFor()
   const inv = (channel, ...args) => page.evaluate(([c, a]) => window.operant.invoke(c, ...a), [channel, args])
 
   const crew = await inv('crews:create', { name: 'console-demo', folder: project })

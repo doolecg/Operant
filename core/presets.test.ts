@@ -58,7 +58,7 @@ describe('built-in presets', () => {
       if (p.agent === 'claude') expect(CLAUDE_MODELS, p.builtin!).toContain(p.model)
     }
     expect(BUILTIN_PRESETS.find((p) => p.builtin === 'design')).toMatchObject({ model: 'claude-opus-5-5', effort: 'high' })
-    expect(BUILTIN_PRESETS.find((p) => p.builtin === 'research')?.model).toBe('claude-haiku-5-5')
+    expect(BUILTIN_PRESETS.find((p) => p.builtin === 'research')?.model).toBe('claude-sonnet-5-5')
     expect(BUILTIN_PRESETS.find((p) => p.builtin === 'review')).toMatchObject({ model: 'claude-sonnet-5-5', effort: 'high' })
   })
 

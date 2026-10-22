@@ -71,7 +71,7 @@ try {
   await page.setViewportSize({ width: 1440, height: 900 })
   await page.waitForFunction(() => !!window.operant)
   await page.evaluate(() => window.operant.invoke('settings:set', { setupDone: true }))
-  await page.getByText('Welcome to Operant 3').waitFor()
+  await page.getByText('Welcome to Operant').waitFor()
 
   // The Claude plan endpoint is answered in the main process: 5-hour window at 86%, weekly at 41%.
   await app.evaluate(() => {

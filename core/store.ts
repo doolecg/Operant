@@ -636,7 +636,7 @@ const editAll = (globs: string[]) => globs.flatMap((g) => [`Edit(${g})`, `Write(
 // The eight stage presets, one Claude Code copy each. Models are the Claude Code aliases (haiku, sonnet, opus), so the
 // CLI's current model of each class is used.
 const CLAUDE_PRESETS: BuiltinPreset[] = [
-  seat({ builtin: 'research', name: 'Research', model: 'claude-haiku-5-5', effort: '', permissionMode: 'dontAsk', tools: READ_WEB_TOOLS, allow: [...READ_ALLOW, 'WebFetch'], deny: READ_DENY, cacheTtl: '5m', contextCap: 100_000 }),
+  seat({ builtin: 'research', name: 'Research', model: 'claude-sonnet-5-5', effort: '', permissionMode: 'dontAsk', tools: READ_WEB_TOOLS, allow: [...READ_ALLOW, 'WebFetch'], deny: READ_DENY, cacheTtl: '5m', contextCap: 100_000 }),
   seat({ builtin: 'plan', name: 'Plan', model: 'claude-sonnet-5-5', effort: 'medium', permissionMode: 'dontAsk', tools: READ_TOOLS, allow: READ_ALLOW, deny: READ_DENY, cacheTtl: '1h', contextCap: 150_000 }),
   seat({ builtin: 'design', name: 'Design', model: 'claude-opus-5-5', effort: 'high', permissionMode: 'dontAsk', tools: READ_WEB_TOOLS, allow: [...READ_ALLOW, 'WebFetch'], deny: READ_DENY, cacheTtl: '1h', contextCap: 300_000 }),
   seat({ builtin: 'implement', name: 'Implement', model: 'claude-opus-5-5', effort: 'medium', permissionMode: 'acceptEdits', tools: EDIT_TOOLS, allow: EDIT_ALLOW, deny: EDIT_DENY, cacheTtl: 'auto', contextCap: 200_000 }),
@@ -682,7 +682,7 @@ const OPENCODE_PRESETS: BuiltinPreset[] = CLAUDE_PRESETS.map((p) => ({
 export const BUILTIN_PRESETS: BuiltinPreset[] = [...CLAUDE_PRESETS, ...OPENCODE_PRESETS].map((p) => ({ ...p, roleText: p.roleText ?? presetTextFor(p.builtin!) }))
 
 // Which shipped set the database has. Bump when BUILTIN_PRESETS or the shipped teams change.
-const SEED_VERSION = 5
+const SEED_VERSION = 6
 
 export type NewPreset = Pick<PresetFields, 'name' | 'agent' | 'model' | 'permissionMode'> &
   Partial<Omit<PresetFields, 'builtin'>>

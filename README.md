@@ -1,24 +1,70 @@
-<p align="center"><img src="docs/logo.png" width="160" alt="Operant 3"></p>
+<p align="center">
+  <img src="docs/logo.png" alt="Operant" width="160">
+</p>
 
-# Operant 3
+<h1 align="center">Operant</h1>
 
-A home for your coding terminals. Claude Code and OpenCode side by side, with memory and skills kept per project.
+<p align="center">
+  <strong>A home for your coding agents. Claude Code and OpenCode side by side, with memory and skills kept per project.</strong><br>
+  Every project gets its own threads, shells and browser. Lessons from finished sessions are kept, so the next session starts smarter.<br>
+  Your projects and chats stay on your computer. No account, no analytics.
+</p>
+
+<p align="center">
+  <a href="https://github.com/doolecg/Operant/actions/workflows/build.yml"><img alt="CI" src="https://github.com/doolecg/Operant/actions/workflows/build.yml/badge.svg?branch=main"></a>
+  <a href="https://github.com/doolecg/Operant/releases"><img alt="Release" src="https://img.shields.io/github/v/release/doolecg/Operant?style=flat-square&color=da7756&labelColor=1f1c1a"></a>
+  <a href="LICENSE"><img alt="License: MIT" src="https://img.shields.io/badge/license-MIT-da7756?style=flat-square&labelColor=1f1c1a"></a>
+  <img alt="Windows, macOS, Linux" src="https://img.shields.io/badge/Windows%20%7C%20macOS%20%7C%20Linux-da7756?style=flat-square&labelColor=1f1c1a">
+  <img alt="Node 24" src="https://img.shields.io/badge/node-24-da7756?style=flat-square&labelColor=1f1c1a">
+</p>
+
+<p align="center">
+  <a href="#quick-start">Quick start</a> ·
+  <a href="#why-operant">Why Operant</a> ·
+  <a href="#features">Features</a> ·
+  <a href="#what-operant-runs-on-your-machine">What it runs</a> ·
+  <a href="#privacy-what-leaves-your-computer">Privacy</a> ·
+  <a href="#development">Development</a> ·
+  <a href="https://github.com/doolecg/Operant/releases">Releases</a>
+</p>
+
+---
+
+Coding agents are strong, but they live in a terminal window with no memory of last week, no view of your other projects and no way to see what ten of them are doing at once. **Operant is a desktop app that hosts Claude Code and OpenCode per project and keeps what they learn.** It does not orchestrate work for you: each agent is the real CLI, running with your account, in your folder.
+
+## Quick start
+
+1. **Download the installer** for your system from [Releases](https://github.com/doolecg/Operant/releases): `.msi` for Windows, `.dmg` for macOS (Apple silicon or Intel), `.AppImage` or `.deb` for Linux. Operant then updates itself.
+2. **Have an agent CLI** on your `PATH`: [Claude Code](https://code.claude.com) (`claude`) or OpenCode (`opencode`).
+3. **Add a project folder, press New thread.** That is it.
+
+## Why Operant
+
+**Your agents remember.** When a session ends, Operant extracts the few lessons worth keeping: how the project does things, what failed and why, what you corrected. Useful procedures become skills you approve once, for every session. Memory is one fact per entry, de-duplicated, and stale entries are retired.
+
+**See everything at once.** Threads per project in the sidebar, a Board of every thread across projects with who needs you, and Tiles to watch several agents side by side. Each thread shows its model, context use and state.
+
+**Shells and a browser where you expect them.** Shells open in a drawer at the bottom, like the Console, and only show the current project's. The browser opens at the side of the thread. An AI agent can drive it when you allow it.
+
+**One orchestrator, no fixed team.** Orchestrator Mode lets the thread you are talking to do the work itself and hand a part to a helper only when that saves context or time. No roles to configure, no coordination overhead.
+
+**Built to be cheap on tokens.** Helpers start with only the tools they need and skip your global plugins and hooks, so they begin near 13k tokens instead of over 100k. A Compact button appears when the context is nearly full.
+
+**Private by default.** No account, no analytics, no tracking. Your projects, chats, lessons and settings stay in Operant's data folder. The [privacy section](#privacy-what-leaves-your-computer) lists every connection Operant makes.
 
 ## Features
 
-- **Terminals as tiles.** Claude Code and OpenCode per project, in a Chat or Terminal view, with model and context on each tile.
+- **Threads, Chat and Terminal views.** Claude Code and OpenCode per project, in a Chat view or the real terminal, with model, effort and context on each.
+- **Board and Plans.** The Board shows the threads of all your projects as cards. Plans lists the Engineering tasks of every project.
+- **Engineering Mode.** A task goes through frame, spec, slices, plan approval, build and ship, with one approval gate: the plan.
+- **Memory that sticks.** Lessons go to the project's Hindsight bank or memory folder. Facts about you are kept apart from facts about the project.
 - **Mods.** An Agents panel for sub-agents, a Commands menu, and an activity box for learning and memory.
-- **Memory that sticks.** Lessons from finished sessions go to the project's Hindsight bank. Useful procedures become skills you approve once, for every session.
-- **Usage at a glance.** Plan rings for the 5-hour and weekly limits, budgets and export.
+- **Usage at a glance.** Plan rings for the 5-hour and weekly limits (opt in), budgets and export.
 - **Git, backups, presets and themes**, with settings applied live.
+- **Edit from here.** Rewind a chat, and optionally the files, to before a message.
+- **Dictation.** Speech turned into text on your computer.
 
-## Install
-
-Download the installer for your system from [Releases](https://github.com/doolecg/Operant/releases): `.msi` for Windows, `.dmg` for macOS (Apple silicon or Intel), `.AppImage` or `.deb` for Linux. Operant then updates itself.
-
-You need [Claude Code](https://code.claude.com) (`claude`) or OpenCode (`opencode`) on your `PATH`.
-
-### What Operant runs on your machine
+## What Operant runs on your machine
 
 Read this before the first start. By using Operant you agree to it running the following.
 
@@ -28,7 +74,7 @@ Read this before the first start. By using Operant you agree to it running the f
 
 If you do not want any of this, do not install Operant, or skip the setup window and leave Settings, Install alone. Without the optional tools the features that need them stay hidden and the console shows `ENOENT` lines for the missing commands; that is expected.
 
-### Privacy: what leaves your computer
+## Privacy: what leaves your computer
 
 Operant has no analytics, tracking or crash reporting, and no account of its own. Your projects, chats, lessons and settings stay in Operant's data folder on your computer. These are the only connections Operant makes, and why:
 

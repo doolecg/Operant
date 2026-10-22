@@ -222,7 +222,7 @@ function createWindow(): void {
     minHeight: 640,
     show: false,
     backgroundColor: windowBackground(operant?.currentSettings.appearance ?? DEFAULT_APPEARANCE, nativeTheme.shouldUseDarkColors),
-    title: 'Operant 3',
+    title: 'Operant',
     icon: iconFile,
     autoHideMenuBar: true,
     webPreferences: windowWebPreferences(),
@@ -287,7 +287,7 @@ function createWindow(): void {
 app.whenReady().then(() => {
   // Started while an update installs (the old copy quit for it): holding its files would make the install fail.
   if (process.platform === 'win32' && app.isPackaged && updateInstalling()) {
-    dialog.showMessageBoxSync({ type: 'info', title: 'Operant 3', message: 'Operant 3 is installing an update', detail: 'It opens again by itself when the update is done.' })
+    dialog.showMessageBoxSync({ type: 'info', title: 'Operant', message: 'Operant is installing an update', detail: 'It opens again by itself when the update is done.' })
     app.quit()
     return
   }

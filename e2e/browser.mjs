@@ -145,7 +145,7 @@ let crewB = 0
 
 try {
   await launch()
-  await page.getByText('Welcome to Operant 3').waitFor()
+  await page.getByText('Welcome to Operant').waitFor()
   await inv('settings:set', { mainCli: 'claude', browser: { homeUrl: `${base}/`, autonomy: 'full' } })
   crewA = (await inv('crews:create', { name: 'alpha', folder: alpha })).id
   crewB = (await inv('crews:create', { name: 'beta', folder: beta })).id

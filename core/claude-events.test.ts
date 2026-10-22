@@ -147,7 +147,7 @@ describe('op-event.mjs Factory cap', () => {
         hookSpecificOutput: {
           hookEventName: 'PreToolUse',
           permissionDecision: 'deny',
-          permissionDecisionReason: 'Subagent Factory Mode: 3 helpers are already running. Wait for one to finish.',
+          permissionDecisionReason: 'Orchestrator Mode: 3 helpers are already running. Wait for one to finish.',
         },
       })
     }

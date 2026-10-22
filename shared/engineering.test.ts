@@ -100,19 +100,17 @@ describe('buildPreamble', () => {
     expect(t).not.toContain('Factory')
   })
 
-  it('names the factory skill, task card and worker brief when only Factory is on', () => {
+  it('names the orchestrator skill when only Orchestrator Mode is on', () => {
     const t = buildPreamble({ engineering: false, factory: true }, dirs)
-    expect(t).toContain('Subagent Factory Mode is on')
+    expect(t).toContain('Orchestrator Mode is on')
     expect(t).toContain('C:\\Data\\engineering\\factory/skills/factory/SKILL.md')
-    expect(t).toContain('factory/skills/factory/task-card.md')
-    expect(t).toContain('factory/skills/factory/worker-brief.md')
     expect(t).not.toContain('Engineering Mode')
   })
 
   it('carries both blocks when both are on, and stays short', () => {
     const t = buildPreamble({ engineering: true, factory: true }, dirs)
     expect(t).toContain('Engineering Mode is on')
-    expect(t).toContain('Subagent Factory Mode is on')
+    expect(t).toContain('Orchestrator Mode is on')
     expect(t.split(/\s+/).length).toBeLessThan(350)
   })
 })

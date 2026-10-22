@@ -105,7 +105,7 @@ try {
     throw new Error(`${label}: ${last}`)
   }
 
-  await page.getByText('Welcome to Operant 3').waitFor()
+  await page.getByText('Welcome to Operant').waitFor()
   await inv('crews:create', { name: 'fill', folder: project })
   await inv('settings:set', { mainCli: 'claude' })
   await page.locator('[data-crew-row]').getByText('fill', { exact: true }).click({ position: { x: 4, y: 4 } })

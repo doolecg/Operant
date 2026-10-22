@@ -52,7 +52,7 @@ const gitModal = () => page.getByRole('dialog', { name: 'Git' })
 
 try {
   await launch()
-  await page.getByText('Welcome to Operant 3').waitFor()
+  await page.getByText('Welcome to Operant').waitFor()
   const crew = await inv('crews:create', { name: 'shell', folder: project })
   await inv('settings:set', { tiles: { layout: 'dwindle', gaps: 6 } })
 

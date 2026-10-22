@@ -96,7 +96,7 @@ async function step(name, fn) {
 const ids = {}
 try {
   await launch()
-  await page.getByText('Welcome to Operant 3').waitFor()
+  await page.getByText('Welcome to Operant').waitFor()
 
   await step('set up a project with seeded lessons, drafts and a learn run', async () => {
     ids.crew = (await inv('crews:create', { name: 'alpha', folder: project })).id

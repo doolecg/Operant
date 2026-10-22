@@ -34,7 +34,7 @@ try {
     throw new Error(`timed out waiting for ${label}`)
   }
 
-  await page.getByText('Welcome to Operant 3').waitFor()
+  await page.getByText('Welcome to Operant').waitFor()
   await inv('crews:create', { name: 'mods', folder: project })
   await inv('settings:set', { mainCli: 'claude', mods: { enabled: true, mods: { subagents: true } }, infoBar: true })
   await page.locator('[data-crew-row]').getByText('mods', { exact: true }).click({ position: { x: 4, y: 4 } })

@@ -100,7 +100,7 @@ function factoryCap(file, payload) {
   } catch {
     return
   }
-  const reason = `Subagent Factory Mode: ${FACTORY_CAP} helpers are already running. Wait for one to finish.`
+  const reason = `Orchestrator Mode: ${FACTORY_CAP} helpers are already running. Wait for one to finish.`
   process.stdout.write(`${JSON.stringify({ hookSpecificOutput: { hookEventName: 'PreToolUse', permissionDecision: 'deny', permissionDecisionReason: reason } })}\n`)
 }
 

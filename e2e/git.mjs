@@ -44,7 +44,7 @@ try {
   await page.setViewportSize({ width: 1920, height: 1080 })
   await page.waitForFunction(() => !!window.operant)
   await page.evaluate(() => window.operant.invoke('settings:set', { setupDone: true }))
-  await page.getByText('Welcome to Operant 3').waitFor()
+  await page.getByText('Welcome to Operant').waitFor()
   await page.evaluate((folder) => window.operant.invoke('crews:create', { name: 'shop', folder }), repo)
   await page.locator('[data-crew-row]').getByText('shop', { exact: true }).click({ position: { x: 4, y: 4 } })
 

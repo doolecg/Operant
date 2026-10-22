@@ -34,7 +34,7 @@ function UpdateRow({ status }: { status?: UpdateStatus }) {
         idle: 'Not checked yet',
         unsupported: s.message ?? 'Updates are unavailable',
         checking: 'Checking for updates…',
-        current: s.message ?? 'Operant 3 is up to date',
+        current: s.message ?? 'Operant is up to date',
         downloading: `Downloading ${s.version}…`,
         ready: `Version ${s.version} is ready to install`,
         installing: `Installing ${s.version}…`,
