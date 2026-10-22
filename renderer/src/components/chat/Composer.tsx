@@ -609,6 +609,10 @@ export function Composer({ scratchId, state, launchEffort, tileModel, disabled, 
                     setMenuOpen(false)
                     area.current?.focus()
                   }}
+                  onRun={(name) => {
+                    setMenuOpen(false)
+                    void chatActions.send(scratchId, `/${name}`)
+                  }}
                 />
               </PopoverContent>
             </Popover>

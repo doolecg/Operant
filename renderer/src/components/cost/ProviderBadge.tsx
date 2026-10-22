@@ -2,7 +2,7 @@ import { Button } from '@/components/ui/button'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { cn } from '@/lib/utils'
 import { useLimitAlerts } from './Providers'
-import { useProviders } from '@/lib/queries'
+import { useProviders, useSettings } from '@/lib/queries'
 
 const FIVE_HOUR = /5[\s-]?h|five|hour|session/i
 const WEEK = /week|7[\s-]?day/i
@@ -28,7 +28,7 @@ const R = 9
 const C = 2 * Math.PI * R
 
 // One window as a ring that fills with the share used (amber at 80% or more), the number in the middle.
-function Ring({ label, pct }: { label: string; pct: number | null }) {
+function Ring({ label, pct, empty = '--' }: { label: string; pct: number | null; empty?: string }) {
   const value = pct === null ? null : Math.min(100, Math.max(0, Math.round(pct)))
   const hot = value !== null && value >= 80
   return (
@@ -48,7 +48,7 @@ function Ring({ label, pct }: { label: string; pct: number | null }) {
         />
       </svg>
       <span aria-hidden className="text-[9px] leading-none font-semibold tabular-nums">
-        {value === null ? '--' : value}
+        {value === null ? empty : value}
       </span>
     </span>
   )
@@ -60,6 +60,7 @@ function Ring({ label, pct }: { label: string; pct: number | null }) {
 export function ProviderLimitBadge({ onOpen }: { onOpen: () => void }) {
   const hot = useLimitAlerts()
   const providers = useProviders().data?.providers ?? []
+  const planOff = useSettings().data?.claudePlanUsage === false
   const reported = providers.flatMap((p) => p.windows.filter((w) => w.usedPct != null).map((w) => ({ p, w: { label: w.label, pct: w.usedPct as number, resetsAt: w.resetsAt } })))
   const all = reported.map(({ p, w }) => ({ provider: p.name, window: w.label, pct: w.pct }))
   const claude: Win[] = reported.filter(({ p }) => p.id === 'claude' || /^claude/i.test(p.name)).map(({ w }) => w)
@@ -67,7 +68,8 @@ export function ProviderLimitBadge({ onOpen }: { onOpen: () => void }) {
   const week = claude.find((w) => WEEK.test(w.label) && !w.label.includes('(')) ?? claude.find((w) => WEEK.test(w.label))
   const pair = five && week ? [five, week] : claude.slice(0, 2)
   const shown = hot.length > 0 ? hot : all
-  const text = shown.length === 0 ? 'no usage data' : shown.map((h) => `${h.provider} ${h.window} ${Math.round(h.pct)}% used`).join('; ')
+  const none = planOff ? 'plan limits are off. Turn them on in Settings, Tokens and budgets. Click for Operant usage' : 'no plan-limit data yet. Click for Operant usage'
+  const text = shown.length === 0 ? none : shown.map((h) => `${h.provider} ${h.window} ${Math.round(h.pct)}% used`).join('; ')
   return (
     <Tooltip>
       <TooltipTrigger asChild>
@@ -81,7 +83,7 @@ export function ProviderLimitBadge({ onOpen }: { onOpen: () => void }) {
           {pair.length > 0 ? (
             pair.map((w) => <Ring key={w.label} label={w.label} pct={w.pct} />)
           ) : (
-            <Ring label="Highest provider usage" pct={shown.length === 0 ? null : Math.max(...shown.map((h) => h.pct))} />
+            <Ring label="Highest provider usage" empty={planOff ? 'off' : '--'} pct={shown.length === 0 ? null : Math.max(...shown.map((h) => h.pct))} />
           )}
         </Button>
       </TooltipTrigger>

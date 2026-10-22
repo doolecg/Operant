@@ -66,6 +66,20 @@ function setup(run?: (spec: ChatSpawnSpec) => { code: number | null; stdout: str
 
 const ids = (s: ChatSession) => s.state.items.filter((i) => i.kind === 'user').map((i) => i.id)
 
+describe('ChatSession /clear', () => {
+  it('empties the chat and starts a new session on the next message, without sending the text to Claude', async () => {
+    const h = setup()
+    h.session.send({ text: '/clear' })
+    await new Promise((r) => setTimeout(r, 20))
+    expect(h.session.state.items).toEqual([])
+    const newId = h.sessions[0]!
+    expect(newId).toMatch(/^[0-9a-f-]{36}$/)
+    expect(h.session.state.sessionId).toBe(newId)
+    h.session.send({ text: 'hello again' })
+    expect(h.spawned[h.spawned.length - 1]!.args).toEqual(['-p', '--session-id', newId])
+  })
+})
+
 describe('ChatSession.rewind', () => {
   it('forks the session at the entry before the message and returns its text and images', async () => {
     const h = setup()

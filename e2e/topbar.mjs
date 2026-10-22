@@ -157,7 +157,7 @@ try {
   await foot.getByRole('button', { name: /^Console/ }).waitFor()
   await foot.getByRole('button', { name: /^Learning health/ }).waitFor()
   await foot.getByRole('button', { name: /^Provider limits: / }).waitFor()
-  assert.match((await foot.getByRole('button', { name: /^Provider limits: / }).textContent()) ?? '', /--%/, 'the usage badge shows --% without data')
+  assert.match((await foot.getByRole('button', { name: /^Provider limits: / }).textContent()) ?? '', /off/, 'the usage badge says off while plan limits are off')
   const cog = foot.getByRole('button', { name: 'Settings' })
   await cog.waitFor()
   await cog.click()

@@ -5,7 +5,18 @@ import { bridge } from '@/lib/bridge'
 import { compact } from '@/lib/format'
 import { useMoney } from '@/lib/useMoney'
 import { cn } from '@/lib/utils'
+import { OPEN_SETTINGS_EVENT } from '@/components/memory/LearningBadge'
 import { RUNS_IN_CHAT } from './chatHelpers'
+
+// Commands that only run on Claude Code's own screen, but have a place in Operant: the Settings page they map to.
+const IN_SETTINGS: Record<string, { section: string; label: string }> = {
+  config: { section: 'general', label: 'Settings' },
+  theme: { section: 'appearance', label: 'Appearance settings' },
+  memory: { section: 'memory', label: 'Memory settings' },
+  usage: { section: 'tokens', label: 'Token settings' },
+  hooks: { section: 'mods', label: 'Mods settings' },
+  plugin: { section: 'superpowers', label: 'Skills settings' },
+}
 
 const MCP_STATUS: Record<McpServerInfo['status'], string> = { connected: 'Connected', pending: 'Starting', failed: 'Failed', 'needs-auth': 'Needs sign-in', disabled: 'Disabled' }
 
@@ -31,7 +42,7 @@ function statusRows(s: ChatState, money: (usd: number) => string): Array<[string
 
 // The Commands menu of a Claude tile: every slash command, filterable. /status, /mcp and /doctor show their result
 // here; a chat command goes into the message box; the rest only run on Claude Code's own screen, which is said.
-export function CommandMenu({ commands, state, initial, onInsert }: { commands: ChatCommand[]; state: ChatState; initial: string | null; onInsert: (name: string) => void }) {
+export function CommandMenu({ commands, state, initial, onInsert, onRun }: { commands: ChatCommand[]; state: ChatState; initial: string | null; onInsert: (name: string) => void; onRun: (name: string) => void }) {
   const { money } = useMoney()
   const [query, setQuery] = useState('')
   const [picked, setPicked] = useState<string | null>(initial)
@@ -119,13 +130,29 @@ export function CommandMenu({ commands, state, initial, onInsert }: { commands: 
               {report.text && <pre className="bg-background max-h-56 overflow-auto rounded-md p-2 font-mono text-[11px] leading-[1.5] whitespace-pre-wrap">{report.text}</pre>}
             </div>
           )}
-          {cmd.terminalOnly && !RUNS_IN_CHAT.has(cmd.name) && (
-            <p className="text-muted-foreground text-[12px]">This command runs only on Claude Code's own screen, which the Chat view does not show. It is not available here yet.</p>
+          {cmd.terminalOnly && !RUNS_IN_CHAT.has(cmd.name) && IN_SETTINGS[cmd.name] && (
+            <button
+              type="button"
+              onClick={() => window.dispatchEvent(new CustomEvent(OPEN_SETTINGS_EVENT, { detail: IN_SETTINGS[cmd.name]!.section }))}
+              className="border-border hover:bg-accent rounded-[9px] border px-3 py-[4px] text-[12px]"
+            >
+              Open {IN_SETTINGS[cmd.name]!.label}
+            </button>
+          )}
+          {cmd.terminalOnly && !RUNS_IN_CHAT.has(cmd.name) && !IN_SETTINGS[cmd.name] && (
+            <p className="text-muted-foreground text-[12px]">This command runs only on Claude Code's own screen. Switch this thread to the Terminal view to use it.</p>
           )}
           {!cmd.terminalOnly && (
-            <button type="button" onClick={() => onInsert(cmd.name)} className="border-border hover:bg-accent rounded-[9px] border px-3 py-[4px] text-[12px]">
-              Put /{cmd.name} in the message
-            </button>
+            <div className="flex flex-wrap gap-2">
+              {!cmd.argumentHint && (
+                <button type="button" onClick={() => onRun(cmd.name)} className="bg-primary text-primary-foreground hover:opacity-90 rounded-[9px] px-3 py-[4px] text-[12px]">
+                  Run /{cmd.name}
+                </button>
+              )}
+              <button type="button" onClick={() => onInsert(cmd.name)} className="border-border hover:bg-accent rounded-[9px] border px-3 py-[4px] text-[12px]">
+                Put /{cmd.name} in the message
+              </button>
+            </div>
           )}
         </div>
       )}

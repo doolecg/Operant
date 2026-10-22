@@ -637,6 +637,27 @@ export class ChatSession {
     return { text: point.text, images: point.images }
   }
 
+  // /clear: the thread starts a new conversation (a new session id; the old transcript stays on disk) and the chat empties.
+  // Claude Code starts again on the next message.
+  async clear(): Promise<void> {
+    if (this.disposed || !this.deps.filesFor) return
+    if (this.mapper.hasPending()) {
+      this.push(this.mapper.noteNotice({ source: 'info', tone: 'info', text: 'Answer or stop the question Claude is waiting on before clearing the chat' }))
+      return
+    }
+    await this.stop()
+    const to = randomUUID()
+    const files = this.deps.filesFor(to)
+    this.sessionId = to
+    this.transcriptFile = files.transcriptFile
+    this.statusFile = files.statusFile
+    this.fork = null
+    if (this.history) this.history.length = 0
+    const first = this.mapper.items[0]
+    this.push([...(first ? this.mapper.truncateFrom(first.id) : []), ...this.mapper.setSession(to)])
+    this.deps.onSession?.(to)
+  }
+
   // Stops everything and drops the timers; the session is not used again.
   async dispose(): Promise<void> {
     await this.stop()
@@ -661,7 +682,8 @@ export class ChatSession {
     const text = (input.text ?? '').trim()
     const images = (input.images ?? []).filter((i) => i && typeof i.base64 === 'string' && /^image\/[a-z0-9.+-]+$/i.test(i.mediaType))
     if (!text && !images.length) return
-    // Operant's own command: handled here, never sent to Claude as text.
+    // Operant's own commands: handled here, never sent to Claude as text.
+    if (!images.length && /^\/clear\s*$/i.test(text)) return void this.clear()
     const kw = images.length ? null : parseKeepWarm(text)
     if (kw) {
       if (this.deps.keepWarm?.enabled && !this.deps.keepWarm.enabled()) {

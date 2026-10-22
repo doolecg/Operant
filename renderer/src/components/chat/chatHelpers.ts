@@ -135,6 +135,7 @@ export function applySuggestion(text: string, trigger: Trigger, caret: number, i
 
 // Commands Operant handles itself (never sent to Claude), listed with Claude's own in the "/" suggestions.
 export const LOCAL_COMMANDS: ChatCommand[] = [
+  { name: 'clear', description: 'Start a fresh conversation in this thread: clears the chat and the context', argumentHint: '', source: 'built-in', terminalOnly: false },
   { name: 'keepwarm', description: 'Keep the prompt cache warm: bare for 6h, a window such as 90m, always, off, or status', argumentHint: '[6h|90m|always|off|status]', source: 'built-in', terminalOnly: false },
 ]
 

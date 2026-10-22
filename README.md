@@ -28,6 +28,10 @@
   <a href="https://github.com/doolecg/Operant/releases">Releases</a>
 </p>
 
+<p align="center">
+  <img src="docs/images/hero.jpg" alt="Operant: a home for your coding agents" width="100%">
+</p>
+
 ---
 
 Coding agents are strong, but they live in a terminal window with no memory of last week, no view of your other projects and no way to see what ten of them are doing at once. **Operant is a desktop app that hosts Claude Code and OpenCode per project and keeps what they learn.** It does not orchestrate work for you: each agent is the real CLI, running with your account, in your folder.
@@ -65,6 +69,20 @@ Read [What Operant runs on your machine](#what-operant-runs-on-your-machine) bef
 - **Git, backups, presets and themes**, with settings applied live.
 - **Edit from here.** Rewind a chat, and optionally the files, to before a message.
 - **Dictation.** Speech turned into text on your computer.
+
+## Screenshots
+
+<p align="center">
+  <img src="docs/images/threads-board-tiles.jpg" alt="Threads, Board and Tiles views" width="49%">
+  <img src="docs/images/shell-drawer.jpg" alt="A shell in a drawer at the bottom of the window" width="49%">
+</p>
+<p align="center">
+  <img src="docs/images/modes.jpg" alt="Orchestrator Mode and Engineering Mode switches in the top bar" width="49%">
+  <img src="docs/images/memory-learning.jpg" alt="Learning settings: when and where lessons are kept" width="49%">
+</p>
+<p align="center">
+  <img src="docs/images/mods.jpg" alt="Settings: Mods and token budgets" width="49%">
+</p>
 
 ## What Operant runs on your machine
 
