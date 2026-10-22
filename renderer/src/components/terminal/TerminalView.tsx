@@ -17,8 +17,12 @@ import { ChatHeaderControls, ChatStateBadge, ViewSwitch } from '@/components/cha
 import { CLI_SHORT, cliBlocked } from '@/lib/capabilities'
 import { call, useCapabilities, useCrews, useSettings } from '@/lib/queries'
 import { toast } from '@/lib/toast'
+import { cn } from '@/lib/utils'
 import { NOTES_DEFAULT, NOTES_MAX, NOTES_MIN, NOTES_RAIL, NotesPanel, NotesRail } from '@/components/notes/NotesPanel'
 import { TileIcon } from './TileFrame'
+import { ThreadHeader } from './ThreadHeader'
+import { FactoryChip } from '@/components/chat/FactoryBox'
+import { StageChip } from '@/components/chat/StageBox'
 import { TileInfoBar, TileStatus } from './TileInfoBar'
 import { TileSurface } from './TileSurface'
 import { useTilePopouts } from './useTilePopouts'
@@ -37,10 +41,12 @@ interface Props {
   active: number | null
   onCloseScratch: (scratchId: number) => void
   onStart: (kind: 'shell' | MainCli) => void
+  // 'thread' shows the open tile on its own, without a frame; 'tiles' shows every tile of the project side by side.
+  mode: 'thread' | 'tiles'
 }
 
 // The project's Terminal view: the tiles (the shell and agent terminals) and the Mods sub-agent panel.
-export function TerminalView({ crewId, scratch, active, onCloseScratch, onStart }: Props) {
+export function TerminalView({ crewId, scratch, active, onCloseScratch, onStart, mode }: Props) {
   const settings = useSettings().data
   const cli = settings?.mainCli ?? 'claude'
   const strip = settings?.tiles.strip ?? 'normal'
@@ -70,6 +76,9 @@ export function TerminalView({ crewId, scratch, active, onCloseScratch, onStart 
     [],
   )
 
+  // The thread on screen: the tile opened last, else the first one.
+  const openTile = tiles.find((t) => t.id === activeTile) ?? tiles[0]
+
   const close = (t: TileInfo) => (t.scratch ? onCloseScratch(t.scratch.scratchId) : void browser.close.mutate())
 
   // Each Claude tile is in the Chat or the Terminal view (a property of the scratch terminal).
@@ -80,7 +89,7 @@ export function TerminalView({ crewId, scratch, active, onCloseScratch, onStart 
     .join(',')
   const views = useQuery({
     queryKey: ['scratchViews', crewId, claudeIds],
-    queryFn: async () => Object.fromEntries((await call('scratch:list', crewId)).map((s) => [s.id, { view: s.view, effort: s.effort, model: s.model, presetId: s.presetId }])),
+    queryFn: async () => Object.fromEntries((await call('scratch:list', crewId)).map((s) => [s.id, { title: s.title, view: s.view, effort: s.effort, model: s.model, presetId: s.presetId }])),
     enabled: claudeIds !== '',
   }).data
   const viewOf = (t: ScratchTileInfo): ScratchView | undefined => (t.scratch.kind === 'claude' ? views?.[t.scratch.scratchId]?.view : 'terminal')
@@ -93,6 +102,8 @@ export function TerminalView({ crewId, scratch, active, onCloseScratch, onStart 
     return e && e !== 'default' ? e : null
   }
 
+  const workers = Object.entries(views ?? {}).map(([id, v]) => ({ id: Number(id), presetId: v.presetId }))
+
   const body = (tile: TileInfo) => {
     if (!isScratchTile(tile)) return <BrowserTile crewId={crewId} />
     const t = tile
@@ -103,7 +114,7 @@ export function TerminalView({ crewId, scratch, active, onCloseScratch, onStart 
     if (t.scratch.kind === 'claude' && view === 'chat')
       return (
         <div className="relative h-full min-h-0">
-          <ChatView scratchId={t.scratch.scratchId} launchEffort={effortOf(t)} tileModel={views?.[t.scratch.scratchId]?.model ?? ''} onTerminal={() => void switchView(t, 'terminal')} projectName={crew?.name} threadTitle={t.title} crewId={crewId} engineering={crew?.engineering ?? false} factory={crew?.factory ?? false} workers={Object.entries(views ?? {}).map(([id, v]) => ({ id: Number(id), presetId: v.presetId }))} />
+          <ChatView scratchId={t.scratch.scratchId} launchEffort={effortOf(t)} tileModel={views?.[t.scratch.scratchId]?.model ?? ''} onTerminal={() => void switchView(t, 'terminal')} projectName={crew?.name} threadTitle={t.title} crewId={crewId} engineering={crew?.engineering ?? false} factory={crew?.factory ?? false} workers={workers} chips={mode === 'tiles'} />
         </div>
       )
     return (
@@ -111,6 +122,44 @@ export function TerminalView({ crewId, scratch, active, onCloseScratch, onStart 
         <OperatorTerminal sessionKey={`scratch:${t.scratch.scratchId}`} autoFocus={false} crewId={crewId} cli={t.scratch.kind} />
       </div>
     )
+  }
+
+  const chrome = (tile: TileInfo) => {
+    if (!isScratchTile(tile)) return { icon: <TileIcon kind="browser" compact={strip === 'compact'} />, heading: 'Browser', subtitle: crew?.name }
+    const t = tile
+    if (t.scratch.kind === 'claude' && viewOf(t) === 'chat')
+      return {
+        icon: (
+          <span aria-hidden className="text-primary grid size-6 shrink-0 place-items-center text-[13px]">
+            ◆
+          </span>
+        ),
+        heading: HEADING.claude,
+        badge: <ChatStateBadge scratchId={t.scratch.scratchId} />,
+        status: <ChatHeaderControls scratchId={t.scratch.scratchId} onView={(v) => void switchView(t, v)} />,
+      }
+    return {
+      icon: <TileIcon kind={t.scratch.kind} compact={strip === 'compact'} />,
+      heading: HEADING[t.scratch.kind],
+      subtitle: crew?.name,
+      status:
+        t.scratch.kind === 'claude' && viewOf(t) === 'terminal' ? (
+          <>
+            <TileStatus tile={t.scratch} />
+            <ViewSwitch view="terminal" blockedReason={null} onChange={(v) => void switchView(t, v)} />
+          </>
+        ) : (
+          <TileStatus tile={t.scratch} />
+        ),
+    }
+  }
+
+  const popOut = (tile: TileInfo) => {
+    if (!isScratchTile(tile)) return browserOut ? null : () => void browser.popOut.mutate()
+    const t = tile
+    if (isTileOut(out, t.scratch.scratchId)) return null
+    return () =>
+      void call('tile:popOut', { scratchId: t.scratch.scratchId, crewId, kind: t.scratch.kind, title: t.title }).catch((e) => toast(decodeIpcError(e).message, true))
   }
 
   // The Notes panel: when the area is too narrow for the tiles to keep 480px it shrinks to a rail (and floats open on demand).
@@ -144,7 +193,7 @@ export function TerminalView({ crewId, scratch, active, onCloseScratch, onStart 
         ) : (
           <NotesPanel crewId={crewId} />
         ))}
-      <section aria-label="Terminal tiles" className="flex min-w-0 flex-1 flex-col p-1.5">
+      <section aria-label="Terminal tiles" className={cn('flex min-w-0 flex-1 flex-col', mode === 'tiles' && 'p-1.5')}>
         {tiles.length === 0 ? (
           <div className="grid flex-1 place-content-center gap-3 p-4 text-center">
             <p className="text-muted-foreground text-sm">No terminals open. Start one here, or add one from the terminal drawer.</p>
@@ -157,48 +206,31 @@ export function TerminalView({ crewId, scratch, active, onCloseScratch, onStart 
               </Button>
             </div>
           </div>
+        ) : mode === 'thread' && openTile ? (
+          <div data-thread={openTile.id} data-tile={openTile.id} className="flex min-h-0 flex-1 flex-col">
+            <ThreadHeader
+              title={isScratchTile(openTile) ? (views?.[openTile.scratch.scratchId]?.title || openTile.title) : 'Browser'}
+              chips={
+                <>
+                  <StageChip crewId={crewId} on={crew?.engineering ?? false} />
+                  <FactoryChip crewId={crewId} on={crew?.factory ?? false} workers={workers} />
+                </>
+              }
+              badge={chrome(openTile).badge}
+              status={chrome(openTile).status}
+              onPopOut={popOut(openTile)}
+              onClose={() => close(openTile)}
+            />
+            <div className="min-h-0 flex-1">{body(openTile)}</div>
+          </div>
         ) : (
           <TileSurface
             crewId={crewId}
             tiles={tiles}
             onClose={close}
-            popOut={(tile) => {
-              if (!isScratchTile(tile)) return browserOut ? null : () => void browser.popOut.mutate()
-              const t = tile
-              if (isTileOut(out, t.scratch.scratchId)) return null
-              return () =>
-                void call('tile:popOut', { scratchId: t.scratch.scratchId, crewId, kind: t.scratch.kind, title: t.title }).catch((e) => toast(decodeIpcError(e).message, true))
-            }}
+            popOut={popOut}
             body={body}
-            chrome={(tile) => {
-              if (!isScratchTile(tile)) return { icon: <TileIcon kind="browser" compact={strip === 'compact'} />, heading: 'Browser', subtitle: crew?.name }
-              const t = tile
-              if (t.scratch.kind === 'claude' && viewOf(t) === 'chat')
-                return {
-                  icon: (
-                    <span aria-hidden className="text-primary grid size-6 shrink-0 place-items-center text-[13px]">
-                      ◆
-                    </span>
-                  ),
-                  heading: HEADING.claude,
-                  badge: <ChatStateBadge scratchId={t.scratch.scratchId} />,
-                  status: <ChatHeaderControls scratchId={t.scratch.scratchId} onView={(v) => void switchView(t, v)} />,
-                }
-              return {
-                icon: <TileIcon kind={t.scratch.kind} compact={strip === 'compact'} />,
-                heading: HEADING[t.scratch.kind],
-                subtitle: crew?.name,
-                status:
-                  t.scratch.kind === 'claude' && viewOf(t) === 'terminal' ? (
-                    <>
-                      <TileStatus tile={t.scratch} />
-                      <ViewSwitch view="terminal" blockedReason={null} onChange={(v) => void switchView(t, v)} />
-                    </>
-                  ) : (
-                    <TileStatus tile={t.scratch} />
-                  ),
-              }
-            }}
+            chrome={chrome}
             info={(t) => (!isScratchTile(t) || t.scratch.kind === 'shell' || (t.scratch.kind === 'claude' && viewOf(t) !== 'terminal') ? null : <TileInfoBar tile={t.scratch} crew={crew} />)}
             onFocusChange={setFocusedId}
             focusId={activeTile}

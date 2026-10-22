@@ -29,6 +29,8 @@ const SHORTCUT_INFO: Partial<Record<KeyAction, string>> = {
   openInIde: 'Opens the selected project folder in the editor chosen under Projects settings. If the editor cannot be found, you get an error message instead.',
   toggleSidebar: 'Shows or hides the project list on the left, and remembers the choice. Currently it does the same job as the all panels shortcut below.',
   toggleAllPanels: 'Shows or hides the project list, and remembers the choice. Currently it does exactly the same as the project list shortcut above, whichever key you press.',
+  newThread: 'Opens a new chat with the main CLI (Claude Code by default) in the selected project and shows it. It does nothing if no project is selected.',
+  searchThreads: 'Jumps to the search box above the project list so you can find a thread or project by name. Press it again, or Esc, to leave the box.',
   toggleNotes: 'Shows or hides the Notes panel beside your tiles, and remembers whether it was open. Works anywhere in the Operant window.',
   tileLayout: 'Switches the tiles between dwindle (each new tile halves the space) and master (one large tile plus a stack). The choice is saved. Works when the terminal tiles are showing.',
   tileSplit: 'Flips the split direction for the focused tile between side by side and stacked, changing how it shares space with its neighbour. It needs a focused tile.',

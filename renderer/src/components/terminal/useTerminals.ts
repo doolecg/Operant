@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { decodeIpcError } from '@shared/ipc'
-import type { Crew } from '@shared/types'
+import type { Crew, ScratchTerminal } from '@shared/types'
 import type { MainCli } from '@shared/settings'
 import { claudeEffortsFor } from '@shared/models'
 import { bridge } from '@/lib/bridge'
@@ -77,15 +77,39 @@ export function useTerminals(crews: Crew[] | undefined, defaultModel: string, ma
     [defaultModel, defaultEffort, mainCli],
   )
 
+  // A Claude chat that has history is stopped and kept as a settled thread; an empty one, a shell and OpenCode are deleted.
   const closeTab = useCallback((scratchId: number) => {
-    void bridge().invoke('scratch:delete', scratchId).catch(() => {})
+    const b = bridge()
+    const tab = tabs.find((x) => x.scratchId === scratchId)
+    void (async () => {
+      const row = tab?.kind === 'claude' ? (await b.invoke('scratch:list', tab.crewId)).find((r) => r.id === scratchId) : undefined
+      if (row && row.updatedAt > row.createdAt) await b.invoke('scratch:stop', scratchId)
+      else await b.invoke('scratch:delete', scratchId)
+    })().catch(() => {})
     setTabs((t) => {
       const next = t.filter((x) => x.scratchId !== scratchId)
       setActive((a) => (a === scratchId ? (next.at(-1)?.scratchId ?? null) : a))
       if (next.length === 0) setOpen(false)
       return next
     })
-  }, [])
+  }, [tabs])
+
+  // Opens a thread that is already saved: a closed chat resumes its session, an open one just comes to the front.
+  const reopenTab = useCallback(
+    async (row: ScratchTerminal) => {
+      if (tabs.some((t) => t.scratchId === row.id)) return setActive(row.id)
+      if (row.agent !== 'claude' && row.agent !== 'opencode') return
+      try {
+        await bridge().invoke('scratch:start', row.id, true)
+        setTabs((t) => [...t, { scratchId: row.id, crewId: row.crewId, title: row.title, kind: row.agent as MainCli, exited: false }])
+        setActive(row.id)
+        setOpen(true)
+      } catch (e) {
+        toast(`Could not open the thread: ${decodeIpcError(e).message}`, true)
+      }
+    },
+    [tabs],
+  )
 
   // A deleted project takes its tiles with it (the main process stops them).
   const dropCrew = useCallback((crewId: number) => {
@@ -97,5 +121,5 @@ export function useTerminals(crews: Crew[] | undefined, defaultModel: string, ma
     })
   }, [])
 
-  return { tabs, active, setActive, open, setOpen, openTab, closeTab, dropCrew }
+  return { tabs, active, setActive, open, setOpen, openTab, reopenTab, closeTab, dropCrew }
 }

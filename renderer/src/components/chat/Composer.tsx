@@ -19,6 +19,7 @@ import { setActivity } from './activityStore'
 import { CommandMenu } from './CommandMenu'
 import { LearningBadge } from '@/components/memory/LearningBadge'
 import { LearnPill } from './ComposerPills'
+import { ImageChip } from './ImageChip'
 import { InfoRow } from './InfoRow'
 import { QueueStrip } from './QueueStrip'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
@@ -26,6 +27,7 @@ import { chatActions, onComposerRestore } from './useChat'
 import { altEnterTarget, editRefusal, planSteer } from '@shared/chat-queue'
 
 interface Attachment {
+  name: string
   mediaType: string
   base64: string
   preview: string
@@ -44,7 +46,7 @@ const readImage = (file: File): Promise<Attachment | null> =>
     r.onload = () => {
       const url = String(r.result)
       const comma = url.indexOf(',')
-      resolve(comma < 0 ? null : { mediaType: file.type || 'image/png', base64: url.slice(comma + 1), preview: url })
+      resolve(comma < 0 ? null : { name: file.name || 'image.png', mediaType: file.type || 'image/png', base64: url.slice(comma + 1), preview: url })
     }
     r.onerror = () => resolve(null)
     r.readAsDataURL(file)
@@ -279,7 +281,7 @@ export function Composer({ scratchId, state, launchEffort, tileModel, disabled, 
     const m = await chatActions.queueTake(scratchId, id)
     if (!m) return toast('That message was already sent', true)
     setText((t) => (t.trim() ? `${m.text}\n\n${t}` : m.text))
-    setImages((x) => [...(m.images ?? []).map((i) => ({ ...i, preview: `data:${i.mediaType};base64,${i.base64}` })), ...x])
+    setImages((x) => [...(m.images ?? []).map((i) => ({ ...i, name: 'image.png', preview: `data:${i.mediaType};base64,${i.base64}` })), ...x])
     area.current?.focus()
   }
 
@@ -288,7 +290,7 @@ export function Composer({ scratchId, state, launchEffort, tileModel, disabled, 
     () =>
       onComposerRestore(scratchId, (m) => {
         setText((t) => (t.trim() ? `${m.text}\n\n${t}` : m.text))
-        setImages((x) => [...(m.images ?? []).map((i) => ({ ...i, preview: `data:${i.mediaType};base64,${i.base64}` })), ...x])
+        setImages((x) => [...(m.images ?? []).map((i) => ({ ...i, name: 'image.png', preview: `data:${i.mediaType};base64,${i.base64}` })), ...x])
         area.current?.focus()
       }),
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -397,60 +399,6 @@ export function Composer({ scratchId, state, launchEffort, tileModel, disabled, 
 
   return (
     <div className="shrink-0 px-4 pt-1.5 pb-3.5" onDragOver={(e) => e.preventDefault()} onDrop={onDrop}>
-      <div className="mx-auto mb-1.5 flex max-w-[720px] flex-wrap items-center gap-x-2 gap-y-1 px-1">
-        <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
-        {enhancing ? (
-          <>
-            <span role="status" className="bg-accent text-foreground inline-flex h-[26px] items-center gap-1.5 rounded-full px-3 text-[13px]">
-              <Loader2 className="size-3.5 animate-spin" aria-hidden /> Enhancing…
-            </span>
-            <button type="button" onClick={cancelEnhance} title="Cancel" aria-label="Cancel enhancing" className="text-muted-foreground hover:text-foreground inline-flex items-center gap-1 text-[13px] underline-offset-2 hover:underline">
-              <X className="size-3.5" aria-hidden /> Cancel
-            </button>
-          </>
-        ) : (
-          <ContextMenu>
-            <ContextMenuTrigger asChild>
-              <button
-                type="button"
-                onClick={() => void enhance()}
-                disabled={!text.trim() || running}
-                title={running ? 'Wait for Claude to finish' : !text.trim() ? 'Write a prompt first, then enhance it' : 'Rewrite this prompt with the files to change, context, skills to load, what to ask first and when it is done. Right-click to recover the last enhanced prompt'}
-                className="bg-accent/60 text-muted-foreground hover:bg-accent hover:text-foreground inline-flex h-[26px] items-center gap-1.5 rounded-full px-3 text-[13px] disabled:opacity-50 disabled:hover:bg-accent/60"
-              >
-                <Sparkles className="size-3.5" aria-hidden /> Enhance prompt
-              </button>
-            </ContextMenuTrigger>
-            <ContextMenuContent>
-              <ContextMenuItem disabled={!lastEnhanced.has(scratchId)} onSelect={() => (setText(lastEnhanced.get(scratchId) ?? ''), area.current?.focus())}>
-                Recover last enhanced prompt
-              </ContextMenuItem>
-            </ContextMenuContent>
-          </ContextMenu>
-        )}
-        {!enhancing && lastRun && <span className="text-muted-foreground text-[13px]">{lastRun.recalls}</span>}
-        {!enhancing && held !== null && (
-          <>
-            <button type="button" onClick={useHeld} title="Put the rewrite in the box" aria-label="Use the enhanced rewrite" className="text-muted-foreground hover:text-foreground inline-flex items-center gap-1 text-[13px] underline-offset-2 hover:underline">
-              <Check className="size-3.5" aria-hidden /> Use rewrite
-            </button>
-            <button type="button" onClick={() => setHeld(null)} title="Throw the rewrite away" aria-label="Discard the enhanced rewrite" className="text-muted-foreground hover:text-foreground inline-flex items-center gap-1 text-[13px] underline-offset-2 hover:underline">
-              <X className="size-3.5" aria-hidden /> Discard
-            </button>
-          </>
-        )}
-        {!enhancing && held === null && undo !== null && (
-          <button type="button" onClick={undoEnhance} title="Put your text back" aria-label="Undo the enhanced rewrite" className="text-muted-foreground hover:text-foreground inline-flex items-center gap-1 text-[13px] underline-offset-2 hover:underline">
-            <Undo2 className="size-3.5" aria-hidden /> Undo
-          </button>
-        )}
-        {!enhancing && lastRun?.note && <span className="text-muted-foreground/70 text-[11px]">{lastRun.note}</span>}
-        </div>
-        <LearnPill scratchId={scratchId} />
-        <LearningBadge variant="pill" />
-        <KeepWarmLine state={state} />
-        <InfoRow state={state} />
-      </div>
       {state.queue.length > 0 && <QueueStrip queue={state.queue} sendBlocked={sendBlocked} onEdit={(id) => void editQueued(id)} onMove={(id, by) => chatActions.queueMove(scratchId, id, by)} onSend={(id) => chatActions.queueSend(scratchId, id)} onRemove={(id) => chatActions.queueRemove(scratchId, id)} />}
       <div className="relative mx-auto max-w-[720px]">
         {suggesting && (
@@ -478,20 +426,28 @@ export function Composer({ scratchId, state, launchEffort, tileModel, disabled, 
             ))}
           </div>
         )}
-        <div className={cn('border-border bg-popover rounded-[18px] border py-1.5 pr-2 pl-[18px] shadow-[0_10px_30px_rgba(0,0,0,.18)] dark:shadow-[0_10px_30px_rgba(0,0,0,.45)]', dictation.state === 'recording' && 'chat-ai-border')}>
+        <div className={cn('border-primary/30 bg-card rounded-[22px] border py-2 pr-2 pl-2', dictation.state === 'recording' && 'chat-ai-border')}>
           {images.length > 0 && (
-            <div className="mb-2 flex flex-wrap gap-1.5">
+            <div className="mb-1.5 flex flex-wrap gap-1.5 pl-1.5">
               {images.map((im, i) => (
-                <span key={i} className="relative">
-                  <img src={im.preview} alt="Attachment" className="size-14 rounded-lg object-cover" />
-                  <button type="button" aria-label="Remove image" onClick={() => setImages((x) => x.filter((_, k) => k !== i))} className="bg-foreground text-background absolute -top-1 -right-1 grid size-4 place-items-center rounded-full">
-                    <X className="size-3" />
-                  </button>
-                </span>
+                <ImageChip key={i} src={im.preview} name={im.name} onRemove={() => setImages((x) => x.filter((_, k) => k !== i))} />
               ))}
             </div>
           )}
-          <div className="flex items-end gap-2.5">
+          <div className="flex items-end gap-1">
+            <DropdownMenu>
+              <DropdownMenuTrigger className={cn(toolbarBtn, 'w-[26px] justify-center px-0')} aria-label="Attach">
+                <Plus className="size-3.5" />
+              </DropdownMenuTrigger>
+              <DropdownMenuContent side="top" align="start">
+                <DropdownMenuItem onSelect={() => picker.current?.click()}>Upload file or image</DropdownMenuItem>
+                <div className="text-muted-foreground px-2 py-1 text-xs">Paste an image with Ctrl+V</div>
+              </DropdownMenuContent>
+            </DropdownMenu>
+            <input ref={picker} type="file" multiple hidden onChange={(e) => (void addFiles([...(e.target.files ?? [])]), (e.target.value = ''))} />
+
+            {speechReady && <DictationButton dictation={dictation} />}
+
             <textarea
               ref={area}
               data-chat-composer
@@ -506,6 +462,40 @@ export function Composer({ scratchId, state, launchEffort, tileModel, disabled, 
               onPaste={onPaste}
               className={cn('placeholder:text-muted-foreground/70 min-h-[23px] flex-1 resize-none self-center border-0 bg-transparent p-0 text-[15px] leading-[23px] outline-none', (running || dictation.state !== 'idle') && 'pr-6')}
             />
+            <DropdownMenu>
+              <DropdownMenuTrigger className={toolbarBtn} aria-label={`Permission mode: ${modeLabel(state.permissionMode)}`} title="Permission mode (Shift+Tab)">
+                {modeLabel(state.permissionMode)}
+                <ChevronDown className="size-3" aria-hidden />
+              </DropdownMenuTrigger>
+              <DropdownMenuContent side="top" align="start">
+                {modeOptions(state).map((m) => (
+                  <DropdownMenuItem key={m} onSelect={() => chatActions.setMode(scratchId, m)}>
+                    <span className="flex-1">{modeLabel(m)}</span>
+                    {m === state.permissionMode && <Check className="size-3.5" />}
+                  </DropdownMenuItem>
+                ))}
+              </DropdownMenuContent>
+            </DropdownMenu>
+
+            <DropdownMenu>
+              <DropdownMenuTrigger className={toolbarBtn} aria-label={`Model: ${modelName ?? 'unknown'}`} disabled={state.models.length === 0}>
+                {modelName ?? 'Model'}
+                <ChevronDown className="size-3" aria-hidden />
+              </DropdownMenuTrigger>
+              <DropdownMenuContent side="top" align="end" className="w-72">
+                {state.models.map((m) => (
+                  <DropdownMenuItem key={m.value} onSelect={() => void chatActions.setModel(scratchId, m.value).then(() => qc.invalidateQueries({ queryKey: ['scratchViews'] }))} className="items-start">
+                    <span className="min-w-0 flex-1">
+                      <span className="block">{m.displayName}</span>
+                      {m.description && <span className="text-muted-foreground block text-xs">{m.description}</span>}
+                    </span>
+                    {model?.value === m.value && <Check className="mt-0.5 size-3.5" />}
+                  </DropdownMenuItem>
+                ))}
+              </DropdownMenuContent>
+            </DropdownMenu>
+
+            <EffortPopover model={model} modelName={modelName} effort={state.effort} defaultLevel={launchEffort} onChange={(l) => chatActions.setEffort(scratchId, l)} triggerClass={toolbarBtn} />
             {running ? (
               <button type="button" aria-label="Stop" title="Stop (Esc)" onClick={() => chatActions.interrupt(scratchId)} className="bg-foreground text-background grid size-[30px] shrink-0 place-items-center rounded-full hover:opacity-90">
                 <Square className="size-[9px] fill-current" aria-hidden />
@@ -530,20 +520,58 @@ export function Composer({ scratchId, state, launchEffort, tileModel, disabled, 
             </span>
           )}
         </div>
-        <div className="text-muted-foreground mt-1.5 flex items-center gap-0.5 px-1">
-          <DropdownMenu>
-            <DropdownMenuTrigger className={cn(toolbarBtn, 'w-[26px] justify-center px-0')} aria-label="Attach">
-              <Plus className="size-3.5" />
-            </DropdownMenuTrigger>
-            <DropdownMenuContent side="top" align="start">
-              <DropdownMenuItem onSelect={() => picker.current?.click()}>Upload file or image</DropdownMenuItem>
-              <div className="text-muted-foreground px-2 py-1 text-xs">Paste an image with Ctrl+V</div>
-            </DropdownMenuContent>
-          </DropdownMenu>
-          <input ref={picker} type="file" multiple hidden onChange={(e) => (void addFiles([...(e.target.files ?? [])]), (e.target.value = ''))} />
-
-          {speechReady && <DictationButton dictation={dictation} />}
-
+        <div className="mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-1 px-1">
+          <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
+          {enhancing ? (
+            <>
+              <span role="status" className="bg-accent text-foreground inline-flex h-[26px] items-center gap-1.5 rounded-full px-3 text-[13px]">
+                <Loader2 className="size-3.5 animate-spin" aria-hidden /> Enhancing…
+              </span>
+              <button type="button" onClick={cancelEnhance} title="Cancel" aria-label="Cancel enhancing" className="text-muted-foreground hover:text-foreground inline-flex items-center gap-1 text-[13px] underline-offset-2 hover:underline">
+                <X className="size-3.5" aria-hidden /> Cancel
+              </button>
+            </>
+          ) : (
+            <ContextMenu>
+              <ContextMenuTrigger asChild>
+                <button
+                  type="button"
+                  onClick={() => void enhance()}
+                  disabled={!text.trim() || running}
+                  title={running ? 'Wait for Claude to finish' : !text.trim() ? 'Write a prompt first, then enhance it' : 'Rewrite this prompt with the files to change, context, skills to load, what to ask first and when it is done. Right-click to recover the last enhanced prompt'}
+                  className="bg-accent/60 text-muted-foreground hover:bg-accent hover:text-foreground inline-flex h-[26px] items-center gap-1.5 rounded-full px-3 text-[13px] disabled:opacity-50 disabled:hover:bg-accent/60"
+                >
+                  <Sparkles className="size-3.5" aria-hidden /> Enhance prompt
+                </button>
+              </ContextMenuTrigger>
+              <ContextMenuContent>
+                <ContextMenuItem disabled={!lastEnhanced.has(scratchId)} onSelect={() => (setText(lastEnhanced.get(scratchId) ?? ''), area.current?.focus())}>
+                  Recover last enhanced prompt
+                </ContextMenuItem>
+              </ContextMenuContent>
+            </ContextMenu>
+          )}
+          {!enhancing && lastRun && <span className="text-muted-foreground text-[13px]">{lastRun.recalls}</span>}
+          {!enhancing && held !== null && (
+            <>
+              <button type="button" onClick={useHeld} title="Put the rewrite in the box" aria-label="Use the enhanced rewrite" className="text-muted-foreground hover:text-foreground inline-flex items-center gap-1 text-[13px] underline-offset-2 hover:underline">
+                <Check className="size-3.5" aria-hidden /> Use rewrite
+              </button>
+              <button type="button" onClick={() => setHeld(null)} title="Throw the rewrite away" aria-label="Discard the enhanced rewrite" className="text-muted-foreground hover:text-foreground inline-flex items-center gap-1 text-[13px] underline-offset-2 hover:underline">
+                <X className="size-3.5" aria-hidden /> Discard
+              </button>
+            </>
+          )}
+          {!enhancing && held === null && undo !== null && (
+            <button type="button" onClick={undoEnhance} title="Put your text back" aria-label="Undo the enhanced rewrite" className="text-muted-foreground hover:text-foreground inline-flex items-center gap-1 text-[13px] underline-offset-2 hover:underline">
+              <Undo2 className="size-3.5" aria-hidden /> Undo
+            </button>
+          )}
+          {!enhancing && lastRun?.note && <span className="text-muted-foreground/70 text-[11px]">{lastRun.note}</span>}
+          </div>
+          <LearnPill scratchId={scratchId} />
+          <LearningBadge variant="pill" />
+          <KeepWarmLine state={state} />
           {commandMenuOn && (
             <Popover
               open={menuOpen}
@@ -581,42 +609,7 @@ export function Composer({ scratchId, state, launchEffort, tileModel, disabled, 
             <StickyNote className="size-3.5" aria-hidden />
           </button>
 
-          <DropdownMenu>
-            <DropdownMenuTrigger className={toolbarBtn} aria-label={`Permission mode: ${modeLabel(state.permissionMode)}`} title="Permission mode (Shift+Tab)">
-              {modeLabel(state.permissionMode)}
-              <ChevronDown className="size-3" aria-hidden />
-            </DropdownMenuTrigger>
-            <DropdownMenuContent side="top" align="start">
-              {modeOptions(state).map((m) => (
-                <DropdownMenuItem key={m} onSelect={() => chatActions.setMode(scratchId, m)}>
-                  <span className="flex-1">{modeLabel(m)}</span>
-                  {m === state.permissionMode && <Check className="size-3.5" />}
-                </DropdownMenuItem>
-              ))}
-            </DropdownMenuContent>
-          </DropdownMenu>
-
-          <span className="flex-1" />
-
-          <DropdownMenu>
-            <DropdownMenuTrigger className={toolbarBtn} aria-label={`Model: ${modelName ?? 'unknown'}`} disabled={state.models.length === 0}>
-              {modelName ?? 'Model'}
-              <ChevronDown className="size-3" aria-hidden />
-            </DropdownMenuTrigger>
-            <DropdownMenuContent side="top" align="end" className="w-72">
-              {state.models.map((m) => (
-                <DropdownMenuItem key={m.value} onSelect={() => void chatActions.setModel(scratchId, m.value).then(() => qc.invalidateQueries({ queryKey: ['scratchViews'] }))} className="items-start">
-                  <span className="min-w-0 flex-1">
-                    <span className="block">{m.displayName}</span>
-                    {m.description && <span className="text-muted-foreground block text-xs">{m.description}</span>}
-                  </span>
-                  {model?.value === m.value && <Check className="mt-0.5 size-3.5" />}
-                </DropdownMenuItem>
-              ))}
-            </DropdownMenuContent>
-          </DropdownMenu>
-
-          <EffortPopover model={model} modelName={modelName} effort={state.effort} defaultLevel={launchEffort} onChange={(l) => chatActions.setEffort(scratchId, l)} triggerClass={toolbarBtn} />
+          <InfoRow state={state} />
         </div>
       </div>
     </div>

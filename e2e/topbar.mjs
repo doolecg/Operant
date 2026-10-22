@@ -142,11 +142,6 @@ try {
   await page.waitForTimeout(800)
   await bar.screenshot({ path: join(outDir, 'media-bar.png') })
 
-  // The project block at the top left has its mini buttons on hover.
-  await page.getByRole('heading', { level: 1 }).hover({ position: { x: 4, y: 4 } })
-  for (const n of [/^(Update index|Index with CodeGraph)$/, /^Open .* in IDE$/, /^New shell in /, /^Actions for project /]) await page.getByRole('button', { name: n }).waitFor()
-  await page.mouse.move(5, 500)
-
   // The git chip sits in the sidebar footer and shows the branch and the changed files, the sidebar row too; clicking the chip opens the changes.
   const chip = page.getByTestId('sidebar-footer').getByRole('button', { name: /^Git: Branch feature\/topbar, 2 changed files/ })
   await chip.waitFor()

@@ -39,11 +39,13 @@ interface Props {
   factory?: boolean
   // The project's Claude tiles and the preset each runs, for the Factory levels' pixel bars.
   workers?: FactoryWorker[]
+  // The stage and Factory chips on top of the chat; off when the thread header shows them.
+  chips?: boolean
 }
 
 // The Chat view of a Claude tile: the conversation (Claude's text on the background, owner messages as soft bubbles,
 // tools as quiet rows, one bordered card per prompt), the running status line and the composer.
-export function ChatView({ scratchId, launchEffort, tileModel, onTerminal, projectName = null, threadTitle = 'Chat', crewId, engineering = false, factory = false, workers }: Props) {
+export function ChatView({ scratchId, launchEffort, tileModel, onTerminal, projectName = null, threadTitle = 'Chat', crewId, engineering = false, factory = false, workers, chips = true }: Props) {
   const state = useChatState(scratchId)
   const caps = useCapabilities().data
   const scroller = useRef<HTMLDivElement>(null)
@@ -171,7 +173,7 @@ export function ChatView({ scratchId, launchEffort, tileModel, onTerminal, proje
 
   return (
     <div className={cn('@container relative flex h-full min-h-0 flex-col', returning.current && 'm-drill-out')} onKeyDown={onKeyDown} data-chat="view">
-      {(engineering || factory) && (
+      {chips && (engineering || factory) && (
         <div data-chat="mode-chips" className="mx-auto flex w-full max-w-[720px] shrink-0 justify-end gap-2 px-5 pt-2">
           <StageChip crewId={crewId ?? null} on={engineering} />
           <FactoryChip crewId={crewId ?? null} on={factory} workers={workers} />

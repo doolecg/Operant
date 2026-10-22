@@ -1,4 +1,4 @@
-import { Code2, Copy, FolderInput, FolderOpen, FolderOutput, FolderPlus, GitCompare, Network, Settings2, Sparkles, SquareTerminal, Trash2 } from 'lucide-react'
+import { Code2, Copy, Pencil, FolderInput, FolderOpen, FolderOutput, FolderPlus, GitCompare, Network, Settings2, Sparkles, SquareTerminal, Trash2 } from 'lucide-react'
 import type { ProjectGroup } from '@shared/projects'
 import type { Crew } from '@shared/types'
 import type { MainCli } from '@shared/settings'
@@ -13,6 +13,7 @@ export interface ProjectMenuHandlers {
   newShell: (c: Crew) => void
   openIde: (c: Crew) => void
   openFolder: (c: Crew) => void
+  edit: (c: Crew) => void
   index: (c: Crew) => void
   indexMany: (crews: Crew[]) => void
   changes: (c: Crew) => void
@@ -87,6 +88,9 @@ export function ProjectMenuContent({ kind, crew, groups, ideName, platform, alig
           <FolderOutput /> Remove from group
         </K.Item>
       )}
+      <K.Item onSelect={() => h.edit(crew)}>
+        <Pencil /> Rename or change folder…
+      </K.Item>
       <K.Item onSelect={() => h.defaults(crew)}>
         <Settings2 /> Project defaults…
       </K.Item>

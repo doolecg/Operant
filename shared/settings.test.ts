@@ -14,7 +14,7 @@ describe('settings', () => {
     expect(s.defaultModels).toEqual({ claude: 'opus' })
     expect(s.updates).toEqual({ channel: 'stable', checkHours: 24, installOnQuit: true })
     expect(s.keybinds.newCrew).toBe('Mod+Shift+N')
-    expect(Object.keys(s.keybinds).sort()).toEqual(['dictate', 'indexCrew', 'mediaNext', 'mediaPlayPause', 'mediaPrev', 'mediaShuffle', 'newCrew', 'newShell', 'openInIde', 'openPlayground', 'openSettings', 'tileClose', 'tileFocusNext', 'tileFocusPrev', 'tileFullscreen', 'tileLayout', 'tileSplit', 'toggleAllPanels', 'toggleConsole', 'toggleNotes', 'toggleSidebar', 'zoomIn', 'zoomOut', 'zoomReset'])
+    expect(Object.keys(s.keybinds).sort()).toEqual(['dictate', 'indexCrew', 'mediaNext', 'mediaPlayPause', 'mediaPrev', 'mediaShuffle', 'newCrew', 'newShell', 'newThread', 'openInIde', 'openPlayground', 'openSettings', 'searchThreads', 'tileClose', 'tileFocusNext', 'tileFocusPrev', 'tileFullscreen', 'tileLayout', 'tileSplit', 'toggleAllPanels', 'toggleConsole', 'toggleNotes', 'toggleSidebar', 'zoomIn', 'zoomOut', 'zoomReset'])
     expect('defaultReview' in s).toBe(false)
   })
 

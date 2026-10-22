@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type DragEvent, type KeyboardEvent, type ReactNode } from 'react'
+import { useEffect, useRef, useState, type DragEvent, type KeyboardEvent, type ReactNode, type RefObject } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import {
   ChevronDown,
@@ -14,12 +14,13 @@ import {
   Network,
   Plus,
   RefreshCw,
+  Search,
   Sparkles,
   SquareTerminal,
 } from 'lucide-react'
 import { decodeIpcError } from '@shared/ipc'
 import type { ProjectGroup } from '@shared/projects'
-import type { Crew } from '@shared/types'
+import type { Crew, ScratchTerminal } from '@shared/types'
 import { Button } from '@/components/ui/button'
 import { ContextMenu, ContextMenuTrigger } from '@/components/ui/context-menu'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
@@ -49,7 +50,9 @@ import { toast } from '@/lib/toast'
 import { cn } from '@/lib/utils'
 import { openBrowser } from '@/components/browser/useBrowser'
 import { gitSummary } from '@/components/topbar/GitChip'
+import type { TerminalTab } from '@/components/terminal/useTerminals'
 import { ProjectMenuContent, type ProjectMenuHandlers } from './ProjectMenu'
+import { ThreadRows } from './ThreadRows'
 
 interface Props {
   crews: Crew[]
@@ -64,6 +67,13 @@ interface Props {
   waiting?: ReadonlySet<number>
   // Called when a row button opens something that lives in the Terminal view (the browser), so the view can switch to it.
   onShowTerminal?: () => void
+  // The open tiles and the one in front, the threads under the open project and what the buttons above the list do.
+  tabs: TerminalTab[]
+  active: number | null
+  onOpenThread: (row: ScratchTerminal) => void
+  onDeleteThread: (row: ScratchTerminal) => void
+  onNewThread: () => void
+  searchRef: RefObject<HTMLInputElement | null>
 }
 
 // A row that waits for the owner: amber, pulsing (steady amber when the system asks for reduced motion).
@@ -142,7 +152,8 @@ const tiny = 'text-muted-foreground hover:text-foreground size-5 shrink-0'
 const headerBtn = 'text-muted-foreground hover:text-foreground hover:bg-foreground/[.08] size-[22px] rounded-md [&_svg]:size-3'
 const ring = 'shadow-[inset_0_0_0_1.5px_var(--primary)]'
 
-export function Sidebar({ crews: allCrews, selected, onSelect, onNewCrew, actions, footer, waiting, onShowTerminal }: Props) {
+export function Sidebar({ crews: allCrews, selected, onSelect, onNewCrew, actions, footer, waiting, onShowTerminal, tabs, active, onOpenThread, onDeleteThread, onNewThread, searchRef }: Props) {
+  const [query, setQuery] = useState('')
   // The Playground is pinned above the list; every list below works on the real projects only.
   const playground = allCrews.find((c) => c.kind === 'playground')
   const crews = allCrews.filter((c) => c.kind !== 'playground')
@@ -338,11 +349,13 @@ export function Sidebar({ crews: allCrews, selected, onSelect, onNewCrew, action
     const key = `p:${crew.id}`
     const isCurrent = cursor === key
     const isSelected = crew.id === selected
+    if (query.trim() && !isSelected && !crew.name.toLowerCase().includes(query.trim().toLowerCase())) return null
     const menu = (kind: 'context' | 'dropdown') => (
       <ProjectMenuContent kind={kind} crew={crew} groups={groups} ideName={ideName} platform={platform} align="end" {...handlers} />
     )
     return (
-      <ContextMenu key={crew.id}>
+      <div key={crew.id}>
+      <ContextMenu>
         <ContextMenuTrigger asChild>
           <div
             role="treeitem"
@@ -422,6 +435,8 @@ export function Sidebar({ crews: allCrews, selected, onSelect, onNewCrew, action
         </ContextMenuTrigger>
         {menu('context')}
       </ContextMenu>
+      {isSelected && <ThreadRows crew={crew} tabs={tabs} active={active} query={query} onOpen={onOpenThread} onDelete={onDeleteThread} />}
+      </div>
     )
   }
 
@@ -600,6 +615,23 @@ export function Sidebar({ crews: allCrews, selected, onSelect, onNewCrew, action
         className="-right-[3px] w-1.5 cursor-ew-resize"
         {...panel.handle}
       />
+      <div className="shrink-0 space-y-1 px-2 pt-2">
+        <label className="bg-accent/50 focus-within:bg-accent text-muted-foreground flex h-9 items-center gap-2 rounded-xl px-3 text-[13px]">
+          <Search className="size-3.5 shrink-0" aria-hidden />
+          <input
+            ref={searchRef}
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            onKeyDown={(e) => e.key === 'Escape' && (setQuery(''), e.currentTarget.blur())}
+            aria-label="Search threads"
+            placeholder="Search threads"
+            className="text-foreground placeholder:text-muted-foreground min-w-0 flex-1 bg-transparent outline-none"
+          />
+        </label>
+        <button type="button" onClick={onNewThread} className="text-foreground hover:bg-foreground/5 flex h-9 w-full items-center gap-2 rounded-xl px-3 text-[13.5px] font-medium">
+          <Plus className="text-primary size-4" aria-hidden /> New thread
+        </button>
+      </div>
       <div data-testid="project-panel-header" className="flex h-8 shrink-0 items-center gap-0.5 pr-1.5 pl-3.5">
         <span className="text-primary mr-auto text-[10.5px] font-semibold tracking-[.09em] uppercase">Projects</span>
         <Button variant="ghost" size="icon" className={headerBtn} onClick={() => onNewCrew()} aria-label="Add project" title="Add project">

@@ -20,6 +20,7 @@ import { critterFor } from '@/components/mods/agents/agentView'
 import { cn } from '@/lib/utils'
 import { agentRowFor, agentTitle, agentTldr, firstLines, formatDuration, isToolRunning, kTokens, noticeChipIcon, toolIconKey, tokensSuffix, toolRowParts, type AgentDot, type ChipIcon, type ToolIconKey } from './chatHelpers'
 import { useClock } from './clock'
+import { ImageChip } from './ImageChip'
 import { ImageModal } from './ImageModal'
 import { RewindDialog } from './RewindDialog'
 import { useChatWaiting } from './useChat'
@@ -112,16 +113,7 @@ export const UserBubble = memo(function UserBubble({ item, small, editFrom }: { 
         {item.images.length > 0 && (
           <div className="mb-2 flex flex-wrap gap-1.5">
             {item.images.map((im, i) => (
-              <button
-                key={i}
-                type="button"
-                aria-label={many ? `Open image ${i + 1}` : 'Open image'}
-                title="Open image"
-                onClick={() => setShown(i)}
-                className="focus-visible:ring-ring rounded-lg focus-visible:ring-2 focus-visible:outline-none"
-              >
-                <img src={im.dataUrl} alt="" className="size-16 rounded-lg object-cover" />
-              </button>
+              <ImageChip key={i} src={im.dataUrl} name={many ? `Image ${i + 1}` : 'Image'} onOpen={() => setShown(i)} />
             ))}
           </div>
         )}

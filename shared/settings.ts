@@ -40,6 +40,8 @@ export type KeyAction =
   | 'zoomReset'
   | 'dictate'
   | 'toggleNotes'
+  | 'newThread'
+  | 'searchThreads'
 
 export type TileLayout = 'dwindle' | 'master'
 export type MainCli = 'claude' | 'opencode'
@@ -163,6 +165,8 @@ export const KEY_ACTIONS: Array<{ id: KeyAction; label: string }> = [
   { id: 'zoomReset', label: 'Reset the UI scale to automatic' },
   { id: 'dictate', label: 'Start or stop dictation' },
   { id: 'toggleNotes', label: 'Toggle notes' },
+  { id: 'newThread', label: 'New thread in the selected project' },
+  { id: 'searchThreads', label: 'Search threads' },
 ]
 
 export const DEFAULT_SETTINGS: Settings = {
@@ -211,6 +215,8 @@ export const DEFAULT_SETTINGS: Settings = {
     zoomReset: 'Mod+0',
     dictate: 'Alt+D',
     toggleNotes: 'Alt+N',
+    newThread: 'Mod+Shift+N',
+    searchThreads: 'Mod+K',
   },
   uiScale: 0,
   appearance: DEFAULT_APPEARANCE,

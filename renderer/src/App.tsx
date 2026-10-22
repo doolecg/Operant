@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Bot, PanelLeft, Plus, Settings, Terminal } from 'lucide-react'
 import { ConsoleDrawer } from '@/components/console/ConsoleDrawer'
 import { useConsole } from '@/components/console/useConsole'
@@ -24,17 +24,19 @@ import { ClockPill } from '@/components/topbar/ClockPill'
 import { OPEN_CHANGES_EVENT } from '@/components/chat/ChangedFilesCard'
 import { GitChip } from '@/components/topbar/GitChip'
 import { MediaBar } from '@/components/topbar/MediaBar'
-import { ProjectBlock } from '@/components/topbar/ProjectBlock'
 import { ModeToggles } from '@/components/topbar/ModeToggles'
 import { CliSelect } from '@/components/topbar/CliSelect'
+import { TopNav, type View } from '@/components/topbar/TopNav'
 import { ActivityMenu } from '@/components/topbar/ActivityMenu'
 import { UsageDialog } from '@/components/cost/UsageDialog'
 import { useBarTier } from '@/components/topbar/useBarTier'
 import { mediaCommand } from '@/components/topbar/useMedia'
 import { matches, matchesMouseEvent, swallowBoundMouse } from '@/lib/keys'
 import { effectiveScale, stepScale, useUiScale } from '@/lib/uiScale'
-import { useCodegraphAvailable, useCrews, useIndexStatus, useLiveUpdates, useMoveToGroup, useSaveSettings, useSettings } from '@/lib/queries'
+import { useCodegraphAvailable, useCrews, useLiveUpdates, useMoveToGroup, useSaveSettings, useSettings } from '@/lib/queries'
 import { bridge } from '@/lib/bridge'
+import { toast } from '@/lib/toast'
+import { decodeIpcError } from '@shared/ipc'
 import { CloseAppDialog } from '@/components/terminal/CloseAppDialog'
 import { LearnOnCloseDialog } from '@/components/memory/LearnOnCloseDialog'
 import { SetupDialog } from '@/components/setup/SetupDialog'
@@ -43,8 +45,6 @@ import type { Crew } from '@shared/types'
 import type { MainCli } from '@shared/settings'
 
 const LAST_CREW = 'operant.lastCrew'
-
-const Divider = () => <span aria-hidden className="bg-border h-5 w-px shrink-0" />
 
 function readLastCrew(): number | null {
   try {
@@ -62,6 +62,7 @@ export function App() {
   const [newCrew, setNewCrew] = useState(false)
   const [crewDialog, setCrewDialog] = useState<'edit' | 'delete' | null>(null)
   const [page, setPage] = useState<'dashboard' | 'settings'>('dashboard')
+  const [view, setView] = useState<View>('thread')
   const [settingsSection, setSettingsSection] = useState<string | undefined>()
   const [consoleOpen, setConsoleOpen] = useState(false)
   const bgConsole = useConsole(consoleOpen)
@@ -72,6 +73,7 @@ export function App() {
   const moveToGroup = useMoveToGroup()
   const [barRef, tier] = useBarTier()
   const [cliOpen, setCliOpen] = useState(false)
+  const searchRef = useRef<HTMLInputElement>(null)
   const [usageOpen, setUsageOpen] = useState(false)
   const [gitOpen, setGitOpen] = useState(false)
   // The Welcome screen shows while there is no project, until the Playground has been opened.
@@ -106,7 +108,6 @@ export function App() {
     }
   }, [crewId])
 
-  const index = useIndexStatus(crewId)
   const codegraph = useCodegraphAvailable()
   const settings = useSettings()
   const saveSettings = useSaveSettings()
@@ -172,6 +173,7 @@ export function App() {
     newShell: (c: Crew) => void terminals.openTab(c, 'shell'),
     openIde: (c: Crew) => void projectActions.openIde(c),
     openFolder: (c: Crew) => void projectActions.openFolder(c),
+    edit: (c: Crew) => (setCrewId(c.id), setCrewDialog('edit')),
     index: (c: Crew) => void projectActions.index(c),
     indexMany: (cs: Crew[]) => void projectActions.indexMany(cs),
     changes: (c: Crew) => setChangesTarget(c),
@@ -199,6 +201,8 @@ export function App() {
         [binds.openSettings, () => setPage((v) => (v === 'settings' ? 'dashboard' : 'settings'))],
         [binds.toggleConsole, () => setConsoleOpen((v) => !v)],
         [binds.newShell, () => crew && (dash(), void terminals.openTab(crew, 'shell'))],
+        [binds.newThread, () => crew && (dash(), setView('thread'), void terminals.openTab(crew, 'agent'))],
+        [binds.searchThreads, () => (setLayout({ sidebarHidden: false }), setTimeout(() => searchRef.current?.focus(), 0))],
         [binds.toggleSidebar, () => setLayout({ sidebarHidden: !sidebarHidden })],
         [binds.toggleAllPanels, () => setLayout({ sidebarHidden: !sidebarHidden })],
         [binds.toggleNotes, () => setLayout({ notesOpen: !notesOpen })],
@@ -238,7 +242,7 @@ export function App() {
   return (
     <TooltipProvider>
       <div className="flex h-full flex-col">
-      <header ref={barRef} className="bg-background/80 grid h-[38px] shrink-0 grid-cols-[minmax(auto,1fr)_auto_minmax(auto,1fr)] items-center gap-3 border-b px-3 text-xs backdrop-blur">
+      <header ref={barRef} className="bg-sidebar grid h-11 shrink-0 grid-cols-[minmax(auto,1fr)_auto_minmax(auto,1fr)] items-center gap-3 px-3 text-xs">
         <div className="flex items-center gap-3">
           <Tooltip>
             <TooltipTrigger asChild>
@@ -252,31 +256,15 @@ export function App() {
             <span aria-hidden className="text-[20px] leading-none text-[#d97757]">
               ◈
             </span>
-            {tier < 3 && <span className="text-[13px] font-semibold whitespace-nowrap">Operant 3</span>}
+            {tier < 3 && <span className="text-[14px] font-semibold whitespace-nowrap">Operant 3</span>}
           </div>
-          {crew && (
-            <>
-              <Divider />
-              <ProjectBlock
-                crew={crew}
-                indexed={!!index.data?.initialized}
-                indexing={!!index.data?.indexing}
-                onIndex={() => void projectActions.index(crew)}
-                onIde={() => projectMenu.openIde(crew)}
-                onShell={() => projectMenu.newShell(crew)}
-                onAgent={() => projectMenu.newCli(crew, settings.data?.mainCli ?? 'claude')}
-                onEdit={() => setCrewDialog('edit')}
-                onDelete={() => setCrewDialog('delete')}
-              />
-              <ModeToggles crew={crew} tier={tier} />
-            </>
-          )}
-          <Divider />
           {tier < 7 && <CliSelect />}
           {tier >= 7 && cliMenu}
         </div>
-        <div className="flex shrink-0 justify-center">{tb && tier < 6 && <ClockPill format={tb.clockFormat} seconds={tb.clockSeconds} date={tb.clockDate && tier < 2} />}</div>
-        <div className="flex items-center justify-end gap-1.5">
+        <TopNav views={['thread', 'tiles']} view={page === 'dashboard' ? view : null} onChange={(v) => (setView(v), setPage('dashboard'))} />
+        <div className="flex items-center justify-end gap-2">
+          {crew && <ModeToggles crew={crew} tier={tier} />}
+          {tb && tier < 6 && <ClockPill format={tb.clockFormat} seconds={tb.clockSeconds} date={tb.clockDate && tier < 2} />}
           {tb?.mediaControls && tier < 5 && <MediaBar enabled size={tb.mediaSize} tier={tier} />}
           <ActivityMenu crewId={crewId} />
           <Tooltip>
@@ -298,6 +286,12 @@ export function App() {
             onNewCrew={(groupId) => (setNewCrewGroup(groupId), setNewCrew(true))}
             actions={projectMenu}
             waiting={waitingCrews}
+            tabs={terminals.tabs}
+            active={terminals.active}
+            searchRef={searchRef}
+            onOpenThread={(row) => (setView('thread'), setPage('dashboard'), void terminals.reopenTab(row))}
+            onDeleteThread={(row) => void bridge().invoke('scratch:delete', row.id).catch((e) => toast(decodeIpcError(e).message, true))}
+            onNewThread={() => crew && (setView('thread'), setPage('dashboard'), void terminals.openTab(crew, 'agent'))}
             footer={
               <>
                 <Tooltip>
@@ -351,6 +345,7 @@ export function App() {
                   active={terminals.active}
                   onCloseScratch={closeTile.request}
                   onStart={(kind) => crew && void terminals.openTab(crew, kind)}
+                  mode={view === 'tiles' ? 'tiles' : 'thread'}
                 />
               )}
             </div>

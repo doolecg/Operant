@@ -9,3 +9,12 @@ export function timeAgo(at: number, now = Date.now()): string {
 }
 
 export const compact = (n: number) => n.toLocaleString(undefined, { notation: 'compact', maximumFractionDigits: 1 })
+
+// "4m", "2h", "3d": how long ago, as short as it gets (a minute or less is "now").
+export function shortAge(at: number, now = Date.now()): string {
+  const m = Math.floor(Math.max(0, now - at) / 60_000)
+  if (m < 1) return 'now'
+  if (m < 60) return `${m}m`
+  const h = Math.floor(m / 60)
+  return h < 24 ? `${h}h` : `${Math.floor(h / 24)}d`
+}

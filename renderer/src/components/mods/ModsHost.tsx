@@ -36,7 +36,7 @@ export function ModsHost({ tileId, crewId, chat }: { tileId: number; crewId: num
   const caps = useCapabilities().data
   const state = useClaudeTileState(tileId).data ?? null
   const [width, setWidth] = useState(() => Number(readStored(WIDTH_KEY)) || DEFAULT_WIDTH)
-  const [collapsed, setCollapsed] = useState(() => readStored(COLLAPSED_KEY) === '1')
+  const [collapsed, setCollapsed] = useState(() => readStored(COLLAPSED_KEY) !== '0')
   const panel = useRef<HTMLElement>(null)
   // Opening an agent from the chat expands a collapsed panel.
   const opened = useAgentSelection(tileId).nonce
